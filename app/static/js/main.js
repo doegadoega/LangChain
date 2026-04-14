@@ -1,10 +1,10 @@
-import { state, parseSkills, parseDelimitedList, DEFAULT_PRESET_ID } from "./state.js?v=3";
+import { state, parseSkills, parseDelimitedList, DEFAULT_PRESET_ID } from "./state.js?v=4";
 import {
   renderAgents,
   syncStateFromDom,
   addCustomAgent,
   removeAgent,
-} from "./agents.js?v=3";
+} from "./agents.js?v=4";
 import {
   initProfileDom,
   renderPresetOptions,
@@ -14,13 +14,13 @@ import {
   saveCurrentProfile,
   loadSelectedProfile,
   deleteSelectedProfile,
-} from "./profiles.js?v=3";
+} from "./profiles.js?v=4";
 import {
   initStreamingDom,
   setStatus,
   handleStreamEvent,
-} from "./streaming.js?v=3";
-import { initWizard } from "./wizard.js?v=3";
+} from "./streaming.js?v=4";
+import { initWizard } from "./wizard.js?v=4";
 
 const PAGE_NAMES = [
   "templates",
@@ -315,18 +315,33 @@ formEl.addEventListener("submit", async (event) => {
       test_command: domRefs.testCommandEl.value || "",
     },
     rounds: Number(domRefs.roundsEl.value || 1),
-    agents: state.agents.map((agent) => ({
-      id: agent.id,
-      name: agent.name,
-      mode: agent.mode,
-      provider: agent.provider,
-      persona: agent.persona || "",
-      skills: parseSkills(agent.skills_text),
-      depends_on: parseDelimitedList(agent.depends_on_text),
-      command_template: agent.command_template || null,
-      model: agent.model || null,
-      is_custom: Boolean(agent.is_custom),
-    })),
+    agents: state.agents.map((agent) => {
+      const timeoutRaw = Number(agent.mcp_timeout_sec);
+      const timeout =
+        Number.isFinite(timeoutRaw) && timeoutRaw >= 5 && timeoutRaw <= 600
+          ? timeoutRaw
+          : 60;
+      return {
+        id: agent.id,
+        name: agent.name,
+        mode: agent.mode,
+        provider: agent.provider,
+        persona: agent.persona || "",
+        skills: parseSkills(agent.skills_text),
+        depends_on: parseDelimitedList(agent.depends_on_text),
+        command_template: agent.command_template || null,
+        model: agent.model || null,
+        mcp_enabled:
+          agent.mcp_enabled === true ||
+          String(agent.mcp_enabled).toLowerCase() === "true",
+        mcp_config_path: (agent.mcp_config_path || "").trim() || null,
+        mcp_servers: parseDelimitedList(agent.mcp_servers_text),
+        mcp_instruction: agent.mcp_instruction || "",
+        mcp_context_command: (agent.mcp_context_command || "").trim() || null,
+        mcp_timeout_sec: timeout,
+        is_custom: Boolean(agent.is_custom),
+      };
+    }),
   };
 
   runBtn.disabled = true;

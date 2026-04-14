@@ -43,6 +43,12 @@ class AgentConfig(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     command_template: str | None = Field(default=None, max_length=2000)
     model: str | None = Field(default=None, max_length=100)
+    mcp_enabled: bool = False
+    mcp_config_path: str | None = Field(default=None, max_length=500)
+    mcp_servers: list[str] = Field(default_factory=list)
+    mcp_instruction: str = Field(default="", max_length=3000)
+    mcp_context_command: str | None = Field(default=None, max_length=2000)
+    mcp_timeout_sec: int = Field(default=60, ge=5, le=600)
     is_custom: bool = False
 
     @field_validator("skills")
@@ -67,6 +73,29 @@ class AgentConfig(BaseModel):
         if len(unique) > 20:
             raise ValueError("depends_on can contain at most 20 entries")
         return unique
+
+    @field_validator("mcp_servers")
+    @classmethod
+    def validate_mcp_servers(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item.strip()]
+        unique: list[str] = []
+        seen: set[str] = set()
+        for server in cleaned:
+            if server in seen:
+                continue
+            seen.add(server)
+            unique.append(server)
+        if len(unique) > 20:
+            raise ValueError("mcp_servers can contain at most 20 entries")
+        return unique
+
+    @field_validator("mcp_config_path", "mcp_context_command", mode="before")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
 
 
 class CodeContext(BaseModel):
@@ -153,6 +182,9 @@ class TurnResult(BaseModel):
     output: str
     error: str | None = None
     file_changes: str | None = None
+    mcp_enabled: bool = False
+    mcp_context_used: bool = False
+    mcp_context_error: str | None = None
 
 
 class RoundResult(BaseModel):

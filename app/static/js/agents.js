@@ -1,4 +1,4 @@
-import { state, escapeHtml, MAX_CUSTOM_AGENTS } from "./state.js?v=3";
+import { state, escapeHtml, MAX_CUSTOM_AGENTS } from "./state.js?v=4";
 
 export function normalizeAgent(agent, index = 0) {
   const dependsOnText =
@@ -7,6 +7,14 @@ export function normalizeAgent(agent, index = 0) {
       : Array.isArray(agent.depends_on)
         ? agent.depends_on.join("\n")
         : "";
+  const mcpServersText =
+    typeof agent.mcp_servers_text === "string"
+      ? agent.mcp_servers_text
+      : Array.isArray(agent.mcp_servers)
+        ? agent.mcp_servers.join("\n")
+        : "";
+  const mcpEnabled =
+    agent.mcp_enabled === true || String(agent.mcp_enabled).toLowerCase() === "true";
   return {
     id: agent.id || `agent-${index + 1}`,
     name: agent.name || `Agent ${index + 1}`,
@@ -17,6 +25,12 @@ export function normalizeAgent(agent, index = 0) {
     depends_on_text: dependsOnText,
     command_template: agent.command_template || "",
     model: agent.model || "",
+    mcp_enabled: mcpEnabled ? "true" : "false",
+    mcp_config_path: agent.mcp_config_path || "",
+    mcp_servers_text: mcpServersText,
+    mcp_instruction: agent.mcp_instruction || "",
+    mcp_context_command: agent.mcp_context_command || "",
+    mcp_timeout_sec: Number(agent.mcp_timeout_sec || 60),
     is_custom: Boolean(agent.is_custom),
   };
 }
@@ -96,6 +110,43 @@ export function renderAgents(agentListEl, addAgentBtn) {
             command_template (custom_cli時に必須)
             <input data-field="command_template" value="${escapeHtml(agent.command_template || "")}" placeholder="例: codex exec {prompt}" />
           </label>
+
+          <details class="agent-mcp-block">
+            <summary>MCP設定</summary>
+            <div class="agent-meta">
+              <label>
+                MCP有効
+                <select data-field="mcp_enabled">
+                  <option value="false" ${String(agent.mcp_enabled) === "false" ? "selected" : ""}>OFF</option>
+                  <option value="true" ${String(agent.mcp_enabled) === "true" ? "selected" : ""}>ON</option>
+                </select>
+              </label>
+              <label>
+                MCP timeout(sec)
+                <input data-field="mcp_timeout_sec" type="number" min="5" max="600" value="${Number(agent.mcp_timeout_sec || 60)}" />
+              </label>
+            </div>
+
+            <label>
+              mcp_config_path (任意)
+              <input data-field="mcp_config_path" value="${escapeHtml(agent.mcp_config_path || "")}" placeholder="例: /Users/you/.mcp/config.json" />
+            </label>
+
+            <label>
+              mcp_servers (改行またはカンマ区切り)
+              <textarea data-field="mcp_servers_text" rows="2" placeholder="例: github&#10;figma">${escapeHtml(agent.mcp_servers_text || "")}</textarea>
+            </label>
+
+            <label>
+              mcp_context_command (任意)
+              <input data-field="mcp_context_command" value="${escapeHtml(agent.mcp_context_command || "")}" placeholder="例: mcp-client query --servers {mcp_servers_csv} --prompt {prompt}" />
+            </label>
+
+            <label>
+              mcp_instruction (任意)
+              <textarea data-field="mcp_instruction" rows="2" placeholder="例: まずGitHub issueとPR差分を確認してから提案する">${escapeHtml(agent.mcp_instruction || "")}</textarea>
+            </label>
+          </details>
         </div>
       `;
     })
@@ -137,6 +188,12 @@ export function addCustomAgent(agentListEl, addAgentBtn) {
     depends_on_text: "",
     command_template: "",
     model: "",
+    mcp_enabled: "false",
+    mcp_config_path: "",
+    mcp_servers_text: "",
+    mcp_instruction: "",
+    mcp_context_command: "",
+    mcp_timeout_sec: 60,
     is_custom: true,
   });
   renderAgents(agentListEl, addAgentBtn);

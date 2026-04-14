@@ -1,6 +1,6 @@
-import { state, escapeHtml, parseSkills, parseDelimitedList, clone } from "./state.js?v=3";
-import { syncStateFromDom } from "./agents.js?v=3";
-import { setStatus, handleStreamEvent } from "./streaming.js?v=3";
+import { state, escapeHtml, parseSkills, parseDelimitedList, clone } from "./state.js?v=4";
+import { syncStateFromDom } from "./agents.js?v=4";
+import { setStatus, handleStreamEvent } from "./streaming.js?v=4";
 
 const CODING_TEAM_PRESET = [
   {
@@ -291,18 +291,35 @@ function buildWizardPayload() {
       test_command: document.getElementById("testCommand").value || "",
     },
     rounds,
-    agents: enabledAgents.map((agent) => ({
-      id: agent.id,
-      name: agent.name,
-      mode: agent.mode,
-      provider: agent.provider,
-      persona: agent.persona || "",
-      skills: parseSkills(agent.skills_text),
-      depends_on: (agent.depends_on || []).filter((dep) => enabledAgentIds.has(dep)),
-      command_template: agent.command_template || null,
-      model: agent.model || null,
-      is_custom: Boolean(agent.is_custom),
-    })),
+    agents: enabledAgents.map((agent) => {
+      const timeoutRaw = Number(agent.mcp_timeout_sec);
+      const timeout =
+        Number.isFinite(timeoutRaw) && timeoutRaw >= 5 && timeoutRaw <= 600
+          ? timeoutRaw
+          : 60;
+      return {
+        id: agent.id,
+        name: agent.name,
+        mode: agent.mode,
+        provider: agent.provider,
+        persona: agent.persona || "",
+        skills: parseSkills(agent.skills_text),
+        depends_on: (agent.depends_on || []).filter((dep) =>
+          enabledAgentIds.has(dep),
+        ),
+        command_template: agent.command_template || null,
+        model: agent.model || null,
+        mcp_enabled:
+          agent.mcp_enabled === true ||
+          String(agent.mcp_enabled).toLowerCase() === "true",
+        mcp_config_path: agent.mcp_config_path || null,
+        mcp_servers: parseDelimitedList(agent.mcp_servers_text || ""),
+        mcp_instruction: agent.mcp_instruction || "",
+        mcp_context_command: agent.mcp_context_command || null,
+        mcp_timeout_sec: timeout,
+        is_custom: Boolean(agent.is_custom),
+      };
+    }),
   };
 }
 

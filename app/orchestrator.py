@@ -19,7 +19,7 @@ from app.models import (
     TurnResult,
     WorkflowMode,
 )
-from app.providers import ProviderError, resolve_provider
+from app.providers import CLITemplateProvider, ProviderError, resolve_provider
 
 
 @dataclass
@@ -69,12 +69,37 @@ def _is_git_repo(path: str) -> bool:
 def _build_system_directive(agent: AgentConfig) -> str:
     persona_block = agent.persona.strip() or "なし"
     skills_block = "\n".join(f"- {skill}" for skill in agent.skills) or "- なし"
+    if agent.mcp_enabled:
+        mcp_servers = ", ".join(agent.mcp_servers) or "未指定"
+        mcp_instruction = agent.mcp_instruction.strip() or "特になし"
+        mcp_block = (
+            "MCP設定:\n"
+            "- 有効化: 有効\n"
+            f"- サーバー: {mcp_servers}\n"
+            f"- 設定ファイル: {agent.mcp_config_path or '未指定'}\n"
+            f"- 参照コマンド: {agent.mcp_context_command or '未指定'}\n"
+            f"- MCP指示:\n{mcp_instruction}\n"
+        )
+    else:
+        mcp_block = "MCP設定:\n- 有効化: 無効\n"
     return (
         f"あなたは {agent.name} です。\n"
         f"役割: {agent.mode.value}\n"
         f"ペルソナ:\n{persona_block}\n\n"
         f"活用するスキル:\n{skills_block}\n"
+        f"{mcp_block}"
     )
+
+
+def _build_mcp_context_block(mcp_context: str, mcp_error: str | None) -> str:
+    if mcp_context:
+        return (
+            "MCP参照コンテキスト:\n"
+            f"```text\n{_truncate_output(mcp_context, max_chars=6000)}\n```"
+        )
+    if mcp_error:
+        return f"MCP参照コンテキスト: 取得失敗 ({mcp_error})"
+    return "MCP参照コンテキスト: なし"
 
 
 def _build_code_context_block(context: RunContext) -> str:
@@ -111,6 +136,32 @@ def _build_dependency_context_block(
             continue
         lines.append(f"- {dep}:\n```text\n{_truncate_output(output)}\n```")
     return "\n".join(lines) + "\n"
+
+
+def _load_mcp_context(
+    *,
+    agent: AgentConfig,
+    prompt: str,
+    cwd: str | None,
+) -> tuple[str, str | None]:
+    if not agent.mcp_enabled or not agent.mcp_context_command:
+        return "", None
+
+    provider = CLITemplateProvider(
+        command_template=agent.mcp_context_command,
+        timeout_sec=agent.mcp_timeout_sec,
+    )
+    try:
+        context_text = provider.generate(
+            prompt=prompt,
+            model=agent.model,
+            cwd=cwd,
+            mcp_config_path=agent.mcp_config_path,
+            mcp_servers=agent.mcp_servers,
+        ).strip()
+        return context_text, None
+    except ProviderError as exc:
+        return "", str(exc)
 
 
 def _build_task_prompt(
@@ -350,6 +401,9 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
         "execution_plan": execution_plan,
         "rounds": request.rounds,
         "agent_count": len(request.agents),
+        "mcp_enabled_agents": [
+            agent.id for agent in request.agents if agent.mcp_enabled
+        ],
         "total_turns": total_turns,
         "has_working_dir": has_working_dir,
     }
@@ -390,6 +444,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     "mode": agent.mode.value,
                     "provider": agent.provider.value,
                     "depends_on": agent.depends_on,
+                    "mcp_enabled": agent.mcp_enabled,
                 }
 
                 prompt = _build_task_prompt(
@@ -400,6 +455,19 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     round_outputs=round_outputs,
                     has_working_dir=has_working_dir,
                 )
+                cwd = working_dir if has_working_dir else None
+                mcp_context = ""
+                mcp_context_error = None
+                if agent.mcp_enabled:
+                    mcp_context, mcp_context_error = _load_mcp_context(
+                        agent=agent,
+                        prompt=prompt,
+                        cwd=cwd,
+                    )
+                    prompt = (
+                        f"{prompt}\n\n"
+                        f"{_build_mcp_context_block(mcp_context, mcp_context_error)}"
+                    )
 
                 try:
                     use_coding = has_working_dir and agent.mode != AgentMode.REVIEWER
@@ -408,9 +476,12 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                         command_template=agent.command_template,
                         coding_mode=use_coding,
                     )
-                    cwd = working_dir if has_working_dir else None
                     output = provider.generate(
-                        prompt=prompt, model=agent.model, cwd=cwd
+                        prompt=prompt,
+                        model=agent.model,
+                        cwd=cwd,
+                        mcp_config_path=agent.mcp_config_path,
+                        mcp_servers=agent.mcp_servers,
                     ).strip()
 
                     file_changes = None
@@ -424,6 +495,9 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                         provider=agent.provider,
                         output=output,
                         file_changes=file_changes,
+                        mcp_enabled=agent.mcp_enabled,
+                        mcp_context_used=bool(mcp_context),
+                        mcp_context_error=mcp_context_error,
                     )
                     turns.append(turn)
                     round_outputs[agent.id] = output
@@ -445,6 +519,9 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                         provider=agent.provider,
                         output="",
                         error=str(exc),
+                        mcp_enabled=agent.mcp_enabled,
+                        mcp_context_used=bool(mcp_context),
+                        mcp_context_error=mcp_context_error,
                     )
                     turns.append(turn)
                     round_outputs[agent.id] = ""

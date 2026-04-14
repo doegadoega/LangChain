@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import subprocess
@@ -41,7 +42,13 @@ class ProviderError(RuntimeError):
 
 class TextProvider(Protocol):
     def generate(
-        self, *, prompt: str, model: str | None = None, cwd: str | None = None
+        self,
+        *,
+        prompt: str,
+        model: str | None = None,
+        cwd: str | None = None,
+        mcp_config_path: str | None = None,
+        mcp_servers: list[str] | None = None,
     ) -> str: ...
 
 
@@ -50,23 +57,50 @@ class CLITemplateProvider:
     command_template: str
     timeout_sec: int = 300
 
-    def _build_args(self, prompt: str, model: str | None) -> list[str]:
+    def _build_args(
+        self,
+        prompt: str,
+        model: str | None,
+        mcp_config_path: str | None,
+        mcp_servers: list[str] | None,
+    ) -> list[str]:
         args = shlex.split(self.command_template)
+        servers = mcp_servers or []
+        replacements = {
+            "{prompt}": prompt,
+            "{query}": prompt,
+            "{model}": model or "",
+            "{mcp_config_path}": mcp_config_path or "",
+            "{mcp_servers_csv}": ",".join(servers),
+            "{mcp_servers_json}": json.dumps(servers, ensure_ascii=False),
+        }
         built: list[str] = []
         for token in args:
-            replaced = token.replace("{prompt}", prompt)
-            replaced = replaced.replace("{model}", model or "")
+            replaced = token
+            for key, value in replacements.items():
+                replaced = replaced.replace(key, value)
             built.append(replaced)
 
-        if all("{prompt}" not in token for token in args):
+        if all("{prompt}" not in token and "{query}" not in token for token in args):
             built.append(prompt)
 
         return [arg for arg in built if arg]
 
     def generate(
-        self, *, prompt: str, model: str | None = None, cwd: str | None = None
+        self,
+        *,
+        prompt: str,
+        model: str | None = None,
+        cwd: str | None = None,
+        mcp_config_path: str | None = None,
+        mcp_servers: list[str] | None = None,
     ) -> str:
-        args = self._build_args(prompt=prompt, model=model)
+        args = self._build_args(
+            prompt=prompt,
+            model=model,
+            mcp_config_path=mcp_config_path,
+            mcp_servers=mcp_servers,
+        )
         try:
             completed = subprocess.run(
                 args,

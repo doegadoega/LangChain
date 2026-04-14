@@ -2,6 +2,15 @@
 
 AIエージェント同士を会話させながら文章を推敲するローカル実行プラットフォームです。
 
+## V2 仕様
+
+V2 の全体仕様（組織体制、インフラ構成、アプリ構成、構成図、データフロー、通信フロー）は以下を参照してください。
+
+- [docs/V2_SYSTEM_SPEC.md](/Users/sfidante-he/workspace/LangChain/docs/V2_SYSTEM_SPEC.md)
+- [docs/PROJECT_SUMMARY_2026-04-14.md](/Users/sfidante-he/workspace/LangChain/docs/PROJECT_SUMMARY_2026-04-14.md)（ここまでの意思決定サマリー）
+- [docs/UI_SCREEN_SPEC_V1.md](/Users/sfidante-he/workspace/LangChain/docs/UI_SCREEN_SPEC_V1.md)（画面UI設計）
+- [docs/MCP_SETUP.md](/Users/sfidante-he/workspace/LangChain/docs/MCP_SETUP.md)（MCP連携設定）
+
 - 既定フロー: `Drafter -> Critic -> Editor` (初期Providerは `codex_cli`)
 - 追加エージェント: **最大5人**
 - 各エージェントに `ペルソナ` と `スキル` を設定可能
@@ -18,6 +27,10 @@ AIエージェント同士を会話させながら文章を推敲するローカ
   - `claude_cli`
   - `codex_cli`
   - `custom_cli`
+- MCP連携（エージェント単位）
+  - `mcp_enabled` でON/OFF
+  - `mcp_servers[]` / `mcp_instruction` をプロンプトへ反映
+  - `mcp_context_command` で外部MCPクライアント実行結果を注入可能
 
 ## 1. セットアップ
 
@@ -94,6 +107,14 @@ export CODEX_CLI_CMD='codex exec -c model_reasoning_effort=high --skip-git-repo-
 
 `custom_cli` を選んだエージェントは、画面上で `command_template` を必ず設定してください。
 
+MCP連携時、`command_template` と `mcp_context_command` では以下のプレースホルダが使えます。
+
+- `{prompt}` / `{query}`: 実行プロンプト
+- `{model}`: モデル名（未指定時は空）
+- `{mcp_config_path}`: MCP設定ファイルパス
+- `{mcp_servers_csv}`: MCPサーバー一覧（カンマ区切り）
+- `{mcp_servers_json}`: MCPサーバー一覧（JSON配列）
+
 ## 4. API
 
 `POST /api/refine`
@@ -112,6 +133,8 @@ export CODEX_CLI_CMD='codex exec -c model_reasoning_effort=high --skip-git-repo-
 - `agents`: エージェント配列
   - `name`, `mode(writer/reviewer/editor)`, `provider`
   - `persona`, `skills[]`, `depends_on[]`, `command_template`, `model`, `is_custom`
+  - `mcp_enabled`, `mcp_config_path`, `mcp_servers[]`
+  - `mcp_instruction`, `mcp_context_command`, `mcp_timeout_sec`
 
 制約:
 

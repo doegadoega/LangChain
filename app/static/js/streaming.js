@@ -1,4 +1,4 @@
-import { escapeHtml } from "./state.js?v=3";
+import { escapeHtml } from "./state.js?v=4";
 
 let statusEl = null;
 let finalTextEl = null;
@@ -104,6 +104,15 @@ function renderResult(result) {
           const error = turn.error
             ? `<div class="error">Error: ${escapeHtml(turn.error)}</div>`
             : "";
+          const mcpMeta = turn.mcp_enabled
+            ? `<div class="turn-meta">MCP: ${
+                turn.mcp_context_used ? "context loaded" : "enabled"
+              }${
+                turn.mcp_context_error
+                  ? ` (error: ${escapeHtml(turn.mcp_context_error)})`
+                  : ""
+              }</div>`
+            : "";
           const fileChangesBlock = turn.file_changes
             ? `<details><summary class="file-changes-toggle">ファイル変更を表示</summary><pre class="code-diff">${escapeHtml(turn.file_changes)}</pre></details>`
             : "";
@@ -111,6 +120,7 @@ function renderResult(result) {
             <div class="turn">
               <h4>${escapeHtml(turn.agent_name)} (${turn.mode} / ${turn.provider})</h4>
               ${error}
+              ${mcpMeta}
               <pre>${escapeHtml(output)}</pre>
               ${fileChangesBlock}
             </div>
@@ -211,7 +221,16 @@ export function handleStreamEvent(event) {
       errorEl.hidden = true;
       errorEl.textContent = "";
     }
-    preEl.textContent = turn.output || "(empty)";
+    const mcpSuffix = turn.mcp_enabled
+      ? `\n\n[MCP] ${
+          turn.mcp_context_used ? "context loaded" : "enabled"
+        }${
+          turn.mcp_context_error
+            ? ` | error: ${turn.mcp_context_error}`
+            : ""
+        }`
+      : "";
+    preEl.textContent = (turn.output || "(empty)") + mcpSuffix;
 
     // Show per-turn file changes
     if (turn.file_changes) {
