@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/primary.swiftdeps"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/AgentRefinementApp.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.dia"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/ContentView.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.dia"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/Services/SidecarManager.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.dia"
+  }
+}

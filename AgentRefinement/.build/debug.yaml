@@ -1,0 +1,146 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "AgentRefinement-arm64-apple-macosx-debug.exe": ["<AgentRefinement-arm64-apple-macosx-debug.exe>"]
+  "AgentRefinement-arm64-apple-macosx-debug.module": ["<AgentRefinement-arm64-apple-macosx-debug.module>"]
+  "AgentRefinementPackageTests-arm64-apple-macosx-debug.module": ["<AgentRefinementPackageTests-arm64-apple-macosx-debug.module>"]
+  "AgentRefinementPackageTests-arm64-apple-macosx-debug.test": ["<AgentRefinementPackageTests-arm64-apple-macosx-debug.test>"]
+  "AgentRefinementTests-arm64-apple-macosx-debug.module": ["<AgentRefinementTests-arm64-apple-macosx-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<AgentRefinement-arm64-apple-macosx-debug.exe>","<AgentRefinement-arm64-apple-macosx-debug.module>"]
+  "test": ["<AgentRefinement-arm64-apple-macosx-debug.exe>","<AgentRefinement-arm64-apple-macosx-debug.module>","<AgentRefinementPackageTests-arm64-apple-macosx-debug.test>","<AgentRefinementTests-arm64-apple-macosx-debug.module>"]
+default: "main"
+nodes:
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement":
+    is-mutated: true
+commands:
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement-entitlement.plist"]
+    description: "Write auxiliary file /Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement-entitlement.plist"
+
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/AgentRefinementApp.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/ContentView.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/Services/SidecarManager.swift"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources"]
+    description: "Write auxiliary file /Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources"
+
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.product/Objects.LinkFileList"
+
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources"]
+    description: "Write auxiliary file /Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources"
+
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift":
+    tool: test-entry-point-tool
+    inputs: []
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift"]
+
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/runner.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.product/Objects.LinkFileList"
+
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/AgentRefinementTests.swift"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources"]
+    description: "Write auxiliary file /Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources"
+
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "<AgentRefinement-arm64-apple-macosx-debug.exe>":
+    tool: phony
+    inputs: ["<AgentRefinement-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    outputs: ["<AgentRefinement-arm64-apple-macosx-debug.exe>"]
+
+  "<AgentRefinement-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinement.swiftmodule"]
+    outputs: ["<AgentRefinement-arm64-apple-macosx-debug.module>"]
+
+  "<AgentRefinementPackageTests-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/runner.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementPackageTests.swiftmodule"]
+    outputs: ["<AgentRefinementPackageTests-arm64-apple-macosx-debug.module>"]
+
+  "<AgentRefinementPackageTests-arm64-apple-macosx-debug.test>":
+    tool: phony
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.xctest/Contents/MacOS/AgentRefinementPackageTests"]
+    outputs: ["<AgentRefinementPackageTests-arm64-apple-macosx-debug.test>"]
+
+  "<AgentRefinementTests-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule"]
+    outputs: ["<AgentRefinementTests-arm64-apple-macosx-debug.module>"]
+
+  "C.AgentRefinement-arm64-apple-macosx-debug.exe":
+    tool: shell
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.product/Objects.LinkFileList"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/AgentRefinement"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug","-o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement","-module-name","AgentRefinement","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_AgentRefinement_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinement.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.AgentRefinement-arm64-apple-macosx-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement-entitlement.plist"]
+    outputs: ["<AgentRefinement-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/AgentRefinement"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement-entitlement.plist","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement"]
+
+  "C.AgentRefinement-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/AgentRefinementApp.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/ContentView.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/Services/SidecarManager.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinement.swiftmodule"]
+    description: "Compiling Swift Module 'AgentRefinement' (3 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","AgentRefinement","-emit-dependencies","-emit-module","-emit-module-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinement.swiftmodule","-output-file-map","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/output-file-map.json","-incremental","-c","@/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources","-I","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j16","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","AgentRefinement_main","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","agentrefinement"]
+
+  "C.AgentRefinementPackageTests-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/runner.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementPackageTests.swiftmodule"]
+    description: "Compiling Swift Module 'AgentRefinementPackageTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","AgentRefinementPackageTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementPackageTests.swiftmodule","-output-file-map","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources","-I","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j16","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/include/AgentRefinementPackageTests-Swift.h","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","agentrefinement"]
+
+  "C.AgentRefinementPackageTests-arm64-apple-macosx-debug.test":
+    tool: shell
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/runner.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.product/Objects.LinkFileList"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.xctest/Contents/MacOS/AgentRefinementPackageTests"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.xctest/Contents/MacOS/AgentRefinementPackageTests"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug","-o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.xctest/Contents/MacOS/AgentRefinementPackageTests","-module-name","AgentRefinementPackageTests","-Xlinker","-no_warn_duplicate_libraries","-Xlinker","-bundle","-Xlinker","-rpath","-Xlinker","@loader_path/../../../","@/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinement.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementPackageTests.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.AgentRefinementTests-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/AgentRefinementTests.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources"]
+    outputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule"]
+    description: "Compiling Swift Module 'AgentRefinementTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","AgentRefinementTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule","-output-file-map","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources","-I","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j16","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","agentrefinement"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/","/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/","/Users/sfidante-he/workspace/LangChain/AgentRefinement/Package.swift","/Users/sfidante-he/workspace/LangChain/AgentRefinement/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

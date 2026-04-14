@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/primary.swiftdeps"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/AgentRefinementTests.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.dia"
+  }
+}

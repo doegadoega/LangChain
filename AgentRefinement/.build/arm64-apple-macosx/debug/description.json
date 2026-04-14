@@ -1,0 +1,676 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.xctest/Contents/MacOS/AgentRefinementPackageTests",
+      "packagePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement",
+      "productName" : "AgentRefinementPackageTests"
+    }
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.AgentRefinement-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources",
+      "importPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/AgentRefinementApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/ContentView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/Services/SidecarManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "AgentRefinement",
+      "moduleOutputPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinement.swiftmodule",
+      "objects" : [
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j16",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "AgentRefinement_main",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "agentrefinement"
+      ],
+      "outputFileMapPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinement.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/AgentRefinementApp.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/ContentView.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/Services/SidecarManager.swift"
+      ],
+      "tempsPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.AgentRefinementPackageTests-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources",
+      "importPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "AgentRefinementPackageTests",
+      "moduleOutputPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementPackageTests.swiftmodule",
+      "objects" : [
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j16",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/include/AgentRefinementPackageTests-Swift.h",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "agentrefinement"
+      ],
+      "outputFileMapPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.AgentRefinementTests-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources",
+      "importPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/AgentRefinementTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "AgentRefinementTests",
+      "moduleOutputPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule",
+      "objects" : [
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j16",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "agentrefinement"
+      ],
+      "outputFileMapPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules/AgentRefinementTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/AgentRefinementTests.swift"
+      ],
+      "tempsPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "AgentRefinement" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "AgentRefinement",
+      "-package-name",
+      "agentrefinement",
+      "-c",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/AgentRefinementApp.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/ContentView.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/Services/SidecarManager.swift",
+      "-I",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j16",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "AgentRefinement_main",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "agentrefinement",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "AgentRefinementPackageTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "AgentRefinementPackageTests",
+      "-package-name",
+      "agentrefinement",
+      "-c",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift",
+      "-I",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j16",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/include/AgentRefinementPackageTests-Swift.h",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "agentrefinement",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "AgentRefinementTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "AgentRefinementTests",
+      "-package-name",
+      "agentrefinement",
+      "-c",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/AgentRefinementTests.swift",
+      "-I",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j16",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "agentrefinement",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "AgentRefinement" : [
+
+    ],
+    "AgentRefinementPackageTests" : [
+      "AgentRefinementTests",
+      "AgentRefinement"
+    ],
+    "AgentRefinementTests" : [
+      "AgentRefinement"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift" : {
+      "inputs" : [
+
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement-entitlement.plist"
+    },
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/AgentRefinementApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/ContentView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinement/Services/SidecarManager.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/sources"
+    },
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.product/Objects.LinkFileList"
+    },
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/sources"
+    },
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/AgentRefinementApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinement.build/SidecarManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/AgentRefinementTests.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementPackageTests.product/Objects.LinkFileList"
+    },
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/AgentRefinementTests/AgentRefinementTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/AgentRefinementTests.build/sources"
+    },
+    "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinement/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}
