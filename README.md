@@ -7,8 +7,12 @@ AIエージェント同士を会話させながら文章を推敲するローカ
 - 各エージェントに `ペルソナ` と `スキル` を設定可能
 - 推敲の進行状況をラウンド/エージェント単位でリアルタイム表示
 - 組織化機能: テンプレート適用 + チーム構成の保存/読込/削除
-- 画面分割: `1.組織設計` `2.実行設定` `3.実行ログ・結果`
+- 画面分割: サイドバー型 `テンプレート / エージェント / 入力 / パラメータ / コーディング / 結果 / ログ`
 - コーディングモード: `workflow_mode=coding` で実装/設計向けプロンプトに切替
+- オーケストレーション: `orchestration_mode` で実行順を制御
+  - `sequential` (登録順)
+  - `role_based` (`writer -> reviewer -> editor`)
+  - `dependency_graph` (`depends_on` で依存グラフ実行)
 - Providerをエージェントごとに切替可能
   - `gemini_cli` (月額プラン前提のCLI運用向け)
   - `claude_cli`
@@ -44,8 +48,10 @@ uvicorn app.main:app --reload --port 8000
 
 ## 2.2 コーディングモード
 
-`2.実行設定` でモードを `coding` にすると、追加で次の項目を指定できます。
+`パラメータ` でモードを `coding` にすると、`コーディング` ページが有効になります。
+コーディングページではウィザード形式で次を指定できます。
 
+- 作業ディレクトリ (`working_directory`)
 - リポジトリ名 / 機能名
 - 対象ファイル・ディレクトリ
 - 技術スタック・制約
@@ -53,6 +59,25 @@ uvicorn app.main:app --reload --port 8000
 - テストコマンド
 
 これらはエージェントのプロンプトに自動注入され、設計/実装レビュー向けの出力になります。
+
+## 2.3 CLI実行
+
+ブラウザUI以外に、CLI形式でも同じ実行ができます。
+
+```bash
+cd /Users/sfidante-he/workspace/LangChain
+python -m app.cli run --config /path/to/request.json --stream
+```
+
+- `--stream`: NDJSONイベントを順次出力
+- `--output /path/to/result.json`: 最終結果をファイル保存
+- `--pretty`: 最終結果JSONを整形して標準出力
+
+設定ファイルの例は以下で生成できます。
+
+```bash
+python -m app.cli sample-config --path /tmp/langchain-request.sample.json
+```
 
 ## 3. Gemini月額プラン前提で使う
 
@@ -78,13 +103,15 @@ export CODEX_CLI_CMD='codex exec -c model_reasoning_effort=high --skip-git-repo-
 
 - `source_text`: 推敲対象テキスト
 - `workflow_mode`: `writing` or `coding`
+- `orchestration_mode`: `sequential` / `role_based` / `dependency_graph`
 - `objective`: 目的
 - `global_instruction`: 全体ルール
 - `code_context`: コーディングモード用コンテキスト
+  - `working_directory`: 実コード生成を行う作業ディレクトリ (任意)
 - `rounds`: ラウンド数 (1-5)
 - `agents`: エージェント配列
   - `name`, `mode(writer/reviewer/editor)`, `provider`
-  - `persona`, `skills[]`, `command_template`, `model`, `is_custom`
+  - `persona`, `skills[]`, `depends_on[]`, `command_template`, `model`, `is_custom`
 
 制約:
 
@@ -93,7 +120,7 @@ export CODEX_CLI_CMD='codex exec -c model_reasoning_effort=high --skip-git-repo-
 
 ## 5. 仕組み
 
-1. 各ラウンドでエージェントを順番実行
+1. 各ラウンドでオーケストレーションモードに応じて実行順を決定
 2. reviewerは改善指摘を出力
 3. writer/editorは本文を書き換え
 4. 最終稿と差分、会話ログを返却

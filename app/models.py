@@ -20,6 +20,12 @@ class WorkflowMode(str, Enum):
     CODING = "coding"
 
 
+class OrchestrationMode(str, Enum):
+    SEQUENTIAL = "sequential"
+    ROLE_BASED = "role_based"
+    DEPENDENCY_GRAPH = "dependency_graph"
+
+
 class ProviderKind(str, Enum):
     GEMINI_CLI = "gemini_cli"
     CLAUDE_CLI = "claude_cli"
@@ -34,6 +40,7 @@ class AgentConfig(BaseModel):
     provider: ProviderKind
     persona: str = Field(default="", max_length=2000)
     skills: list[str] = Field(default_factory=list)
+    depends_on: list[str] = Field(default_factory=list)
     command_template: str | None = Field(default=None, max_length=2000)
     model: str | None = Field(default=None, max_length=100)
     is_custom: bool = False
@@ -46,9 +53,25 @@ class AgentConfig(BaseModel):
             raise ValueError("skills can contain at most 20 entries")
         return cleaned
 
+    @field_validator("depends_on")
+    @classmethod
+    def validate_depends_on(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item.strip()]
+        unique: list[str] = []
+        seen: set[str] = set()
+        for dep in cleaned:
+            if dep in seen:
+                continue
+            seen.add(dep)
+            unique.append(dep)
+        if len(unique) > 20:
+            raise ValueError("depends_on can contain at most 20 entries")
+        return unique
+
 
 class CodeContext(BaseModel):
     repository: str = Field(default="", max_length=300)
+    working_directory: str = Field(default="", max_length=500)
     target_paths: list[str] = Field(default_factory=list)
     tech_stack: str = Field(default="", max_length=3000)
     acceptance_criteria: str = Field(default="", max_length=5000)
@@ -68,6 +91,7 @@ class CodeContext(BaseModel):
 
 class RefineRequest(BaseModel):
     workflow_mode: WorkflowMode = WorkflowMode.WRITING
+    orchestration_mode: OrchestrationMode = OrchestrationMode.SEQUENTIAL
     source_text: str = Field(min_length=1, max_length=30000)
     objective: str = Field(default="", max_length=3000)
     global_instruction: str = Field(default="", max_length=3000)
@@ -87,6 +111,37 @@ class RefineRequest(BaseModel):
 
         if not any(agent.mode == AgentMode.EDITOR for agent in self.agents):
             raise ValueError("at least one editor agent is required")
+
+        deps_map = {agent.id: set(agent.depends_on) for agent in self.agents}
+        for agent in self.agents:
+            unknown = [dep for dep in agent.depends_on if dep not in agent_ids]
+            if unknown:
+                raise ValueError(
+                    f"agent '{agent.id}' has unknown dependencies: {', '.join(unknown)}"
+                )
+            if agent.id in deps_map[agent.id]:
+                raise ValueError(f"agent '{agent.id}' cannot depend on itself")
+
+        if self.orchestration_mode == OrchestrationMode.DEPENDENCY_GRAPH:
+            indegree: dict[str, int] = {agent_id: 0 for agent_id in agent_ids}
+            reverse: dict[str, set[str]] = {agent_id: set() for agent_id in agent_ids}
+            for agent_id, deps in deps_map.items():
+                indegree[agent_id] = len(deps)
+                for dep in deps:
+                    reverse[dep].add(agent_id)
+
+            ready = [agent_id for agent_id, deg in indegree.items() if deg == 0]
+            visited = 0
+            while ready:
+                current = ready.pop()
+                visited += 1
+                for nxt in reverse[current]:
+                    indegree[nxt] -= 1
+                    if indegree[nxt] == 0:
+                        ready.append(nxt)
+
+            if visited != len(agent_ids):
+                raise ValueError("dependency_graph has a cycle in depends_on")
         return self
 
 
@@ -97,6 +152,7 @@ class TurnResult(BaseModel):
     provider: ProviderKind
     output: str
     error: str | None = None
+    file_changes: str | None = None
 
 
 class RoundResult(BaseModel):
@@ -109,3 +165,4 @@ class RefineResponse(BaseModel):
     final_text: str
     rounds: list[RoundResult]
     diff: str
+    file_changes: str = ""

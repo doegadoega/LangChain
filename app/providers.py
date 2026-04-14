@@ -20,19 +20,35 @@ DEFAULT_COMMANDS = {
     ),
 }
 
+CODING_COMMANDS = {
+    ProviderKind.CODEX_CLI: os.getenv(
+        "CODEX_CLI_CODING_CMD",
+        "codex exec -c model_reasoning_effort=high --full-auto {prompt}",
+    ),
+    ProviderKind.CLAUDE_CLI: os.getenv(
+        "CLAUDE_CLI_CODING_CMD",
+        "claude --print --output-format text {prompt}",
+    ),
+    ProviderKind.GEMINI_CLI: os.getenv(
+        "GEMINI_CLI_CODING_CMD", "gemini -p {prompt}"
+    ),
+}
+
 
 class ProviderError(RuntimeError):
     pass
 
 
 class TextProvider(Protocol):
-    def generate(self, *, prompt: str, model: str | None = None) -> str: ...
+    def generate(
+        self, *, prompt: str, model: str | None = None, cwd: str | None = None
+    ) -> str: ...
 
 
 @dataclass
 class CLITemplateProvider:
     command_template: str
-    timeout_sec: int = 240
+    timeout_sec: int = 300
 
     def _build_args(self, prompt: str, model: str | None) -> list[str]:
         args = shlex.split(self.command_template)
@@ -47,7 +63,9 @@ class CLITemplateProvider:
 
         return [arg for arg in built if arg]
 
-    def generate(self, *, prompt: str, model: str | None = None) -> str:
+    def generate(
+        self, *, prompt: str, model: str | None = None, cwd: str | None = None
+    ) -> str:
         args = self._build_args(prompt=prompt, model=model)
         try:
             completed = subprocess.run(
@@ -56,6 +74,7 @@ class CLITemplateProvider:
                 text=True,
                 timeout=self.timeout_sec,
                 check=False,
+                cwd=cwd or None,
             )
         except FileNotFoundError as exc:
             raise ProviderError(
@@ -83,13 +102,20 @@ def resolve_provider(
     *,
     provider_kind: ProviderKind,
     command_template: str | None,
+    coding_mode: bool = False,
 ) -> TextProvider:
     if provider_kind == ProviderKind.CUSTOM_CLI:
         if not command_template:
             raise ProviderError("custom_cli requires command_template")
         return CLITemplateProvider(command_template=command_template)
 
-    template = command_template or DEFAULT_COMMANDS.get(provider_kind)
+    if coding_mode:
+        template = command_template or CODING_COMMANDS.get(
+            provider_kind, DEFAULT_COMMANDS.get(provider_kind)
+        )
+    else:
+        template = command_template or DEFAULT_COMMANDS.get(provider_kind)
+
     if not template:
         raise ProviderError(f"unsupported provider: {provider_kind}")
 

@@ -4,40 +4,79 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Agent Refinement Platform</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=3" />
   </head>
   <body>
-    <main class="app-shell">
-      <header class="panel topbar">
-        <h1>AI推敲プラットフォーム</h1>
-        <p class="hint">
-          画面を分割しました。まず組織設計を決めてから実行設定へ進み、結果画面で進捗と出力を確認できます。
-        </p>
-        <nav class="view-tabs" aria-label="画面切り替え">
-          <button type="button" class="view-tab is-active" data-screen="team">1. 組織設計</button>
-          <button type="button" class="view-tab" data-screen="run">2. 実行設定</button>
-          <button type="button" class="view-tab" data-screen="result">3. 実行ログ・結果</button>
-        </nav>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <h1>AI推敲</h1>
+      </div>
+      <nav class="sidebar-nav" aria-label="メインメニュー">
+        <button type="button" class="nav-item is-active" data-page="templates">
+          <span class="nav-icon">&#x1F4CB;</span>
+          テンプレート
+        </button>
+        <button type="button" class="nav-item" data-page="agents">
+          <span class="nav-icon">&#x1F916;</span>
+          エージェント
+        </button>
+        <button type="button" class="nav-item" data-page="input">
+          <span class="nav-icon">&#x270F;</span>
+          入力
+        </button>
+        <button type="button" class="nav-item" data-page="params">
+          <span class="nav-icon">&#x2699;</span>
+          パラメータ
+        </button>
+        <button type="button" class="nav-item" data-page="coding" id="navCoding">
+          <span class="nav-icon">&#x1F4BB;</span>
+          コーディング設定
+        </button>
+        <button type="button" class="nav-item" data-page="results">
+          <span class="nav-icon">&#x1F4C4;</span>
+          結果
+        </button>
+        <button type="button" class="nav-item" data-page="log">
+          <span class="nav-icon">&#x1F4DD;</span>
+          ログ
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="runBtnSidebar" class="run sidebar-run" type="button">
+          推敲を実行
+        </button>
+      </div>
+    </aside>
+
+    <div class="main-content" id="mainContent">
+      <header class="mobile-header" id="mobileHeader">
+        <button type="button" id="hamburgerBtn" class="hamburger-btn" aria-label="メニュー">
+          &#9776;
+        </button>
+        <span class="mobile-title">AI推敲プラットフォーム</span>
       </header>
 
-      <form id="refineForm" class="screen-host">
-        <section class="screen-panel panel is-active" data-screen="team" id="screenTeam">
-          <h2>1. 組織設計</h2>
+      <form id="refineForm" class="page-host">
+        <!-- Page 1: テンプレート -->
+        <section class="page-panel panel is-active" data-page="templates" id="pageTemplates">
+          <h2>テンプレート</h2>
+          <p class="page-description">
+            用途ごとにチーム構成をテンプレート化し、保存して再利用できます。
+          </p>
 
           <section class="org-box">
-            <h3>組織テンプレート</h3>
-            <p class="org-note">
-              用途ごとにチーム構成をテンプレート化し、保存して再利用できます。
-            </p>
-
+            <h3>プリセットテンプレート</h3>
             <div class="tool-row">
               <label class="inline-field">
                 テンプレート
                 <select id="presetSelect"></select>
               </label>
-              <button type="button" id="applyPresetBtn" class="tool-btn">テンプレート適用</button>
+              <button type="button" id="applyPresetBtn" class="tool-btn">適用</button>
             </div>
+          </section>
 
+          <section class="org-box">
+            <h3>カスタム構成</h3>
             <div class="tool-row">
               <label class="inline-field">
                 保存名
@@ -55,33 +94,32 @@
               <button type="button" id="deleteProfileBtn" class="remove-btn">削除</button>
             </div>
           </section>
-
-          <div class="agents-header">
-            <h3>エージェント設定</h3>
-            <button type="button" id="addAgentBtn">+ 追加 (最大5)</button>
-          </div>
-
-          <div id="agentList" class="agent-list"></div>
-
-          <div class="screen-actions">
-            <button type="button" id="toRunFromTeam" class="tool-btn">次へ: 実行設定</button>
-          </div>
         </section>
 
-        <section class="screen-panel panel" data-screen="run" id="screenRun">
-          <h2>2. 実行設定</h2>
+        <!-- Page 2: エージェント -->
+        <section class="page-panel panel" data-page="agents" id="pageAgents">
+          <h2>エージェント設定</h2>
+          <p class="page-description">
+            チームを構成するエージェントの役割・プロバイダー・スキルを設定します。
+          </p>
 
-          <label>
-            モード
-            <select id="workflowMode">
-              <option value="writing">writing（文章推敲）</option>
-              <option value="coding">coding（実装/設計）</option>
-            </select>
-          </label>
+          <div class="agents-header">
+            <h3>エージェント一覧</h3>
+            <button type="button" id="addAgentBtn">+ 追加 (最大5)</button>
+          </div>
+          <div id="agentList" class="agent-list"></div>
+        </section>
+
+        <!-- Page 3: 入力 -->
+        <section class="page-panel panel" data-page="input" id="pageInput">
+          <h2>入力</h2>
+          <p class="page-description">
+            推敲したいテキスト・目的・全体指示を入力します。
+          </p>
 
           <label>
             元テキスト
-            <textarea id="sourceText" rows="9" required placeholder="推敲したい文章を入力"></textarea>
+            <textarea id="sourceText" rows="12" placeholder="推敲したい文章を入力"></textarea>
           </label>
 
           <label>
@@ -97,21 +135,113 @@
               placeholder="例: 丁寧語、300字以内、具体例を1つ入れる"
             ></textarea>
           </label>
+        </section>
+
+        <!-- Page 4: パラメータ -->
+        <section class="page-panel panel" data-page="params" id="pageParams">
+          <h2>パラメータ</h2>
+          <p class="page-description">
+            ワークフローモードとラウンド数を設定します。
+          </p>
+
+          <label>
+            モード
+            <select id="workflowMode">
+              <option value="writing">writing（文章推敲）</option>
+              <option value="coding">coding（実装/設計）</option>
+            </select>
+          </label>
 
           <label>
             ラウンド数 (1-5)
             <input id="rounds" type="number" min="1" max="5" value="1" />
           </label>
 
-          <section id="codingFields" class="coding-box" hidden>
-            <h3>コーディングコンテキスト</h3>
+          <label>
+            オーケストレーション
+            <select id="orchestrationMode">
+              <option value="sequential">sequential（登録順）</option>
+              <option value="role_based">role_based（writer→reviewer→editor）</option>
+              <option value="dependency_graph">dependency_graph（depends_on）</option>
+            </select>
+          </label>
+
+          <section class="preview-box">
+            <h3>実行順プレビュー</h3>
+            <div id="orchestrationPreview" class="orchestration-preview"></div>
+          </section>
+
+          <div class="page-actions">
+            <button id="runBtn" class="run" type="submit">推敲を実行</button>
+          </div>
+        </section>
+
+        <!-- Page 5: コーディングウィザード -->
+        <section class="page-panel panel" data-page="coding" id="pageCoding">
+          <h2>コーディング</h2>
+
+          <!-- ステップインジケーター -->
+          <div class="wizard-steps">
+            <button type="button" class="wizard-step is-active" data-wstep="1">
+              <span class="wizard-step-num">1</span>
+              <span class="wizard-step-label">スキル選択</span>
+            </button>
+            <span class="wizard-arrow">&rarr;</span>
+            <button type="button" class="wizard-step" data-wstep="2">
+              <span class="wizard-step-num">2</span>
+              <span class="wizard-step-label">要件入力</span>
+            </button>
+            <span class="wizard-arrow">&rarr;</span>
+            <button type="button" class="wizard-step" data-wstep="3">
+              <span class="wizard-step-num">3</span>
+              <span class="wizard-step-label">確認・実行</span>
+            </button>
+          </div>
+
+          <!-- Step 1: スキル選択 -->
+          <div class="wizard-panel is-active" data-wstep="1" id="wizardStep1">
+            <h3>チーム構成</h3>
+            <p class="page-description">
+              プログラミング言語を選択し、エージェントのON/OFFとプロバイダーを設定してください。
+            </p>
+
+            <div class="wizard-section">
+              <h4>プログラミング言語</h4>
+              <div id="wizardLanguageList" class="wizard-lang-list"></div>
+            </div>
+
+            <div class="wizard-section">
+              <h4>エージェント一覧</h4>
+            </div>
+            <div id="wizardAgentList" class="wizard-agent-list"></div>
+            <div class="wizard-nav">
+              <span></span>
+              <button type="button" class="tool-btn wizard-next" data-goto="2">次へ: 要件入力 &rarr;</button>
+            </div>
+          </div>
+
+          <!-- Step 2: 要件入力 -->
+          <div class="wizard-panel" data-wstep="2" id="wizardStep2">
+            <h3>要件を入力</h3>
+            <p class="page-description">
+              実装・設計の詳細を記述してください。
+            </p>
+
+            <label>
+              作業ディレクトリ（リポジトリのパス）
+              <input id="workingDirectory" type="text" placeholder="例: /Users/username/projects/my-app" />
+            </label>
             <label>
               リポジトリ名 / 機能名
               <input id="repoName" type="text" placeholder="例: payment-service / checkout-v2" />
             </label>
             <label>
               対象ファイル・ディレクトリ（改行 or カンマ区切り）
-              <textarea id="targetPaths" rows="3" placeholder="例: src/api/orders.ts\nsrc/domain/payment/"></textarea>
+              <textarea id="targetPaths" rows="3" placeholder="例: src/api/orders.ts&#10;src/domain/payment/"></textarea>
+            </label>
+            <label>
+              要件・実装したいこと
+              <textarea id="codingSourceText" rows="6" placeholder="例: 決済APIのエラーハンドリングを改善し、リトライロジックを追加する"></textarea>
             </label>
             <label>
               技術スタック・制約
@@ -125,36 +255,64 @@
               テストコマンド
               <input id="testCommand" type="text" placeholder="例: pytest -q" />
             </label>
-          </section>
 
-          <div class="screen-actions">
-            <button type="button" id="toTeamFromRun" class="tool-btn">戻る: 組織設計</button>
-            <button id="runBtn" class="run" type="submit">推敲を実行</button>
-            <button type="button" id="toResultFromRun" class="tool-btn">結果画面へ</button>
+            <div class="wizard-nav">
+              <button type="button" class="tool-btn wizard-prev" data-goto="1">&larr; 戻る: スキル選択</button>
+              <button type="button" class="tool-btn wizard-next" data-goto="3">次へ: 確認 &rarr;</button>
+            </div>
+          </div>
+
+          <!-- Step 3: 確認・実行 -->
+          <div class="wizard-panel" data-wstep="3" id="wizardStep3">
+            <h3>確認して実行</h3>
+            <p class="page-description">
+              設定内容を確認し、問題なければ実行してください。
+            </p>
+
+            <div class="wizard-summary" id="wizardSummary"></div>
+
+            <label>
+              ラウンド数 (1-5)
+              <input id="wizardRounds" type="number" min="1" max="5" value="2" />
+            </label>
+
+            <div class="wizard-nav">
+              <button type="button" class="tool-btn wizard-prev" data-goto="2">&larr; 戻る: 要件入力</button>
+              <button type="button" id="wizardRunBtn" class="run">推敲を実行</button>
+            </div>
           </div>
         </section>
       </form>
 
-      <section class="screen-panel panel result-panel" data-screen="result" id="screenResult">
-        <h2>3. 実行ログ・結果</h2>
+      <!-- Page 6: 結果 (form外) -->
+      <section class="page-panel panel" data-page="results" id="pageResults">
+        <h2>結果</h2>
         <div id="status" class="status">待機中</div>
+
+        <div id="fileChangesSection" hidden>
+          <h3>ファイル変更（git diff）</h3>
+          <pre id="fileChangesText" class="block code-diff"></pre>
+        </div>
 
         <h3>最終稿</h3>
         <pre id="finalText" class="block empty">ここに最終稿が表示されます</pre>
 
         <h3>差分</h3>
         <pre id="diffText" class="block empty">ここに差分が表示されます</pre>
-
-        <h3>会話ログ</h3>
-        <div id="roundLog" class="round-log"></div>
-
-        <div class="screen-actions">
-          <button type="button" id="toTeamFromResult" class="tool-btn">組織設計へ</button>
-          <button type="button" id="toRunFromResult" class="tool-btn">実行設定へ</button>
-        </div>
       </section>
-    </main>
 
-    <script src="/static/app.js" defer></script>
+      <!-- Page 7: ログ (form外) -->
+      <section class="page-panel panel" data-page="log" id="pageLog">
+        <h2>実行ログ</h2>
+        <p class="page-description">
+          各ラウンド・ターンの詳細出力を確認できます。
+        </p>
+        <div id="roundLog" class="round-log"></div>
+      </section>
+    </div>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <script type="module" src="/static/js/main.js?v=3"></script>
   </body>
 </html>
