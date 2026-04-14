@@ -61,7 +61,7 @@ struct MainTabView: View {
                 case .templates:
                     PlaceholderView(title: "🏢 組織テンプレート", detail: "Phase 2で実装")
                 case .agents:
-                    PlaceholderView(title: "🤖 エージェント管理", detail: "Phase 2で実装")
+                    AgentsScreen()
                 case .workflow:
                     PlaceholderView(title: "🔀 ワークフローエディタ", detail: "Phase 3で実装")
                 }
