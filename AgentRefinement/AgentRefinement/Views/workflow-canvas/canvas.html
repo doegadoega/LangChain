@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="canvas.css">
+</head>
+<body>
+<div id="canvas-container">
+  <svg id="edge-layer"></svg>
+  <div id="node-layer"></div>
+</div>
+<div id="palette">
+  <div class="palette-title">ノード</div>
+  <div class="palette-item" draggable="true" data-type="slot">📦 スロット</div>
+  <div class="palette-item" draggable="true" data-type="gate">⛩ ゲート</div>
+  <div class="palette-item" draggable="true" data-type="loop">🔁 ループ</div>
+  <div class="palette-item" draggable="true" data-type="fork">⑃ 並列</div>
+  <div class="palette-title">テンプレート</div>
+  <div class="palette-item template" draggable="true" data-type="pdca">🔄 PDCAサイクル</div>
+  <div class="palette-item template" draggable="true" data-type="review-loop">📝 レビューループ</div>
+</div>
+<script src="canvas.js"></script>
+</body>
+</html>
