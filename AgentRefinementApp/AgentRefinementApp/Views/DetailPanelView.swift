@@ -139,8 +139,8 @@ struct AgentEditForm: View {
 
             fieldLabel("モデル決定")
             Picker("", selection: $modelDecision) {
-                Text("fixed").tag(ModelDecision.fixed)
-                Text("ceo_decides").tag(ModelDecision.ceoDecides)
+                Text("モデル固定").tag(ModelDecision.fixed)
+                Text("CEOが選定").tag(ModelDecision.ceoDecides)
             }.pickerStyle(.segmented).font(.system(size: 16))
         }
     }

@@ -88,7 +88,7 @@ struct RequirementsScreen: View {
                 let agentName = event["agent_name"] as? String
 
                 switch eventType {
-                case "turn_start":
+                case "turn_started":
                     if let name = agentName {
                         agentLogs[name, default: []].append("→ 開始")
                     }
@@ -98,18 +98,24 @@ struct RequirementsScreen: View {
                         let preview = String(output.prefix(80))
                         agentLogs[name, default: []].append(preview)
                     }
-                case "turn_end":
+                case "turn_completed":
                     if let name = agentName {
-                        agentLogs[name, default: []].append("✓ 完了")
+                        let success = event["success"] as? Bool ?? false
+                        if success {
+                            agentLogs[name, default: []].append("✓ 完了")
+                        } else {
+                            let errorMsg = event["error"] as? String ?? "エラー"
+                            agentLogs[name, default: []].append("✗ " + errorMsg)
+                        }
                         completedAgents.insert(name)
                     }
-                case "run_complete":
+                case "run_completed":
                     chatMessages.append(ChatMessage(
                         sender: "Director", icon: "👑",
                         content: "全エージェントの実行が完了しました。",
                         isUser: false
                     ))
-                case "run_failed":
+                case "run_failed", "turn_failed":
                     let errorMsg = event["error"] as? String ?? "不明なエラー"
                     chatMessages.append(ChatMessage(
                         sender: "Director", icon: "👑",
