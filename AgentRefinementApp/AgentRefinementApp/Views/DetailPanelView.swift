@@ -30,6 +30,7 @@ struct AgentEditForm: View {
     @State private var persona: String = ""
     @State private var skills: String = ""
     @State private var dependsOn: String = ""
+    @State private var commandTemplate: String = ""
     @State private var mcpEnabled: Bool = false
     @State private var mcpConfigPath: String = ""
     @State private var modelDecision: ModelDecision = .fixed
@@ -114,6 +115,14 @@ struct AgentEditForm: View {
             Picker("", selection: $provider) {
                 ForEach(ProviderKind.allCases, id: \.self) { p in Text(p.rawValue).tag(p) }
             }.font(.system(size: 11))
+
+            if provider == .customCli {
+                fieldLabel("コマンドテンプレート")
+                TextField("例: ollama run llama3 {prompt}", text: $commandTemplate)
+                    .textFieldStyle(.roundedBorder).font(.system(size: 11))
+                Text("{prompt}, {model}, {mcp_config_path} が使用可能")
+                    .font(.system(size: 8)).foregroundStyle(.tertiary)
+            }
 
             fieldLabel("モデル")
             TextField("例: claude-sonnet-4-6", text: $model).textFieldStyle(.roundedBorder).font(.system(size: 11))
@@ -233,6 +242,7 @@ struct AgentEditForm: View {
         dependsOn = agent.dependsOn.joined(separator: ", ")
         mcpEnabled = agent.mcpEnabled
         mcpConfigPath = agent.mcpConfigPath ?? ""
+        commandTemplate = agent.commandTemplate ?? ""
         modelDecision = agent.modelDecision
     }
 
@@ -244,7 +254,7 @@ struct AgentEditForm: View {
             persona: persona.isEmpty ? nil : persona,
             skills: skills.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) },
             dependsOn: dependsOn.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) },
-            commandTemplate: agent.commandTemplate,
+            commandTemplate: commandTemplate.isEmpty ? nil : commandTemplate,
             mcpEnabled: mcpEnabled,
             mcpConfigPath: mcpConfigPath.isEmpty ? nil : mcpConfigPath,
             mcpServers: agent.mcpServers,

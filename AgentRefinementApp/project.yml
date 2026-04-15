@@ -1,0 +1,50 @@
+name: AgentRefinementApp
+options:
+  bundleIdPrefix: com.agentrefinement
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+  defaultConfig: Debug
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  AgentRefinementApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: AgentRefinementApp
+        excludes:
+          - "Resources/**"
+          - "Info.plist"
+    resources:
+      - path: AgentRefinementApp/Resources/workflow-canvas
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.agentrefinement.app
+        INFOPLIST_FILE: AgentRefinementApp/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AgentRefinementApp/AgentRefinementApp.entitlements
+        CODE_SIGN_STYLE: Automatic
+        PRODUCT_NAME: "Agent Refinement"
+        GENERATE_INFOPLIST_FILE: false
+        ENABLE_APP_SANDBOX: true
+    info:
+      path: AgentRefinementApp/Info.plist
+
+  AgentRefinementAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: AgentRefinementAppTests
+    dependencies:
+      - target: AgentRefinementApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.agentrefinement.app.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Agent Refinement.app/Contents/MacOS/Agent Refinement"
+        BUNDLE_LOADER: "$(TEST_HOST)"
