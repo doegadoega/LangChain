@@ -10,6 +10,7 @@ final class AppState: ObservableObject {
 
     @Published var selectedProjectId: UUID?
     @Published var selectedAgentId: String?
+    @Published var selectedWorkflowId: UUID?
     @Published var selectedTab: MainTab = .requirements
     @Published var bottomTab: BottomTab = .agents
 
@@ -17,6 +18,7 @@ final class AppState: ObservableObject {
     @Published var agentSearchText: String = ""
 
     @Published var isExecuting: Bool = false
+    @Published var executionEvents: [StreamEvent] = []
 
     let dataStore: DataStore
     let apiClient: APIClient
@@ -35,6 +37,10 @@ final class AppState: ObservableObject {
 
     var selectedAgent: MasterAgent? {
         agents.first { $0.id == selectedAgentId }
+    }
+
+    var selectedWorkflow: Workflow? {
+        workflows.first { $0.id == selectedWorkflowId }
     }
 
     var filteredAgents: [MasterAgent] {
@@ -126,6 +132,26 @@ final class AppState: ObservableObject {
         try? dataStore.deleteProject(id: id)
     }
 
+    func addWorkflow(name: String) {
+        let startNode = WorkflowNode(type: .start, position: Position(x: 100, y: 30), label: "▶ 開始")
+        let endNode = WorkflowNode(type: .end, position: Position(x: 100, y: 400), label: "⏹ 終了")
+        let workflow = Workflow(name: name, nodes: [startNode, endNode])
+        workflows.append(workflow)
+        try? dataStore.saveWorkflow(workflow)
+        selectedWorkflowId = workflow.id
+    }
+
+    func updateWorkflow(_ workflow: Workflow) {
+        workflows = workflows.map { $0.id == workflow.id ? workflow : $0 }
+        try? dataStore.saveWorkflow(workflow)
+    }
+
+    func deleteWorkflow(id: UUID) {
+        workflows = workflows.filter { $0.id != id }
+        if selectedWorkflowId == id { selectedWorkflowId = nil }
+        try? dataStore.deleteWorkflow(id: id)
+    }
+
     func addTemplate(name: String, slots: [Slot] = []) {
         let template = OrganizationTemplate(name: name, slots: slots)
         templates.append(template)
@@ -140,5 +166,85 @@ final class AppState: ObservableObject {
     func deleteTemplate(id: UUID) {
         templates = templates.filter { $0.id != id }
         try? dataStore.deleteTemplate(id: id)
+    }
+
+    // MARK: - Execution
+
+    func executeRefinement(requirements: String) async {
+        guard !isExecuting, selectedProject != nil else { return }
+        isExecuting = true
+        executionEvents = []
+
+        let agentDTOs = agents.map { agent in
+            AgentDTO(
+                id: agent.id,
+                name: agent.name,
+                orgRole: agent.orgRoles.first?.rawValue ?? "worker",
+                provider: agent.provider.rawValue,
+                mode: agent.mode.rawValue,
+                persona: agent.persona,
+                skills: agent.skills,
+                dependsOn: agent.dependsOn,
+                model: agent.model
+            )
+        }
+
+        let request = RefineRequestDTO(
+            workflowMode: "coding",
+            orchestrationMode: "sequential",
+            sourceText: requirements,
+            rounds: 1,
+            agents: agentDTOs
+        )
+
+        do {
+            for try await event in apiClient.streamRefine(request: request) {
+                executionEvents.append(event)
+            }
+        } catch {
+            executionEvents.append(StreamEvent(from: [
+                "type": "run_failed",
+                "error": error.localizedDescription,
+            ]))
+        }
+
+        isExecuting = false
+    }
+
+    // MARK: - Evaluation
+
+    func addEvaluation(
+        agentSnapshotId: UUID,
+        projectId: UUID,
+        evaluatorRole: EvaluatorRole,
+        score: Int,
+        comment: String?,
+        roundNumber: Int?,
+        isFinal: Bool
+    ) {
+        let evaluation = Evaluation(
+            evaluatorRole: evaluatorRole,
+            score: score,
+            comment: comment,
+            roundNumber: roundNumber,
+            isFinal: isFinal
+        )
+
+        projects = projects.map { project in
+            guard project.id == projectId else { return project }
+            var updated = project
+            updated.agentSnapshots = updated.agentSnapshots.map { snapshot in
+                guard snapshot.id == agentSnapshotId else { return snapshot }
+                var s = snapshot
+                s.evaluations.append(evaluation)
+                return s
+            }
+            updated.updatedAt = Date()
+            return updated
+        }
+
+        if let project = projects.first(where: { $0.id == projectId }) {
+            try? dataStore.saveProject(project)
+        }
     }
 }

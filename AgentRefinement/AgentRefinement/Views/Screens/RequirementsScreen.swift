@@ -62,6 +62,9 @@ struct RequirementsScreen: View {
     }
 
     private func startExecution() {
+        let requirements = requirementsText.trimmingCharacters(in: .whitespaces)
+        guard !requirements.isEmpty else { return }
+
         logEntries = appState.agents.enumerated().map { index, agent in
             ExecutionLogEntry(
                 agentName: agent.name,
@@ -72,5 +75,66 @@ struct RequirementsScreen: View {
             )
         }
         chatMessages.append(ChatMessage(sender: "Director", icon: "👑", content: "要件を受領しました。タスク分解を開始します。", isUser: false))
+
+        Task {
+            await appState.executeRefinement(requirements: requirements)
+
+            var updatedEntries: [ExecutionLogEntry] = []
+            var agentLogs: [String: [String]] = [:]
+            var completedAgents: Set<String> = []
+
+            for event in appState.executionEvents {
+                let eventType = event.type
+                let agentName = event.data["agent_name"] as? String
+
+                switch eventType {
+                case "turn_start":
+                    if let name = agentName {
+                        agentLogs[name, default: []].append("→ 開始")
+                    }
+                case "turn_output":
+                    if let name = agentName,
+                       let output = event.data["output"] as? String {
+                        let preview = String(output.prefix(80))
+                        agentLogs[name, default: []].append(preview)
+                    }
+                case "turn_end":
+                    if let name = agentName {
+                        agentLogs[name, default: []].append("✓ 完了")
+                        completedAgents.insert(name)
+                    }
+                case "run_complete":
+                    chatMessages.append(ChatMessage(
+                        sender: "Director", icon: "👑",
+                        content: "全エージェントの実行が完了しました。",
+                        isUser: false
+                    ))
+                case "run_failed":
+                    let errorMsg = event.data["error"] as? String ?? "不明なエラー"
+                    chatMessages.append(ChatMessage(
+                        sender: "Director", icon: "👑",
+                        content: "実行エラー: \(errorMsg)",
+                        isUser: false
+                    ))
+                default:
+                    break
+                }
+            }
+
+            updatedEntries = appState.agents.map { agent in
+                let logs = agentLogs[agent.name] ?? ["— 未実行"]
+                let status: ExecutionStatus = completedAgents.contains(agent.name)
+                    ? .done
+                    : (appState.isExecuting ? .running : .waiting)
+                return ExecutionLogEntry(
+                    agentName: agent.name,
+                    agentIcon: agent.primaryRole?.icon ?? "🤖",
+                    roles: agent.orgRoles,
+                    status: status,
+                    logs: logs
+                )
+            }
+            logEntries = updatedEntries
+        }
     }
 }
