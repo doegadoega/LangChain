@@ -18,7 +18,7 @@ struct TemplatesScreen: View {
     private var templateList: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("テンプレート").font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
+                Text("テンプレート").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
                 Spacer()
                 Button {
                     appState.addTemplate(name: "新規テンプレート")
@@ -28,7 +28,7 @@ struct TemplatesScreen: View {
                         Image(systemName: "plus")
                         Text("新規")
                     }
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.accentColor).foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -45,9 +45,9 @@ struct TemplatesScreen: View {
                             selectedTemplateId = template.id
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(template.name).font(.system(size: 11, weight: .semibold))
+                                Text(template.name).font(.system(size: 14, weight: .semibold))
                                 Text("\(template.slots.count)スロット · \(template.orchestrationMode)")
-                                    .font(.system(size: 9)).foregroundStyle(.secondary)
+                                    .font(.system(size: 15)).foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -76,7 +76,7 @@ struct TemplatesScreen: View {
             } else {
                 VStack {
                     Text("テンプレートを選択してください")
-                        .font(.system(size: 11)).foregroundStyle(.tertiary)
+                        .font(.system(size: 14)).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -116,11 +116,11 @@ struct TemplateDetailView: View {
             TextField("テンプレート名", text: $name)
                 .font(.system(size: 14, weight: .bold)).textFieldStyle(.plain)
             Text("作成: \(template.createdAt.formatted(.dateTime.month().day()))")
-                .font(.system(size: 9)).foregroundStyle(.tertiary)
+                .font(.system(size: 15)).foregroundStyle(.tertiary)
             Button {
                 appState.deleteTemplate(id: template.id)
             } label: {
-                Text("🗑 削除").font(.system(size: 10)).foregroundStyle(.red)
+                Text("🗑 削除").font(.system(size: 16)).foregroundStyle(.red)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.red.opacity(0.5)))
             }
@@ -131,32 +131,32 @@ struct TemplateDetailView: View {
     private var settingsSection: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("オーケストレーション").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                Text("オーケストレーション").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
                 Picker("", selection: $orchestrationMode) {
                     Text("sequential").tag("sequential")
                     Text("dependency_graph").tag("dependency_graph")
                     Text("role_based").tag("role_based")
-                }.font(.system(size: 10))
+                }.font(.system(size: 16))
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("ラウンド").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                Text("ラウンド").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
                 Picker("", selection: $rounds) {
                     ForEach(1...5, id: \.self) { n in Text("\(n)").tag(n) }
-                }.font(.system(size: 10))
+                }.font(.system(size: 16))
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("モード").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                Text("モード").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
                 Picker("", selection: $workflowMode) {
                     Text("writing").tag("writing")
                     Text("coding").tag("coding")
-                }.font(.system(size: 10))
+                }.font(.system(size: 16))
             }
         }
     }
 
     private var slotsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("スロット定義").font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
+            Text("スロット定義").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
 
             ForEach(template.slots) { slot in
                 SlotEditor(slot: slot) {
@@ -171,14 +171,14 @@ struct TemplateDetailView: View {
                     ForEach(OrgRole.allCases) { role in
                         Text("\(role.icon) \(role.displayName)").tag(role)
                     }
-                }.font(.system(size: 10))
+                }.font(.system(size: 16))
 
                 Button {
                     var t = template
                     t.slots.append(Slot(orgRole: addSlotRole))
                     appState.updateTemplate(t)
                 } label: {
-                    Text("+ 追加").font(.system(size: 10, weight: .semibold))
+                    Text("+ 追加").font(.system(size: 16, weight: .semibold))
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .background(Color.accentColor).foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -198,7 +198,7 @@ struct TemplateDetailView: View {
         HStack {
             Spacer()
             Button { save() } label: {
-                Text("保存").font(.system(size: 11, weight: .bold))
+                Text("保存").font(.system(size: 14, weight: .bold))
                     .padding(.horizontal, 16).padding(.vertical, 6)
                     .background(Color.accentColor).foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 6))

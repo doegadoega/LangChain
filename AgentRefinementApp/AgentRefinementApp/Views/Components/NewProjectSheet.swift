@@ -17,13 +17,13 @@ struct NewProjectSheet: View {
             Text("新規案件").font(.headline)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("案件名").font(.system(size: 12, weight: .medium))
+                Text("案件名").font(.system(size: 15, weight: .medium))
                 TextField("例: MyProject", text: $projectName)
                     .textFieldStyle(.roundedBorder)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("作業ディレクトリ").font(.system(size: 12, weight: .medium))
+                Text("作業ディレクトリ").font(.system(size: 15, weight: .medium))
                 HStack(spacing: 6) {
                     TextField("/path/to/project", text: $workingDirectory)
                         .textFieldStyle(.roundedBorder)

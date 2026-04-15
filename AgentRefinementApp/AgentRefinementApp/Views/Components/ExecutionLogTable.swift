@@ -47,7 +47,7 @@ struct ExecutionLogTable: View {
             Text("状態").frame(width: 60, alignment: .leading)
             Text("ログ出力").frame(maxWidth: .infinity, alignment: .leading)
         }
-        .font(.system(size: 9, weight: .semibold))
+        .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12).padding(.vertical, 6)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
@@ -57,8 +57,8 @@ struct ExecutionLogTable: View {
         HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text(entry.agentIcon).font(.system(size: 12))
-                    Text(entry.agentName).font(.system(size: 10, weight: .semibold))
+                    Text(entry.agentIcon).font(.system(size: 15))
+                    Text(entry.agentName).font(.system(size: 16, weight: .semibold))
                 }
                 HStack(spacing: 3) {
                     ForEach(entry.roles, id: \.self) { role in
@@ -69,7 +69,7 @@ struct ExecutionLogTable: View {
             .frame(width: 120, alignment: .leading)
 
             Text(entry.status.rawValue)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .padding(.horizontal, 6).padding(.vertical, 1)
                 .background(entry.status.color.opacity(0.15))
                 .clipShape(Capsule())
@@ -77,7 +77,7 @@ struct ExecutionLogTable: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(entry.logs, id: \.self) { log in
-                    Text(log).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                    Text(log).font(.system(size: 15, design: .monospaced)).foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

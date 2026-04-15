@@ -62,12 +62,12 @@ struct FileTreeRow: View {
             } label: {
                 HStack(spacing: 4) {
                     if node.isDirectory {
-                        Text(isExpanded ? "▼" : "▶").font(.system(size: 8)).foregroundStyle(.tertiary).frame(width: 10)
+                        Text(isExpanded ? "▼" : "▶").font(.system(size: 14)).foregroundStyle(.tertiary).frame(width: 10)
                     } else {
                         Spacer().frame(width: 10)
                     }
-                    Text(node.isDirectory ? "📂" : "📄").font(.system(size: 10))
-                    Text(node.name).font(.system(size: 11))
+                    Text(node.isDirectory ? "📂" : "📄").font(.system(size: 16))
+                    Text(node.name).font(.system(size: 14))
                         .foregroundStyle(node.isDirectory ? Color.primary : Color.blue)
                         .lineLimit(1)
                 }

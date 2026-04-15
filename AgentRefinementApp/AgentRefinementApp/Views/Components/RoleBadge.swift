@@ -5,8 +5,8 @@ struct RoleBadge: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            Text(role.icon).font(.system(size: 8))
-            Text(role.shortName).font(.system(size: 8, weight: .semibold))
+            Text(role.icon).font(.system(size: 14))
+            Text(role.shortName).font(.system(size: 14, weight: .semibold))
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)

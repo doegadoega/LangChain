@@ -12,7 +12,7 @@ struct TerminalView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     Text(output)
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(size: 15, design: .monospaced))
                         .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 6)
@@ -28,10 +28,10 @@ struct TerminalView: View {
 
             HStack(spacing: 4) {
                 Text("$")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 15, design: .monospaced))
                     .foregroundStyle(.secondary)
                 TextField("", text: $inputText)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 15, design: .monospaced))
                     .textFieldStyle(.plain)
                     .onSubmit { sendCommand() }
             }

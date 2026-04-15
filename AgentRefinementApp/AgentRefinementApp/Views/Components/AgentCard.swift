@@ -17,10 +17,10 @@ struct AgentCard: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(agent.name)
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 15, weight: .bold))
                             .lineLimit(1)
                         Text("\(agent.provider.rawValue) · \(agent.model ?? "default")")
-                            .font(.system(size: 9))
+                            .font(.system(size: 15))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -35,7 +35,7 @@ struct AgentCard: View {
 
                 if let persona = agent.persona, !persona.isEmpty {
                     Text(persona)
-                        .font(.system(size: 9))
+                        .font(.system(size: 15))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }

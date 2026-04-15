@@ -27,7 +27,7 @@ struct WorkflowScreen: View {
                 HStack(spacing: 4) {
                     Text("🔀")
                     Text(appState.selectedWorkflow?.name ?? "ワークフロー選択")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                     Text("▾").foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 5)
@@ -41,7 +41,7 @@ struct WorkflowScreen: View {
             Spacer()
 
             Button { bridge.deleteSelectedNode() } label: {
-                Text("🗑").font(.system(size: 11))
+                Text("🗑").font(.system(size: 14))
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Color(nsColor: .controlBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -49,7 +49,7 @@ struct WorkflowScreen: View {
             .buttonStyle(.plain)
 
             Button { saveWorkflow() } label: {
-                Text("📋 保存").font(.system(size: 10, weight: .semibold))
+                Text("📋 保存").font(.system(size: 16, weight: .semibold))
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Color(nsColor: .controlBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -57,7 +57,7 @@ struct WorkflowScreen: View {
             .buttonStyle(.plain)
 
             Button {} label: {
-                Text("▶ このフローで実行").font(.system(size: 11, weight: .bold))
+                Text("▶ このフローで実行").font(.system(size: 14, weight: .bold))
                     .padding(.horizontal, 14).padding(.vertical, 5)
                     .background(Color.accentColor).foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -70,13 +70,13 @@ struct WorkflowScreen: View {
     private var workflowPickerPopover: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("ワークフロー").font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
+                Text("ワークフロー").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
                 Spacer()
                 Button {
                     appState.addWorkflow(name: "新規ワークフロー")
                     showWorkflowPicker = false
                 } label: {
-                    Text("+ 新規").font(.system(size: 10, weight: .semibold))
+                    Text("+ 新規").font(.system(size: 16, weight: .semibold))
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.accentColor).foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -93,10 +93,10 @@ struct WorkflowScreen: View {
                             showWorkflowPicker = false
                         } label: {
                             HStack {
-                                Text(wf.name).font(.system(size: 11))
+                                Text(wf.name).font(.system(size: 14))
                                 Spacer()
                                 if wf.id == appState.selectedWorkflowId {
-                                    Text("使用中").font(.system(size: 8)).foregroundStyle(.blue)
+                                    Text("使用中").font(.system(size: 14)).foregroundStyle(.blue)
                                 }
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)

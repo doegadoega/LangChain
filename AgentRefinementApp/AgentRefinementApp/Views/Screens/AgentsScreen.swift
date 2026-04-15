@@ -16,10 +16,10 @@ struct AgentsScreen: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                    .font(.system(size: 10))
+                    .font(.system(size: 16))
                 TextField("検索...", text: $appState.agentSearchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 11))
+                    .font(.system(size: 14))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -38,7 +38,7 @@ struct AgentsScreen: View {
                     Image(systemName: "plus")
                     Text("新規エージェント")
                 }
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background(Color.accentColor)

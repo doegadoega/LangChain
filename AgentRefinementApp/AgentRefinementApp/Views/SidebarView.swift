@@ -7,7 +7,7 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Image(systemName: "folder").foregroundStyle(.blue)
-                Text("Explorer").font(.system(size: 11, weight: .bold)).textCase(.uppercase).foregroundStyle(.secondary)
+                Text("Explorer").font(.system(size: 14, weight: .bold)).textCase(.uppercase).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
 
@@ -15,14 +15,14 @@ struct SidebarView: View {
 
             if let dir = workingDirectory {
                 Text(URL(fileURLWithPath: dir).lastPathComponent)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 10).padding(.top, 6)
 
                 FileTreeView(rootPath: dir)
             } else {
                 VStack {
                     Text("案件を選択してください")
-                        .font(.system(size: 11)).foregroundStyle(.tertiary)
+                        .font(.system(size: 14)).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

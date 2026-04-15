@@ -10,7 +10,7 @@ struct DetailPanelView: View {
         } else {
             VStack {
                 Text("エージェントを選択してください")
-                    .font(.system(size: 11))
+                    .font(.system(size: 14))
                     .foregroundStyle(.tertiary)
             }
             .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
@@ -61,8 +61,8 @@ struct AgentEditForm: View {
                 .background(agent.primaryRole?.color.opacity(0.3) ?? Color.gray.opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading) {
-                Text(agent.name).font(.system(size: 13, weight: .bold))
-                Text("エージェント編集").font(.system(size: 9)).foregroundStyle(.tertiary)
+                Text(agent.name).font(.system(size: 16, weight: .bold))
+                Text("エージェント編集").font(.system(size: 15)).foregroundStyle(.tertiary)
             }
         }
     }
@@ -73,7 +73,7 @@ struct AgentEditForm: View {
                 appState.duplicateAgent(id: agent.id)
             } label: {
                 Text("📋 複製して作成")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
                     .background(Color.accentColor.opacity(0.1))
@@ -86,7 +86,7 @@ struct AgentEditForm: View {
                 appState.deleteAgent(id: agent.id)
             } label: {
                 Text("🗑 削除")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
@@ -101,7 +101,7 @@ struct AgentEditForm: View {
     private var formFields: some View {
         VStack(alignment: .leading, spacing: 8) {
             fieldLabel("名前")
-            TextField("", text: $name).textFieldStyle(.roundedBorder).font(.system(size: 11))
+            TextField("", text: $name).textFieldStyle(.roundedBorder).font(.system(size: 14))
 
             fieldLabel("組織ロール（複数選択可）")
             roleSelector
@@ -109,39 +109,39 @@ struct AgentEditForm: View {
             fieldLabel("実行モード")
             Picker("", selection: $mode) {
                 ForEach(AgentMode.allCases, id: \.self) { m in Text(m.rawValue).tag(m) }
-            }.pickerStyle(.segmented).font(.system(size: 10))
+            }.pickerStyle(.segmented).font(.system(size: 16))
 
             fieldLabel("プロバイダー")
             Picker("", selection: $provider) {
                 ForEach(ProviderKind.allCases, id: \.self) { p in Text(p.rawValue).tag(p) }
-            }.font(.system(size: 11))
+            }.font(.system(size: 14))
 
             if provider == .customCli {
                 fieldLabel("コマンドテンプレート")
                 TextField("例: ollama run llama3 {prompt}", text: $commandTemplate)
-                    .textFieldStyle(.roundedBorder).font(.system(size: 11))
+                    .textFieldStyle(.roundedBorder).font(.system(size: 14))
                 Text("{prompt}, {model}, {mcp_config_path} が使用可能")
-                    .font(.system(size: 8)).foregroundStyle(.tertiary)
+                    .font(.system(size: 14)).foregroundStyle(.tertiary)
             }
 
             fieldLabel("モデル")
-            TextField("例: claude-sonnet-4-6", text: $model).textFieldStyle(.roundedBorder).font(.system(size: 11))
+            TextField("例: claude-sonnet-4-6", text: $model).textFieldStyle(.roundedBorder).font(.system(size: 14))
 
             fieldLabel("ペルソナ")
             TextEditor(text: $persona)
-                .font(.system(size: 11))
+                .font(.system(size: 14))
                 .frame(height: 60)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(nsColor: .separatorColor)))
 
             fieldLabel("スキル（カンマ区切り）")
-            TextField("例: 文章構成, 論理展開", text: $skills).textFieldStyle(.roundedBorder).font(.system(size: 11))
+            TextField("例: 文章構成, 論理展開", text: $skills).textFieldStyle(.roundedBorder).font(.system(size: 14))
 
             fieldLabel("モデル決定")
             Picker("", selection: $modelDecision) {
                 Text("fixed").tag(ModelDecision.fixed)
                 Text("ceo_decides").tag(ModelDecision.ceoDecides)
-            }.pickerStyle(.segmented).font(.system(size: 10))
+            }.pickerStyle(.segmented).font(.system(size: 16))
         }
     }
 
@@ -150,12 +150,12 @@ struct AgentEditForm: View {
             HStack(spacing: 4) {
                 ForEach(orgRoles, id: \.self) { role in
                     HStack(spacing: 2) {
-                        Text(role.icon).font(.system(size: 8))
-                        Text(role.shortName).font(.system(size: 8, weight: .semibold))
+                        Text(role.icon).font(.system(size: 14))
+                        Text(role.shortName).font(.system(size: 14, weight: .semibold))
                         Button {
                             orgRoles = orgRoles.filter { $0 != role }
                         } label: {
-                            Text("×").font(.system(size: 8)).foregroundStyle(.secondary)
+                            Text("×").font(.system(size: 14)).foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
                     }
@@ -167,7 +167,7 @@ struct AgentEditForm: View {
                 }
 
                 Button { showRolePicker.toggle() } label: {
-                    Text("+ 追加").font(.system(size: 8))
+                    Text("+ 追加").font(.system(size: 14))
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(Color(nsColor: .controlBackgroundColor))
                         .clipShape(Capsule())
@@ -184,8 +184,8 @@ struct AgentEditForm: View {
                             showRolePicker = false
                         } label: {
                             HStack(spacing: 4) {
-                                Text(role.icon).font(.system(size: 10))
-                                Text(role.displayName).font(.system(size: 10))
+                                Text(role.icon).font(.system(size: 16))
+                                Text(role.displayName).font(.system(size: 16))
                                 Spacer()
                             }
                             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -204,11 +204,11 @@ struct AgentEditForm: View {
         VStack(alignment: .leading, spacing: 6) {
             Divider()
             fieldLabel("MCP設定")
-            Toggle("MCP有効", isOn: $mcpEnabled).font(.system(size: 11))
+            Toggle("MCP有効", isOn: $mcpEnabled).font(.system(size: 14))
             if mcpEnabled {
                 fieldLabel("Config Path")
                 TextField("/path/to/mcp-config.json", text: $mcpConfigPath)
-                    .textFieldStyle(.roundedBorder).font(.system(size: 11))
+                    .textFieldStyle(.roundedBorder).font(.system(size: 14))
             }
         }
     }
@@ -216,7 +216,7 @@ struct AgentEditForm: View {
     private var saveButton: some View {
         Button { save() } label: {
             Text("保存")
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(Color.accentColor)
@@ -228,7 +228,7 @@ struct AgentEditForm: View {
     }
 
     private func fieldLabel(_ text: String) -> some View {
-        Text(text).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+        Text(text).font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
     }
 
     private func loadFromAgent() {

@@ -9,14 +9,14 @@ struct SlotEditor: View {
             Text("⠿").foregroundStyle(.tertiary).font(.system(size: 14))
             Text(slot.orgRole.icon).font(.system(size: 16))
             VStack(alignment: .leading, spacing: 2) {
-                Text(slot.orgRole.displayName).font(.system(size: 11, weight: .semibold))
+                Text(slot.orgRole.displayName).font(.system(size: 14, weight: .semibold))
                 Text("\(slot.minCount)-\(slot.maxCount)名 · \(slot.required ? "必須" : "任意")")
-                    .font(.system(size: 9)).foregroundStyle(.secondary)
+                    .font(.system(size: 15)).foregroundStyle(.secondary)
             }
             Spacer()
-            Text("\(slot.assignedAgentIds.count)名アサイン").font(.system(size: 9)).foregroundStyle(.secondary)
+            Text("\(slot.assignedAgentIds.count)名アサイン").font(.system(size: 15)).foregroundStyle(.secondary)
             Button(action: onRemove) {
-                Text("×").font(.system(size: 10, weight: .semibold)).foregroundStyle(.red).padding(4)
+                Text("×").font(.system(size: 16, weight: .semibold)).foregroundStyle(.red).padding(4)
             }
             .buttonStyle(.plain)
         }

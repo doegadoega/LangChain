@@ -17,8 +17,8 @@ struct RoleFilterBar: View {
             selectedRole = role
         } label: {
             HStack(spacing: 2) {
-                if let icon { Text(icon).font(.system(size: 9)) }
-                Text(label).font(.system(size: 9, weight: isActive ? .bold : .regular))
+                if let icon { Text(icon).font(.system(size: 15)) }
+                Text(label).font(.system(size: 15, weight: isActive ? .bold : .regular))
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 3)

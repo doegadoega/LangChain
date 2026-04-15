@@ -16,7 +16,7 @@ struct CEOChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("💬 CEO レポート").font(.system(size: 9, weight: .bold)).foregroundStyle(.orange)
+                Text("💬 CEO レポート").font(.system(size: 15, weight: .bold)).foregroundStyle(.orange)
                 Spacer()
             }
             .padding(.horizontal, 10).padding(.vertical, 4)
@@ -29,9 +29,9 @@ struct CEOChatView: View {
                     ForEach(messages) { msg in
                         HStack(alignment: .top, spacing: 4) {
                             Text("\(msg.icon) \(msg.sender):")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(msg.isUser ? .blue : .orange)
-                            Text(msg.content).font(.system(size: 10))
+                            Text(msg.content).font(.system(size: 16))
                         }
                     }
                 }
@@ -40,11 +40,11 @@ struct CEOChatView: View {
 
             HStack(spacing: 4) {
                 TextField("メッセージを入力...", text: $inputText)
-                    .textFieldStyle(.roundedBorder).font(.system(size: 10))
+                    .textFieldStyle(.roundedBorder).font(.system(size: 16))
                     .onSubmit { send() }
 
                 Button(action: send) {
-                    Text("送信").font(.system(size: 10, weight: .semibold))
+                    Text("送信").font(.system(size: 16, weight: .semibold))
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.accentColor).foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 4))

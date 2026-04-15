@@ -29,9 +29,9 @@ struct BottomPanelView: View {
                         selectedTab = tab
                     } label: {
                         HStack(spacing: 3) {
-                            Text(tab.icon).font(.system(size: 9))
+                            Text(tab.icon).font(.system(size: 15))
                             Text(tab.rawValue)
-                                .font(.system(size: 10, weight: selectedTab == tab ? .bold : .regular))
+                                .font(.system(size: 16, weight: selectedTab == tab ? .bold : .regular))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -82,11 +82,11 @@ struct BottomPanelView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 4) {
-                                Text(agent.primaryRole?.icon ?? "🤖").font(.system(size: 12))
-                                Text(agent.name).font(.system(size: 10, weight: .bold)).lineLimit(1)
+                                Text(agent.primaryRole?.icon ?? "🤖").font(.system(size: 15))
+                                Text(agent.name).font(.system(size: 16, weight: .bold)).lineLimit(1)
                             }
                             Text(agent.orgRoles.map(\.shortName).joined(separator: " · "))
-                                .font(.system(size: 8)).foregroundStyle(.secondary)
+                                .font(.system(size: 14)).foregroundStyle(.secondary)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)

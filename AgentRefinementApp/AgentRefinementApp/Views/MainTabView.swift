@@ -30,9 +30,9 @@ struct MainTabView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(tab.icon)
-                                .font(.system(size: 10))
+                                .font(.system(size: 16))
                             Text(tab.rawValue)
-                                .font(.system(size: 10, weight: selectedTab == tab ? .bold : .regular))
+                                .font(.system(size: 16, weight: selectedTab == tab ? .bold : .regular))
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)

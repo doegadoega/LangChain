@@ -17,17 +17,17 @@ struct RequirementsScreen: View {
 
     private var requirementsBar: some View {
         HStack(spacing: 8) {
-            Text("要件").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+            Text("要件").font(.system(size: 16, weight: .bold)).foregroundStyle(.secondary)
             TextField("要件を入力...", text: $requirementsText)
-                .textFieldStyle(.roundedBorder).font(.system(size: 11))
+                .textFieldStyle(.roundedBorder).font(.system(size: 14))
             Button {
                 startExecution()
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "play.fill").font(.system(size: 9))
+                    Image(systemName: "play.fill").font(.system(size: 15))
                     Text("実行")
                 }
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .padding(.horizontal, 14).padding(.vertical, 5)
                 .background(appState.isExecuting ? Color.gray : Color.accentColor)
                 .foregroundStyle(.white)
@@ -43,8 +43,8 @@ struct RequirementsScreen: View {
         Group {
             if logEntries.isEmpty {
                 VStack(spacing: 8) {
-                    Text("📋 要件を入力して実行してください").font(.system(size: 12)).foregroundStyle(.tertiary)
-                    Text("エージェントの実行ログがここに表示されます").font(.system(size: 10)).foregroundStyle(.quaternary)
+                    Text("📋 要件を入力して実行してください").font(.system(size: 15)).foregroundStyle(.tertiary)
+                    Text("エージェントの実行ログがここに表示されます").font(.system(size: 16)).foregroundStyle(.quaternary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

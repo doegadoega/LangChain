@@ -11,7 +11,7 @@ struct WorkflowPropertiesPanel: View {
                     nodeProperties(data)
                 } else {
                     Text("ノードを選択してください")
-                        .font(.system(size: 11)).foregroundStyle(.tertiary)
+                        .font(.system(size: 14)).foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -28,18 +28,18 @@ struct WorkflowPropertiesPanel: View {
             HStack(spacing: 6) {
                 Text(nodeIcon(type)).font(.system(size: 16))
                 VStack(alignment: .leading) {
-                    Text(label).font(.system(size: 12, weight: .bold))
-                    Text(type).font(.system(size: 9)).foregroundStyle(.tertiary)
+                    Text(label).font(.system(size: 15, weight: .bold))
+                    Text(type).font(.system(size: 15)).foregroundStyle(.tertiary)
                 }
             }
             Divider()
-            Text("ノードタイプ: \(type)").font(.system(size: 10)).foregroundStyle(.secondary)
+            Text("ノードタイプ: \(type)").font(.system(size: 16)).foregroundStyle(.secondary)
             if let x = data["x"] as? Double, let y = data["y"] as? Double {
-                Text("位置: (\(Int(x)), \(Int(y)))").font(.system(size: 10)).foregroundStyle(.secondary)
+                Text("位置: (\(Int(x)), \(Int(y)))").font(.system(size: 16)).foregroundStyle(.secondary)
             }
             Divider()
             Button(action: onDelete) {
-                Text("🗑 ノードを削除").font(.system(size: 10, weight: .semibold)).foregroundStyle(.red)
+                Text("🗑 ノードを削除").font(.system(size: 16, weight: .semibold)).foregroundStyle(.red)
                     .frame(maxWidth: .infinity).padding(.vertical, 5)
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.red.opacity(0.5)))
             }
