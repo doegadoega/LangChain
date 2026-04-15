@@ -173,8 +173,35 @@ final class AppState: ObservableObject {
     func executeRefinement(requirements: String) async {
         guard !isExecuting else { return }
         isExecuting = true
-        // Will be connected to Orchestrator in a later task
-        isExecuting = false
+
+        let config = Orchestrator.RunConfig(
+            agents: agents,
+            sourceText: requirements,
+            objective: "",
+            globalInstruction: "",
+            workflowMode: "coding",
+            orchestrationMode: "sequential",
+            rounds: 1,
+            workingDirectory: selectedProject?.workingDirectory
+        )
+
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global().async {
+                Orchestrator.run(config: config) { event in
+                    Task { @MainActor in
+                        var entry: [String: Any] = ["type": event.type]
+                        for (key, value) in event.data {
+                            entry[key] = value
+                        }
+                        self.executionEvents.append(entry)
+                    }
+                }
+                Task { @MainActor in
+                    self.isExecuting = false
+                    continuation.resume()
+                }
+            }
+        }
     }
 
     // MARK: - Evaluation
