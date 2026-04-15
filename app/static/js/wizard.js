@@ -1,12 +1,12 @@
-import { state, escapeHtml, parseSkills, parseDelimitedList, clone } from "./state.js?v=4";
-import { syncStateFromDom } from "./agents.js?v=4";
-import { setStatus, handleStreamEvent } from "./streaming.js?v=4";
+import { state, escapeHtml, parseSkills, parseDelimitedList, clone } from "./state.js?v=5";
+import { syncStateFromDom } from "./agents.js?v=5";
+import { setStatus, handleStreamEvent } from "./streaming.js?v=5";
 
 const CODING_TEAM_PRESET = [
   {
     id: "ceo",
     name: "社長",
-    mode: "writer",
+    org_role: "ceo",
     provider: "codex_cli",
     persona: "全体を俯瞰し、ビジネス要件と技術方針を最終決定する。優先順位を明確にし、スコープを定義する。",
     skills_text: "要件定義\nスコープ決定\n優先順位判断\nビジネス視点レビュー",
@@ -19,7 +19,7 @@ const CODING_TEAM_PRESET = [
   {
     id: "manager",
     name: "マネージャー",
-    mode: "reviewer",
+    org_role: "manager",
     provider: "codex_cli",
     persona: "社長の方針を受けてタスクを分解し、各エンジニアへ作業指示を出す。進捗管理とリスク管理を行う。",
     skills_text: "タスク分解\n進捗管理\nリスク管理\n品質基準設定",
@@ -32,7 +32,7 @@ const CODING_TEAM_PRESET = [
   {
     id: "engineer_1",
     name: "エンジニア1号",
-    mode: "writer",
+    org_role: "worker",
     provider: "codex_cli",
     persona: "設計・アーキテクチャ担当。システム全体の構成を設計し、技術選定とインターフェース定義を行う。",
     skills_text: "アーキテクチャ設計\n技術選定\nAPI設計\nデータモデリング",
@@ -45,7 +45,7 @@ const CODING_TEAM_PRESET = [
   {
     id: "engineer_2",
     name: "エンジニア2号",
-    mode: "writer",
+    org_role: "worker",
     provider: "codex_cli",
     persona: "実装担当。設計に基づいて具体的なコードを書き、テストコードも作成する。",
     skills_text: "コーディング\nテスト実装\nデバッグ\nリファクタリング",
@@ -58,7 +58,7 @@ const CODING_TEAM_PRESET = [
   {
     id: "engineer_3",
     name: "エンジニア3号",
-    mode: "editor",
+    org_role: "qa",
     provider: "codex_cli",
     persona: "品質保証・統合担当。コードレビュー、テスト検証、最終統合を行い、リリース可能な状態にまとめる。",
     skills_text: "コードレビュー\nテスト検証\n統合テスト\nリリース準備",
@@ -130,7 +130,7 @@ function renderWizardAgents() {
     .map((agent) => {
       const skills = parseSkills(agent.skills_text);
       const offClass = agent.enabled ? "" : " is-off";
-      const roleClass = agent.mode;
+      const roleClass = String(agent.org_role || "worker").replaceAll("_", "-");
       const providerOptions = PROVIDER_OPTIONS
         .map((opt) => `<option value="${opt.value}"${opt.value === agent.provider ? " selected" : ""}>${opt.label}</option>`)
         .join("");
@@ -143,7 +143,7 @@ function renderWizardAgents() {
           <div class="wizard-agent-body">
             <div class="wizard-agent-header">
               ${escapeHtml(agent.name)}
-              <span class="wizard-agent-role ${roleClass}">${agent.mode}</span>
+              <span class="wizard-agent-role ${roleClass}">${agent.org_role}</span>
             </div>
             <p class="wizard-agent-persona">${escapeHtml(agent.persona)}</p>
             <div class="wizard-agent-footer">
@@ -210,7 +210,7 @@ function renderSummary() {
   const agentChips = enabledAgents
     .map(
       (a) =>
-        `<span class="wizard-skill-tag">${escapeHtml(a.name)} (${a.mode})</span>`,
+        `<span class="wizard-skill-tag">${escapeHtml(a.name)} (${a.org_role})</span>`,
     )
     .join("");
 
@@ -300,7 +300,7 @@ function buildWizardPayload() {
       return {
         id: agent.id,
         name: agent.name,
-        mode: agent.mode,
+        org_role: agent.org_role,
         provider: agent.provider,
         persona: agent.persona || "",
         skills: parseSkills(agent.skills_text),
@@ -399,11 +399,6 @@ function wireWizardEvents() {
       if (enabledAgents.length === 0) {
         setWizardStep(1);
         alert("少なくとも1人のエージェントを選択してください。");
-        return;
-      }
-      if (!enabledAgents.some((agent) => agent.mode === "editor")) {
-        setWizardStep(1);
-        alert("少なくとも1人の editor エージェントを選択してください。");
         return;
       }
 
@@ -511,7 +506,7 @@ function logStreamEvent(event) {
       logToConsole(`--- Round ${event.round_index} 開始 ---`);
       break;
     case "turn_started":
-      logToConsole(`  [${event.agent_name}] (${event.mode}) 作業開始...`);
+      logToConsole(`  [${event.agent_name}] (${event.org_role || "-"}) 作業開始...`);
       break;
     case "turn_completed": {
       const turn = event.turn || {};

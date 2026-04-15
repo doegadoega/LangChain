@@ -6,14 +6,14 @@ import {
   PROFILE_STORAGE_KEY,
   BUILTIN_PRESETS,
   DEFAULT_PRESET_ID,
-} from "./state.js?v=4";
+} from "./state.js?v=5";
 import {
   normalizeAgent,
   computeNextCustomIndex,
   renderAgents,
   syncStateFromDom,
-} from "./agents.js?v=4";
-import { setStatus } from "./streaming.js?v=4";
+} from "./agents.js?v=5";
+import { setStatus } from "./streaming.js?v=5";
 
 let domRefs = null;
 

@@ -1,10 +1,10 @@
-import { state, parseSkills, parseDelimitedList, DEFAULT_PRESET_ID } from "./state.js?v=4";
+import { state, parseSkills, parseDelimitedList, DEFAULT_PRESET_ID } from "./state.js?v=5";
 import {
   renderAgents,
   syncStateFromDom,
   addCustomAgent,
   removeAgent,
-} from "./agents.js?v=4";
+} from "./agents.js?v=5";
 import {
   initProfileDom,
   renderPresetOptions,
@@ -14,13 +14,13 @@ import {
   saveCurrentProfile,
   loadSelectedProfile,
   deleteSelectedProfile,
-} from "./profiles.js?v=4";
+} from "./profiles.js?v=5";
 import {
   initStreamingDom,
   setStatus,
   handleStreamEvent,
-} from "./streaming.js?v=4";
-import { initWizard } from "./wizard.js?v=4";
+} from "./streaming.js?v=5";
+import { initWizard } from "./wizard.js?v=5";
 
 const PAGE_NAMES = [
   "templates",
@@ -112,9 +112,23 @@ function buildExecutionBatches(agents, mode) {
   }
 
   if (mode === "role_based") {
-    const roleOrder = ["writer", "reviewer", "editor"];
+    const roleOrder = [
+      "ceo",
+      "manager",
+      "worker",
+      "pmo",
+      "qa",
+      "ui_designer",
+      "system_designer",
+      "ops_designer",
+      "other",
+    ];
     const batches = roleOrder
-      .map((role) => agents.filter((agent) => agent.mode === role).map((agent) => agent.id))
+      .map((role) =>
+        agents
+          .filter((agent) => (agent.org_role || "worker") === role)
+          .map((agent) => agent.id),
+      )
       .filter((batch) => batch.length > 0);
     return { batches };
   }
@@ -324,7 +338,7 @@ formEl.addEventListener("submit", async (event) => {
       return {
         id: agent.id,
         name: agent.name,
-        mode: agent.mode,
+        org_role: agent.org_role || "worker",
         provider: agent.provider,
         persona: agent.persona || "",
         skills: parseSkills(agent.skills_text),

@@ -1,4 +1,4 @@
-import { escapeHtml } from "./state.js?v=4";
+import { escapeHtml } from "./state.js?v=5";
 
 let statusEl = null;
 let finalTextEl = null;
@@ -101,6 +101,7 @@ function renderResult(result) {
       const turns = (round.turns || [])
         .map((turn) => {
           const output = turn.output || "";
+          const roleLabel = turn.org_role || turn.mode || "-";
           const error = turn.error
             ? `<div class="error">Error: ${escapeHtml(turn.error)}</div>`
             : "";
@@ -118,7 +119,7 @@ function renderResult(result) {
             : "";
           return `
             <div class="turn">
-              <h4>${escapeHtml(turn.agent_name)} (${turn.mode} / ${turn.provider})</h4>
+              <h4>${escapeHtml(turn.agent_name)} (${roleLabel} / ${turn.provider})</h4>
               ${error}
               ${mcpMeta}
               <pre>${escapeHtml(output)}</pre>
@@ -182,7 +183,7 @@ export function handleStreamEvent(event) {
   }
 
   if (event.type === "turn_started") {
-    const header = `${event.agent_name} (${event.mode} / ${event.provider})`;
+    const header = `${event.agent_name} (${event.org_role || "-"} / ${event.provider})`;
     ensureTurnElement(
       event.round_index,
       event.turn_index,
@@ -200,7 +201,7 @@ export function handleStreamEvent(event) {
 
   if (event.type === "turn_completed") {
     const turn = event.turn || {};
-    const header = `${turn.agent_name || "agent"} (${turn.mode || "-"} / ${turn.provider || "-"})`;
+    const header = `${turn.agent_name || "agent"} (${turn.org_role || "-"} / ${turn.provider || "-"})`;
     const turnEl = ensureTurnElement(
       event.round_index,
       event.turn_index,

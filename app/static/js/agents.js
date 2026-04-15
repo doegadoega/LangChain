@@ -1,4 +1,10 @@
-import { state, escapeHtml, MAX_CUSTOM_AGENTS } from "./state.js?v=4";
+import { state, escapeHtml, MAX_CUSTOM_AGENTS } from "./state.js?v=5";
+
+const LEGACY_MODE_TO_ORG_ROLE = {
+  writer: "worker",
+  reviewer: "qa",
+  editor: "manager",
+};
 
 export function normalizeAgent(agent, index = 0) {
   const dependsOnText =
@@ -15,10 +21,14 @@ export function normalizeAgent(agent, index = 0) {
         : "";
   const mcpEnabled =
     agent.mcp_enabled === true || String(agent.mcp_enabled).toLowerCase() === "true";
+  const resolvedOrgRole =
+    (agent.org_role && String(agent.org_role).trim()) ||
+    LEGACY_MODE_TO_ORG_ROLE[String(agent.mode || "").toLowerCase()] ||
+    "worker";
   return {
     id: agent.id || `agent-${index + 1}`,
     name: agent.name || `Agent ${index + 1}`,
-    mode: agent.mode || "reviewer",
+    org_role: resolvedOrgRole,
     provider: agent.provider || "codex_cli",
     persona: agent.persona || "",
     skills_text: agent.skills_text || "",
@@ -67,11 +77,17 @@ export function renderAgents(agentListEl, addAgentBtn) {
             </label>
 
             <label>
-              役割
-              <select data-field="mode">
-                <option value="writer" ${agent.mode === "writer" ? "selected" : ""}>writer</option>
-                <option value="reviewer" ${agent.mode === "reviewer" ? "selected" : ""}>reviewer</option>
-                <option value="editor" ${agent.mode === "editor" ? "selected" : ""}>editor</option>
+              組織ロール
+              <select data-field="org_role">
+                <option value="ceo" ${agent.org_role === "ceo" ? "selected" : ""}>ceo</option>
+                <option value="manager" ${agent.org_role === "manager" ? "selected" : ""}>manager</option>
+                <option value="worker" ${agent.org_role === "worker" ? "selected" : ""}>worker</option>
+                <option value="pmo" ${agent.org_role === "pmo" ? "selected" : ""}>pmo</option>
+                <option value="qa" ${agent.org_role === "qa" ? "selected" : ""}>qa</option>
+                <option value="ui_designer" ${agent.org_role === "ui_designer" ? "selected" : ""}>ui_designer</option>
+                <option value="system_designer" ${agent.org_role === "system_designer" ? "selected" : ""}>system_designer</option>
+                <option value="ops_designer" ${agent.org_role === "ops_designer" ? "selected" : ""}>ops_designer</option>
+                <option value="other" ${agent.org_role === "other" ? "selected" : ""}>other</option>
               </select>
             </label>
 
@@ -103,7 +119,7 @@ export function renderAgents(agentListEl, addAgentBtn) {
 
           <label>
             depends_on (エージェントID。改行またはカンマ区切り)
-            <textarea data-field="depends_on_text" rows="2" placeholder="例: critic,editor">${escapeHtml(agent.depends_on_text || "")}</textarea>
+            <textarea data-field="depends_on_text" rows="2" placeholder="例: manager,qa-1">${escapeHtml(agent.depends_on_text || "")}</textarea>
           </label>
 
           <label>
@@ -181,7 +197,7 @@ export function addCustomAgent(agentListEl, addAgentBtn) {
   state.agents.push({
     id: `custom-${idx}`,
     name: `Custom ${idx}`,
-    mode: "reviewer",
+    org_role: "worker",
     provider: "codex_cli",
     persona: "専門観点で改善点を指摘する。",
     skills_text: "",
