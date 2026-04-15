@@ -132,6 +132,11 @@ final class AppState: ObservableObject {
         try? dataStore.deleteProject(id: id)
     }
 
+    func updateProject(_ project: Project) {
+        projects = projects.map { $0.id == project.id ? project : $0 }
+        try? dataStore.saveProject(project)
+    }
+
     func addWorkflow(name: String) {
         let startNode = WorkflowNode(type: .start, position: Position(x: 100, y: 30), label: "▶ 開始")
         let endNode = WorkflowNode(type: .end, position: Position(x: 100, y: 400), label: "⏹ 終了")

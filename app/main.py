@@ -9,6 +9,11 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
+from app.evaluation import (
+    add_evaluation_to_project,
+    create_evaluation,
+    get_agent_evaluations_across_projects,
+)
 from app.models import RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
 from app.store import FileStore
@@ -143,3 +148,31 @@ def create_workflow(workflow: dict, store: FileStore = Depends(get_store)):
 @app.delete("/api/workflows/{workflow_id}", status_code=204)
 def delete_workflow(workflow_id: str, store: FileStore = Depends(get_store)):
     store.delete_workflow(workflow_id)
+
+
+# -- Evaluation endpoints --
+@app.post("/api/evaluations", status_code=201)
+def submit_evaluation(payload: dict, store: FileStore = Depends(get_store)):
+    project_id = payload["project_id"]
+    projects = store.load_projects()
+    project = next((p for p in projects if p["id"] == project_id), None)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    evaluation = create_evaluation(
+        evaluator_role=payload["evaluator_role"],
+        score=payload["score"],
+        comment=payload.get("comment"),
+        round_number=payload.get("round_number"),
+        is_final=payload.get("is_final", False),
+    )
+
+    updated = add_evaluation_to_project(project, payload["snapshot_id"], evaluation)
+    store.save_project(updated)
+    return evaluation
+
+
+@app.get("/api/agents/{agent_id}/evaluations")
+def get_agent_evaluations(agent_id: str, store: FileStore = Depends(get_store)):
+    projects = store.load_projects()
+    return get_agent_evaluations_across_projects(projects, agent_id)

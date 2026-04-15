@@ -63,7 +63,7 @@ struct MainTabView: View {
                 case .agents:
                     AgentsScreen()
                 case .workflow:
-                    PlaceholderView(title: "🔀 ワークフローエディタ", detail: "Phase 3で実装")
+                    WorkflowScreen()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
