@@ -159,11 +159,20 @@ struct TemplateDetailView: View {
             Text("スロット定義").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
 
             ForEach(template.slots) { slot in
-                SlotEditor(slot: slot) {
-                    var t = template
-                    t.slots = t.slots.filter { $0.id != slot.id }
-                    appState.updateTemplate(t)
-                }
+                SlotEditor(
+                    slot: slot,
+                    agents: appState.agents,
+                    onUpdate: { updated in
+                        var t = template
+                        t.slots = t.slots.map { $0.id == updated.id ? updated : $0 }
+                        appState.updateTemplate(t)
+                    },
+                    onRemove: {
+                        var t = template
+                        t.slots = t.slots.filter { $0.id != slot.id }
+                        appState.updateTemplate(t)
+                    }
+                )
             }
 
             HStack(spacing: 6) {
