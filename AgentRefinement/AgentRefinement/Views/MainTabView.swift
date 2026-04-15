@@ -57,9 +57,9 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .requirements:
-                    PlaceholderView(title: "📋 要件・実行", detail: "Phase 2で実装")
+                    RequirementsScreen()
                 case .templates:
-                    PlaceholderView(title: "🏢 組織テンプレート", detail: "Phase 2で実装")
+                    TemplatesScreen()
                 case .agents:
                     AgentsScreen()
                 case .workflow:
