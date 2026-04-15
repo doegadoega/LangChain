@@ -34,8 +34,8 @@ struct MainTabView: View {
                             Text(tab.rawValue)
                                 .font(.system(size: 16, weight: selectedTab == tab ? .bold : .regular))
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
                         .foregroundStyle(selectedTab == tab ? .primary : .secondary)
                         .background(selectedTab == tab ? Color.accentColor.opacity(0.1) : Color.clear)
                         .overlay(alignment: .bottom) {

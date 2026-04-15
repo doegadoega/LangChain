@@ -59,7 +59,7 @@ struct BottomPanelView: View {
                 }
             }
         }
-        .frame(height: 80)
+        .frame(minHeight: 80, idealHeight: 100, maxHeight: 200)
     }
 
     private var agentCarousel: some View {
