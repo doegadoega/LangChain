@@ -65,6 +65,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/SkillPromptRenderer.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Agent.swift"
         },
         {
@@ -85,11 +89,19 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Skill.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Workflow.swift"
         },
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/DataStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/SkillStore.swift"
         },
         {
           "kind" : "file",
@@ -126,6 +138,10 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/FileTreeView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/MultilineComposer.swift"
         },
         {
           "kind" : "file",
@@ -214,13 +230,16 @@
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/GitHelper.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Orchestrator.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/PromptBuilder.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Agent.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Evaluation.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/OrgRole.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/OrganizationTemplate.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Project.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Workflow.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/DataStore.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/WorkflowBridge.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/ActivityBar.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/BottomPanelView.swift.o",
@@ -230,6 +249,7 @@
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/EvaluationView.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/ExecutionLogTable.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/FileTreeView.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/NewProjectSheet.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/RoleBadge.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/RoleFilterBar.swift.o",
@@ -324,6 +344,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Agent.swift.o"
         },
         {
@@ -344,11 +368,19 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Workflow.swift.o"
         },
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/DataStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.swift.o"
         },
         {
           "kind" : "file",
@@ -385,6 +417,10 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/FileTreeView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.swift.o"
         },
         {
           "kind" : "file",
@@ -463,13 +499,16 @@
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/GitHelper.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/Orchestrator.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/PromptBuilder.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/SkillPromptRenderer.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Agent.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Evaluation.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/OrgRole.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/OrganizationTemplate.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Project.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Skill.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Workflow.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/DataStore.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/SkillStore.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/WorkflowBridge.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/ActivityBar.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/BottomPanelView.swift",
@@ -479,6 +518,7 @@
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/EvaluationView.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/ExecutionLogTable.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/FileTreeView.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/MultilineComposer.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/NewProjectSheet.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/RoleBadge.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/RoleFilterBar.swift",
@@ -625,6 +665,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/MasterAgentCodableTests.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/OrgRoleTests.swift"
         },
         {
@@ -638,6 +682,14 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/DataStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/SkillStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Views/MultilineComposerKeyTests.swift"
         },
         {
           "kind" : "file",
@@ -662,10 +714,13 @@
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/OrchestratorTests.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/PromptBuilderTests.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/AgentTests.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/OrgRoleTests.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/ProjectTests.swift.o",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/WorkflowTests.swift.o",
-        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/DataStoreTests.swift.o"
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/DataStoreTests.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests.swift.o",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests.swift.o"
       ],
       "otherArguments" : [
         "-target",
@@ -743,6 +798,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/OrgRoleTests.swift.o"
         },
         {
@@ -759,6 +818,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/Modules/AgentRefinementAppTests.swiftmodule"
         }
       ],
@@ -770,10 +837,13 @@
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Engine/OrchestratorTests.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Engine/PromptBuilderTests.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/AgentTests.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/MasterAgentCodableTests.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/OrgRoleTests.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/ProjectTests.swift",
         "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/WorkflowTests.swift",
-        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/DataStoreTests.swift"
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/DataStoreTests.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/SkillStoreTests.swift",
+        "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Views/MultilineComposerKeyTests.swift"
       ],
       "tempsPath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build",
       "wholeModuleOptimization" : false
@@ -796,13 +866,16 @@
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/GitHelper.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/Orchestrator.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/PromptBuilder.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/SkillPromptRenderer.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Agent.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Evaluation.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/OrgRole.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/OrganizationTemplate.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Project.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Skill.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Workflow.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/DataStore.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/SkillStore.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/WorkflowBridge.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/ActivityBar.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/BottomPanelView.swift",
@@ -812,6 +885,7 @@
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/EvaluationView.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/ExecutionLogTable.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/FileTreeView.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/MultilineComposer.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/NewProjectSheet.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/RoleBadge.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/RoleFilterBar.swift",
@@ -953,10 +1027,13 @@
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Engine/OrchestratorTests.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Engine/PromptBuilderTests.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/AgentTests.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/MasterAgentCodableTests.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/OrgRoleTests.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/ProjectTests.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/WorkflowTests.swift",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/DataStoreTests.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/SkillStoreTests.swift",
+      "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Views/MultilineComposerKeyTests.swift",
       "-I",
       "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/Modules",
       "-target",
@@ -1090,6 +1167,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/SkillPromptRenderer.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Agent.swift"
         },
         {
@@ -1110,11 +1191,19 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Skill.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Workflow.swift"
         },
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/DataStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/SkillStore.swift"
         },
         {
           "kind" : "file",
@@ -1151,6 +1240,10 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/FileTreeView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/MultilineComposer.swift"
         },
         {
           "kind" : "file",
@@ -1304,6 +1397,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/NewProjectSheet.swift.o"
         },
         {
@@ -1341,6 +1438,18 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SidebarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.swift.o"
         },
         {
           "kind" : "file",
@@ -1480,6 +1589,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/NewProjectSheet.swift.o"
         },
         {
@@ -1517,6 +1630,18 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SidebarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.swift.o"
         },
         {
           "kind" : "file",
@@ -1580,6 +1705,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/OrchestratorTests.swift.o"
         },
         {
@@ -1593,6 +1726,10 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/PromptBuilderTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests.swift.o"
         },
         {
           "kind" : "file",
@@ -1634,6 +1771,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/MasterAgentCodableTests.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/OrgRoleTests.swift"
         },
         {
@@ -1647,6 +1788,14 @@
         {
           "kind" : "file",
           "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/DataStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/SkillStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Views/MultilineComposerKeyTests.swift"
         }
       ],
       "outputFilePath" : "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/sources"

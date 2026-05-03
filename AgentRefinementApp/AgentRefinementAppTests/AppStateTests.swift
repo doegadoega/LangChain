@@ -211,6 +211,60 @@ struct AppStateTests {
         try FileManager.default.removeItem(at: testDir)
     }
 
+    @Test("Delete default agent is blocked")
+    @MainActor
+    func deleteDefaultAgentIsBlocked() throws {
+        let testDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("appstate-test-\(UUID().uuidString)")
+        let store = DataStore(baseDirectory: testDir)
+        let state = AppState(dataStore: store)
+        state.loadAll()
+
+        state.deleteAgent(id: "default-worker")
+
+        #expect(state.agents.contains { $0.id == "default-worker" })
+        #expect(try store.loadAgents().contains { $0.id == "default-worker" })
+        try FileManager.default.removeItem(at: testDir)
+    }
+
+    @Test("Project template selection updates execution agents")
+    @MainActor
+    func projectTemplateSelectionUpdatesExecutionAgents() throws {
+        let testDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("appstate-test-\(UUID().uuidString)")
+        let store = DataStore(baseDirectory: testDir)
+        let state = AppState(dataStore: store)
+
+        state.addAgent(name: "Writer", orgRoles: [.worker], mode: .writer, provider: .customCli)
+        state.addAgent(name: "Reviewer", orgRoles: [.qa], mode: .reviewer, provider: .customCli)
+        let writer = state.agents[0]
+        let reviewer = state.agents[1]
+
+        state.addTemplate(name: "Writing Team", slots: [
+            Slot(orgRole: .worker, assignedAgentIds: [writer.id]),
+        ])
+        state.addTemplate(name: "Review Team", slots: [
+            Slot(orgRole: .qa, assignedAgentIds: [reviewer.id]),
+        ])
+        let writingTemplate = state.templates[0]
+        let reviewTemplate = state.templates[1]
+
+        state.addProject(
+            name: "Switchable",
+            workingDirectory: testDir.path,
+            templateId: writingTemplate.id
+        )
+
+        #expect(state.executionAgentsForSelectedProject().map(\.id) == [writer.id])
+
+        state.updateSelectedProjectTemplate(reviewTemplate.id)
+
+        #expect(state.selectedProject?.templateId == reviewTemplate.id.uuidString)
+        #expect(state.executionAgentsForSelectedProject().map(\.id) == [reviewer.id])
+        #expect(try store.loadProjects().first?.templateId == reviewTemplate.id.uuidString)
+        try FileManager.default.removeItem(at: testDir)
+    }
+
     @Test("Duplicate agent creates copy with new id")
     @MainActor
     func duplicateAgent() throws {

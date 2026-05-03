@@ -36,6 +36,10 @@ struct AgentEditForm: View {
     @State private var modelDecision: ModelDecision = .fixed
     @State private var showRolePicker = false
 
+    private var isDefaultAgent: Bool {
+        appState.isDefaultAgent(id: agent.id)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -87,14 +91,19 @@ struct AgentEditForm: View {
             } label: {
                 Text("🗑 削除")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(isDefaultAgent ? Color.secondary : Color.red)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
-                    .background(Color.red.opacity(0.1))
+                    .background((isDefaultAgent ? Color.gray : Color.red).opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.red.opacity(0.5), lineWidth: 1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder((isDefaultAgent ? Color.gray : Color.red).opacity(0.5), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
+            .disabled(isDefaultAgent)
+            .help(isDefaultAgent ? "標準エージェントは削除できません" : "エージェントを削除")
         }
     }
 

@@ -35,6 +35,43 @@ struct PromptBuilderTests {
         #expect(truncated.contains("truncated"))
     }
 
+    @Test("System directive injects rendered skills block when references resolve")
+    func systemDirectiveIncludesResolvedSkill() throws {
+        let skill = try SkillDocument.parse(
+            markdown: """
+                ---
+                id: swiftui-implementation
+                name: SwiftUI Implementation
+                version: 1.0.0
+                ---
+
+                Common SwiftUI guidance.
+
+                ## Provider: codex_cli
+                Codex specifics.
+                """,
+            source: .user,
+            rootDirectory: nil
+        )
+        let agent = MasterAgent(
+            id: "a", name: "A", orgRoles: [.worker], mode: .writer, provider: .codexCli,
+            skillRefs: [
+                SkillReference(id: "swiftui-implementation", source: .user, versionRequirement: .latest)
+            ]
+        )
+        let directive = PromptBuilder.buildSystemDirective(agent: agent, installedSkills: [skill])
+        #expect(directive.contains("インストール済みスキル"))
+        #expect(directive.contains("[SwiftUI Implementation]"))
+        #expect(directive.contains("Codex specifics."))
+    }
+
+    @Test("System directive omits skills section when no references match")
+    func systemDirectiveOmitsSkillsBlock() {
+        let agent = MasterAgent(id: "a", name: "A", orgRoles: [.worker], mode: .writer, provider: .codexCli)
+        let directive = PromptBuilder.buildSystemDirective(agent: agent, installedSkills: [])
+        #expect(!directive.contains("インストール済みスキル"))
+    }
+
     @Test("Dependency context block lists dependencies")
     func dependencyContext() {
         let agent = MasterAgent(id: "editor", name: "Editor", orgRoles: [.worker], mode: .editor, provider: .claudeCli, dependsOn: ["writer"])

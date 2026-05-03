@@ -2,7 +2,7 @@ import Foundation
 
 enum PromptBuilder {
 
-    static func buildSystemDirective(agent: MasterAgent) -> String {
+    static func buildSystemDirective(agent: MasterAgent, renderedSkillsBlock: String = "") -> String {
         let persona = agent.persona?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "なし"
         let skills = agent.skills.isEmpty ? "- なし" : agent.skills.map { "- \($0)" }.joined(separator: "\n")
         let orgRole = agent.orgRoles.first?.rawValue ?? "worker"
@@ -16,7 +16,26 @@ enum PromptBuilder {
             mcpBlock = "MCP設定:\n- 有効化: 無効"
         }
 
-        return "あなたは \(agent.name) です。\n組織ロール: \(orgRole)\nペルソナ:\n\(persona)\n\n活用するスキル:\n\(skills)\n\(mcpBlock)"
+        let trimmedSkillsBlock = renderedSkillsBlock.trimmingCharacters(in: .whitespacesAndNewlines)
+        let skillSection = trimmedSkillsBlock.isEmpty
+            ? ""
+            : "\n\nインストール済みスキル:\n\(trimmedSkillsBlock)"
+
+        return "あなたは \(agent.name) です。\n組織ロール: \(orgRole)\nペルソナ:\n\(persona)\n\n活用するスキル:\n\(skills)\(skillSection)\n\(mcpBlock)"
+    }
+
+    static func buildSystemDirective(
+        agent: MasterAgent,
+        installedSkills: [SkillDocument]
+    ) -> String {
+        let orgRole = agent.orgRoles.first ?? .worker
+        let rendered = SkillPromptRenderer.render(
+            skills: installedSkills,
+            references: agent.skillRefs,
+            provider: agent.provider,
+            role: orgRole
+        )
+        return buildSystemDirective(agent: agent, renderedSkillsBlock: rendered)
     }
 
     static func buildCodingInstruction(orgRole: OrgRole, hasWorkingDir: Bool) -> String {

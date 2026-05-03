@@ -44,6 +44,13 @@
     "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/PromptBuilder.swiftdeps",
     "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/PromptBuilder.dia"
   },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/SkillPromptRenderer.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.dia"
+  },
   "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Agent.swift": {
     "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Agent.d",
     "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Agent.swift.o",
@@ -79,6 +86,13 @@
     "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Project.swiftdeps",
     "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Project.dia"
   },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Skill.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.dia"
+  },
   "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Workflow.swift": {
     "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Workflow.d",
     "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Workflow.swift.o",
@@ -92,6 +106,13 @@
     "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/DataStore~partial.swiftmodule",
     "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/DataStore.swiftdeps",
     "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/DataStore.dia"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/SkillStore.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.dia"
   },
   "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/WorkflowBridge.swift": {
     "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/WorkflowBridge.d",
@@ -155,6 +176,13 @@
     "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/FileTreeView~partial.swiftmodule",
     "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/FileTreeView.swiftdeps",
     "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/FileTreeView.dia"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/MultilineComposer.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.dia"
   },
   "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/NewProjectSheet.swift": {
     "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/NewProjectSheet.d",

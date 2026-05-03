@@ -5,6 +5,7 @@ import SwiftUI
 final class AppState: ObservableObject {
     private static let requiredAgentSkills = ["Swift", "SwiftUI"]
     private static let defaultTemplateName = "標準チーム"
+    private static let defaultAgentIds: Set<String> = Set(defaultAgentSeeds.map(\.id))
     private static let defaultAgentSeeds: [DefaultAgentSeed] = [
         .init(
             id: "default-ceo",
@@ -67,9 +68,11 @@ final class AppState: ObservableObject {
     @Published var pendingRequirementsAutoRunToken: UUID?
 
     let dataStore: DataStore
+    let skillStore: SkillStore
 
-    init(dataStore: DataStore = DataStore()) {
+    init(dataStore: DataStore = DataStore(), skillStore: SkillStore = SkillStore()) {
         self.dataStore = dataStore
+        self.skillStore = skillStore
     }
 
     var selectedProject: Project? {
@@ -158,6 +161,7 @@ final class AppState: ObservableObject {
     }
 
     func deleteAgent(id: String) {
+        guard !isDefaultAgent(id: id) else { return }
         agents = agents.filter { $0.id != id }
         if selectedAgentId == id { selectedAgentId = nil }
         try? dataStore.deleteAgent(id: id)
@@ -218,6 +222,18 @@ final class AppState: ObservableObject {
         updated.requirements = requirements
         updated.updatedAt = Date()
         updateProject(updated)
+    }
+
+    func updateSelectedProjectTemplate(_ templateId: UUID?) {
+        guard let selectedProject else { return }
+        var updated = selectedProject
+        updated.templateId = templateId?.uuidString
+        updated.updatedAt = Date()
+        updateProject(updated)
+    }
+
+    func isDefaultAgent(id: String) -> Bool {
+        Self.defaultAgentIds.contains(id)
     }
 
     func queueRequirementsRun(_ requirements: String) {
@@ -365,7 +381,8 @@ final class AppState: ObservableObject {
             workflowMode: template?.workflowMode ?? "coding",
             orchestrationMode: template?.orchestrationMode ?? "sequential",
             rounds: max(1, template?.rounds ?? 1),
-            workingDirectory: selectedProject?.workingDirectory
+            workingDirectory: selectedProject?.workingDirectory,
+            installedSkills: (try? skillStore.loadInstalledSkills()) ?? []
         )
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in

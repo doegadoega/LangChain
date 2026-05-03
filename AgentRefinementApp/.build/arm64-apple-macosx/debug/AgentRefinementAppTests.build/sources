@@ -4,7 +4,10 @@
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Engine/OrchestratorTests.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Engine/PromptBuilderTests.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/AgentTests.swift
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/MasterAgentCodableTests.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/OrgRoleTests.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/ProjectTests.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/WorkflowTests.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/DataStoreTests.swift
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/SkillStoreTests.swift
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Views/MultilineComposerKeyTests.swift

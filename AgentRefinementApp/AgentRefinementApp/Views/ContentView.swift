@@ -14,6 +14,8 @@ struct ContentView: View {
             // Center: Main content + Bottom panel
             VStack(spacing: 0) {
                 MainTabView(selectedTab: $appState.selectedTab)
+                projectTeamBar
+                Divider()
 
                 if !simpleMode {
                     BottomPanelView(
@@ -127,6 +129,67 @@ struct ContentView: View {
             .padding(.vertical, 6)
         }
         .frame(minHeight: 80, idealHeight: 120, maxHeight: 200)
+    }
+
+    private var projectTeamBar: some View {
+        HStack(spacing: 8) {
+            Text("チーム")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            Picker("", selection: selectedProjectTemplateBinding) {
+                Text("なし").tag(nil as UUID?)
+                ForEach(appState.templates) { template in
+                    Text(template.name).tag(template.id as UUID?)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 220)
+            .disabled(appState.selectedProject == nil)
+
+            if let selectedTeamName {
+                Text(selectedTeamName)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            } else {
+                Text("チーム未指定の場合は全エージェントで実行します")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.18))
+    }
+
+    private var selectedProjectTemplateBinding: Binding<UUID?> {
+        Binding(
+            get: {
+                guard
+                    let templateString = appState.selectedProject?.templateId,
+                    let templateId = UUID(uuidString: templateString)
+                else {
+                    return nil
+                }
+                return templateId
+            },
+            set: { appState.updateSelectedProjectTemplate($0) }
+        )
+    }
+
+    private var selectedTeamName: String? {
+        guard
+            let templateId = selectedProjectTemplateBinding.wrappedValue,
+            let template = appState.templates.first(where: { $0.id == templateId })
+        else {
+            return nil
+        }
+        let assignedCount = Set(template.slots.flatMap(\.assignedAgentIds)).count
+        return "\(template.slots.count)スロット / \(assignedCount)人"
     }
 
     private func projectIcon(_ project: Project) -> String {

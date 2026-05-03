@@ -4,13 +4,16 @@
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/GitHelper.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/Orchestrator.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/PromptBuilder.swift
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Engine/SkillPromptRenderer.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Agent.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Evaluation.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/OrgRole.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/OrganizationTemplate.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Project.swift
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Skill.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Models/Workflow.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/DataStore.swift
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/SkillStore.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Services/WorkflowBridge.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/ActivityBar.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/BottomPanelView.swift
@@ -20,6 +23,7 @@
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/EvaluationView.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/ExecutionLogTable.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/FileTreeView.swift
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/MultilineComposer.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/NewProjectSheet.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/RoleBadge.swift
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementApp/Views/Components/RoleFilterBar.swift

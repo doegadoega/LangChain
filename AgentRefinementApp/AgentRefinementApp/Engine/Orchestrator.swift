@@ -21,6 +21,29 @@ enum Orchestrator {
         let orchestrationMode: String
         let rounds: Int
         let workingDirectory: String?
+        let installedSkills: [SkillDocument]
+
+        init(
+            agents: [MasterAgent],
+            sourceText: String,
+            objective: String,
+            globalInstruction: String,
+            workflowMode: String,
+            orchestrationMode: String,
+            rounds: Int,
+            workingDirectory: String?,
+            installedSkills: [SkillDocument] = []
+        ) {
+            self.agents = agents
+            self.sourceText = sourceText
+            self.objective = objective
+            self.globalInstruction = globalInstruction
+            self.workflowMode = workflowMode
+            self.orchestrationMode = orchestrationMode
+            self.rounds = rounds
+            self.workingDirectory = workingDirectory
+            self.installedSkills = installedSkills
+        }
     }
 
     // MARK: - Execution Batches
@@ -194,7 +217,7 @@ enum Orchestrator {
         }
 
         return """
-            \(PromptBuilder.buildSystemDirective(agent: agent))
+            \(PromptBuilder.buildSystemDirective(agent: agent, installedSkills: config.installedSkills))
 
             ワークフローモード: \(config.workflowMode)
             オーケストレーション: \(config.orchestrationMode)

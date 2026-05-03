@@ -19,6 +19,14 @@ enum ModelDecision: String, Codable, Sendable {
 }
 
 struct MasterAgent: Codable, Identifiable, Sendable {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, orgRoles, mode, provider, model, persona
+        case skills, skillRefs, dependsOn, commandTemplate
+        case mcpEnabled, mcpConfigPath, mcpServers, mcpInstruction
+        case mcpContextCommand, mcpTimeoutSec
+        case modelDecision, createdAt, updatedAt
+    }
+
     let id: String
     var name: String
     var orgRoles: [OrgRole]
@@ -27,6 +35,7 @@ struct MasterAgent: Codable, Identifiable, Sendable {
     var model: String?
     var persona: String?
     var skills: [String]
+    var skillRefs: [SkillReference]
     var dependsOn: [String]
     var commandTemplate: String?
     var mcpEnabled: Bool
@@ -50,6 +59,7 @@ struct MasterAgent: Codable, Identifiable, Sendable {
         model: String? = nil,
         persona: String? = nil,
         skills: [String] = [],
+        skillRefs: [SkillReference] = [],
         dependsOn: [String] = [],
         commandTemplate: String? = nil,
         mcpEnabled: Bool = false,
@@ -70,6 +80,7 @@ struct MasterAgent: Codable, Identifiable, Sendable {
         self.model = model
         self.persona = persona
         self.skills = skills
+        self.skillRefs = skillRefs
         self.dependsOn = dependsOn
         self.commandTemplate = commandTemplate
         self.mcpEnabled = mcpEnabled
@@ -81,6 +92,30 @@ struct MasterAgent: Codable, Identifiable, Sendable {
         self.modelDecision = modelDecision
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.orgRoles = try c.decode([OrgRole].self, forKey: .orgRoles)
+        self.mode = try c.decode(AgentMode.self, forKey: .mode)
+        self.provider = try c.decode(ProviderKind.self, forKey: .provider)
+        self.model = try c.decodeIfPresent(String.self, forKey: .model)
+        self.persona = try c.decodeIfPresent(String.self, forKey: .persona)
+        self.skills = try c.decodeIfPresent([String].self, forKey: .skills) ?? []
+        self.skillRefs = try c.decodeIfPresent([SkillReference].self, forKey: .skillRefs) ?? []
+        self.dependsOn = try c.decodeIfPresent([String].self, forKey: .dependsOn) ?? []
+        self.commandTemplate = try c.decodeIfPresent(String.self, forKey: .commandTemplate)
+        self.mcpEnabled = try c.decodeIfPresent(Bool.self, forKey: .mcpEnabled) ?? false
+        self.mcpConfigPath = try c.decodeIfPresent(String.self, forKey: .mcpConfigPath)
+        self.mcpServers = try c.decodeIfPresent([String].self, forKey: .mcpServers) ?? []
+        self.mcpInstruction = try c.decodeIfPresent(String.self, forKey: .mcpInstruction)
+        self.mcpContextCommand = try c.decodeIfPresent(String.self, forKey: .mcpContextCommand)
+        self.mcpTimeoutSec = try c.decodeIfPresent(Int.self, forKey: .mcpTimeoutSec) ?? 60
+        self.modelDecision = try c.decodeIfPresent(ModelDecision.self, forKey: .modelDecision) ?? .fixed
+        self.createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        self.updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
 }
 

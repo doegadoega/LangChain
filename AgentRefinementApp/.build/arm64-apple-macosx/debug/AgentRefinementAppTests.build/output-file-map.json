@@ -44,6 +44,13 @@
     "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/AgentTests.swiftdeps",
     "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/AgentTests.dia"
   },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/MasterAgentCodableTests.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MasterAgentCodableTests.dia"
+  },
   "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Models/OrgRoleTests.swift": {
     "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/OrgRoleTests.d",
     "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/OrgRoleTests.swift.o",
@@ -71,5 +78,19 @@
     "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/DataStoreTests~partial.swiftmodule",
     "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/DataStoreTests.swiftdeps",
     "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/DataStoreTests.dia"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Services/SkillStoreTests.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/SkillStoreTests.dia"
+  },
+  "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/AgentRefinementAppTests/Views/MultilineComposerKeyTests.swift": {
+    "dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests.d",
+    "object": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests.swift.o",
+    "swiftmodule": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests.swiftdeps",
+    "diagnostics": "/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementAppTests.build/MultilineComposerKeyTests.dia"
   }
 }

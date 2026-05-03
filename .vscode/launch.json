@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:LangChain}/AgentRefinementApp",
+            "name": "Debug AgentRefinementApp (AgentRefinementApp)",
+            "target": "AgentRefinementApp",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug AgentRefinementApp (AgentRefinementApp)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:LangChain}/AgentRefinementApp",
+            "name": "Release AgentRefinementApp (AgentRefinementApp)",
+            "target": "AgentRefinementApp",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release AgentRefinementApp (AgentRefinementApp)"
+        }
+    ]
+}

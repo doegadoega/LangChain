@@ -17,6 +17,7 @@
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/FileTreeView.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/GitHelper.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MainTabView.swift.o
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/MultilineComposer.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/NewProjectSheet.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Orchestrator.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/OrgRole.swift.o
@@ -27,6 +28,9 @@
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/RoleBadge.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/RoleFilterBar.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SidebarView.swift.o
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/Skill.swift.o
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillPromptRenderer.swift.o
+/Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SkillStore.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/SlotEditor.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/TemplatesScreen.swift.o
 /Users/sfidante-he/workspace/LangChain/AgentRefinementApp/.build/arm64-apple-macosx/debug/AgentRefinementApp.build/TerminalView.swift.o
