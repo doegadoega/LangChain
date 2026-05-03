@@ -9,10 +9,16 @@ MAX_CUSTOM_AGENTS = 5
 MAX_ROUNDS = 5
 
 
-class AgentMode(str, Enum):
-    WRITER = "writer"
-    REVIEWER = "reviewer"
-    EDITOR = "editor"
+class OrgRole(str, Enum):
+    CEO = "ceo"
+    MANAGER = "manager"
+    WORKER = "worker"
+    PMO = "pmo"
+    QA = "qa"
+    UI_DESIGNER = "ui_designer"
+    SYSTEM_DESIGNER = "system_designer"
+    OPS_DESIGNER = "ops_designer"
+    OTHER = "other"
 
 
 class WorkflowMode(str, Enum):
@@ -36,7 +42,7 @@ class ProviderKind(str, Enum):
 class AgentConfig(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=64)
-    mode: AgentMode
+    org_role: OrgRole = OrgRole.WORKER
     provider: ProviderKind
     persona: str = Field(default="", max_length=2000)
     skills: list[str] = Field(default_factory=list)
@@ -50,6 +56,20 @@ class AgentConfig(BaseModel):
     mcp_context_command: str | None = Field(default=None, max_length=2000)
     mcp_timeout_sec: int = Field(default=60, ge=5, le=600)
     is_custom: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_mode(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if "org_role" in data:
+            return data
+        legacy_mode = data.get("mode")
+        if legacy_mode is None:
+            return data
+        migrated = dict(data)
+        migrated["org_role"] = legacy_mode
+        return migrated
 
     @field_validator("skills")
     @classmethod
@@ -97,6 +117,19 @@ class AgentConfig(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
+    @field_validator("org_role", mode="before")
+    @classmethod
+    def normalize_org_role(cls, value: object) -> object:
+        if value is None:
+            return OrgRole.WORKER.value
+        raw = str(value).strip().lower()
+        legacy_map = {
+            "writer": OrgRole.WORKER.value,
+            "reviewer": OrgRole.QA.value,
+            "editor": OrgRole.MANAGER.value,
+        }
+        return legacy_map.get(raw, raw)
+
 
 class CodeContext(BaseModel):
     repository: str = Field(default="", max_length=300)
@@ -138,9 +171,6 @@ class RefineRequest(BaseModel):
         if len(agent_ids) != len(self.agents):
             raise ValueError("agent ids must be unique")
 
-        if not any(agent.mode == AgentMode.EDITOR for agent in self.agents):
-            raise ValueError("at least one editor agent is required")
-
         deps_map = {agent.id: set(agent.depends_on) for agent in self.agents}
         for agent in self.agents:
             unknown = [dep for dep in agent.depends_on if dep not in agent_ids]
@@ -177,7 +207,7 @@ class RefineRequest(BaseModel):
 class TurnResult(BaseModel):
     agent_id: str
     agent_name: str
-    mode: AgentMode
+    org_role: OrgRole
     provider: ProviderKind
     output: str
     error: str | None = None

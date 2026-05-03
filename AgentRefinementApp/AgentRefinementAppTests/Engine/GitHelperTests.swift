@@ -15,6 +15,7 @@ struct GitHelperTests {
 
     @Test("ensureWorkingDir creates directory and git repo")
     func ensureWorkingDir() throws {
+        guard GitHelper.canRunGit() else { return }
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
         try GitHelper.ensureWorkingDir(tmp)
         #expect(GitHelper.isGitRepo(path: tmp))

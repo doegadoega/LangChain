@@ -145,6 +145,7 @@ enum Orchestrator {
                         onEvent(RefinementEvent(type: "turn_completed", data: [
                             "agent_id": agent.id,
                             "agent_name": agent.name,
+                            "full_output": output,
                             "output": PromptBuilder.truncateOutput(output, maxChars: 500),
                             "success": true,
                         ]))

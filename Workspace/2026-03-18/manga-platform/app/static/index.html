@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HOUR SERIAL</title>
+    <link rel="stylesheet" href="/static/styles.css?v=1" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div class="hero-copy reveal">
+          <p class="eyebrow">Hourly Manga Platform</p>
+          <h1>HOUR SERIAL</h1>
+          <p class="hero-lead">
+            10本の新規連載を、毎時20ページずつ回し続ける配信プラットフォーム。
+          </p>
+          <div class="hero-meta">
+            <div>
+              <span class="meta-label">更新ポリシー</span>
+              <strong id="updatePolicy">読み込み中...</strong>
+            </div>
+            <div>
+              <span class="meta-label">通知方式</span>
+              <strong>ブラウザ / メール / Webhook</strong>
+            </div>
+          </div>
+        </div>
+        <div class="hero-panel reveal">
+          <div class="editorial-card">
+            <p class="card-kicker">編集体制</p>
+            <div id="editorialBoard" class="editorial-list"></div>
+          </div>
+          <div class="notice-strip" id="rightsNotice">読み込み中...</div>
+        </div>
+      </header>
+
+      <main>
+        <section class="metrics reveal">
+          <article class="metric-card">
+            <span class="metric-label">新規連載</span>
+            <strong id="metricSeries">10</strong>
+            <p>同時進行</p>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">1時間あたり</span>
+            <strong id="metricPages">200P</strong>
+            <p>全体配信量</p>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">次の更新</span>
+            <strong id="metricNextRelease">--:--</strong>
+            <p id="metricNextTitle">読み込み中...</p>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">稼働エージェント</span>
+            <strong id="metricAgents">7</strong>
+            <p>制作ライン</p>
+          </article>
+        </section>
+
+        <section class="panel release-panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Live Feed</p>
+              <h2>更新監視</h2>
+            </div>
+            <div class="server-clock">
+              <span>サーバー時刻</span>
+              <strong id="serverClock">--</strong>
+            </div>
+          </div>
+          <div id="liveAlerts" class="live-alerts"></div>
+          <div class="release-grid">
+            <div class="release-feed-wrap">
+              <h3>直近の更新</h3>
+              <div id="releaseFeed" class="release-feed"></div>
+            </div>
+            <div class="notification-wrap">
+              <h3>通知登録</h3>
+              <button id="enableBrowserBtn" class="accent-btn" type="button">
+                ブラウザ通知を有効化
+              </button>
+              <form id="subscriptionForm" class="subscription-form">
+                <label>
+                  登録名
+                  <input id="displayName" type="text" value="編集部オペレーター" required />
+                </label>
+                <label>
+                  通知チャネル
+                  <select id="channel" required>
+                    <option value="browser">browser</option>
+                    <option value="email">email</option>
+                    <option value="webhook">webhook</option>
+                  </select>
+                </label>
+                <label>
+                  通知先
+                  <input id="target" type="text" value="browser-session" required />
+                </label>
+                <button class="ghost-btn" type="submit">登録する</button>
+              </form>
+              <p id="subscriptionMessage" class="subscription-message"></p>
+              <div id="subscriptionList" class="subscription-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Series Lineup</p>
+              <h2>連載一覧</h2>
+            </div>
+            <p class="section-note">各作品は毎時1回、20ページずつ更新。</p>
+          </div>
+          <div id="seriesGrid" class="series-grid"></div>
+        </section>
+
+        <section class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Studio Agents</p>
+              <h2>漫画制作エージェント</h2>
+            </div>
+            <p class="section-note">物語設計から写植、最終校正までを毎時間で完走させる。</p>
+          </div>
+          <div id="agentGrid" class="agent-grid"></div>
+        </section>
+
+        <section class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Production Queue</p>
+              <h2>現在の制作進行</h2>
+            </div>
+            <p class="section-note">次回更新に近い作品から順に表示。</p>
+          </div>
+          <div id="queueGrid" class="queue-grid"></div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/static/js/app.js?v=1"></script>
+  </body>
+</html>

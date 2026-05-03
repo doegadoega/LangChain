@@ -9,7 +9,7 @@ struct ChatMessage: Identifiable {
 }
 
 struct CEOChatView: View {
-    @State private var inputText: String = ""
+    @Binding var inputText: String
     let messages: [ChatMessage]
     let onSend: (String) -> Void
 
@@ -38,25 +38,38 @@ struct CEOChatView: View {
                 .padding(.horizontal, 10).padding(.vertical, 4)
             }
 
-            HStack(spacing: 4) {
-                TextField("メッセージを入力...", text: $inputText)
-                    .textFieldStyle(.roundedBorder).font(.system(size: 16))
-                    .onSubmit { send() }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    MultilineComposer(
+                        text: $inputText,
+                        placeholder: "メッセージを入力...",
+                        minHeight: 34,
+                        maxHeight: 120,
+                        onSubmit: send
+                    )
 
-                Button(action: send) {
-                    Text("送信").font(.system(size: 16, weight: .semibold))
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.accentColor).foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                    Button(action: send) {
+                        Text("送信").font(.system(size: 16, weight: .semibold))
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.accentColor).foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+
+                HStack {
+                    Spacer()
+                    Text("⌘+Enter で送信")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
         }
     }
 
     private func send() {
-        let text = inputText.trimmingCharacters(in: .whitespaces)
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         onSend(text)
         inputText = ""

@@ -22,7 +22,6 @@
 - `enabled`
 - `id`, `name`
 - `org_role` (`ceo|manager|worker|pmo|qa|ui_designer|system_designer|ops_designer|other`)
-- `mode` (`writer|reviewer|editor`)
 - `provider` (`codex_cli|claude_cli|gemini_cli|custom_cli`)
 - `model`
 - `persona`

@@ -22,6 +22,10 @@ struct FileTreeView: View {
             .padding(.vertical, 4)
         }
         .onAppear { loadTree() }
+        .onChange(of: rootPath) { _, _ in
+            // Switching projects updates only rootPath, so reload explicitly.
+            loadTree()
+        }
     }
 
     private func loadTree() {

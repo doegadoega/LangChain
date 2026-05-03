@@ -80,7 +80,7 @@ def _cmd_sample_config(args: argparse.Namespace) -> int:
             {
                 "id": "drafter",
                 "name": "Drafter",
-                "mode": "writer",
+                "org_role": "worker",
                 "provider": "codex_cli",
                 "persona": "初稿を作る",
                 "skills": ["構成設計"],
@@ -98,7 +98,7 @@ def _cmd_sample_config(args: argparse.Namespace) -> int:
             {
                 "id": "critic",
                 "name": "Critic",
-                "mode": "reviewer",
+                "org_role": "qa",
                 "provider": "claude_cli",
                 "persona": "問題点を洗い出す",
                 "skills": ["レビュー"],
@@ -116,7 +116,7 @@ def _cmd_sample_config(args: argparse.Namespace) -> int:
             {
                 "id": "editor",
                 "name": "Editor",
-                "mode": "editor",
+                "org_role": "manager",
                 "provider": "codex_cli",
                 "persona": "最終稿へ統合する",
                 "skills": ["推敲"],

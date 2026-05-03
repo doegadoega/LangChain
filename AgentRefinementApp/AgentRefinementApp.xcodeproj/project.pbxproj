@@ -17,13 +17,16 @@
 		2D40E78CEB12B7E38DC138A4 /* Agent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0487B09B218513A081D322FE /* Agent.swift */; };
 		2FD8B0051EB8287D19542CFD /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E501E3E6EDFC71565BBD51 /* SidebarView.swift */; };
 		372033AC933A9CE8BE4361E3 /* Evaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A5400EE0D67A61D10C9D471 /* Evaluation.swift */; };
+		398C889F9E3849E0929DA1AF /* MultilineComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F16EE950C56D1AD95823991D /* MultilineComposer.swift */; };
 		3BA2AD00B405A18B88F76C06 /* WorkflowScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD60B5F02BB482596933E7C0 /* WorkflowScreen.swift */; };
 		4761889CF772FDF114343F6E /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF8984AE7E7A64BA617252E3 /* AppStateTests.swift */; };
 		4FA3333C12182C688AADEF51 /* GitHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 059266D4CCE115B02860484F /* GitHelperTests.swift */; };
+		51279B1980A04BDCFC8CF7FF /* AgentRefinementAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A76C7C3F38430EA9AB9258 /* AgentRefinementAppUITests.swift */; };
 		5417D0DAF753C0A19D6190E5 /* ProjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0530AC18FA2D3F54B6BAECF7 /* ProjectTests.swift */; };
 		55343811D8A5D0648477D5D3 /* GitHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 249FEF4A7E6C25CF541D3415 /* GitHelper.swift */; };
 		56CBC57671EDC13A8D59DFA0 /* DetailPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F78005B414EAAD4E0370025 /* DetailPanelView.swift */; };
 		59C1B73E6DC669A64BACAD9F /* TemplatesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E086982F6166F00A7D9225A /* TemplatesScreen.swift */; };
+		5A26B10134D5E95EE90859AA /* MultilineComposerKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D80AD890A70FA90157749316 /* MultilineComposerKeyTests.swift */; };
 		69C5607EF6C7D51300D23100 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC643107901ED369321DEEF /* MainTabView.swift */; };
 		6B6DB5630C581C5543F737DA /* BottomPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9844049FE3C47F00723E2F29 /* BottomPanelView.swift */; };
 		71E9E1EFE0CB8B346DB6B639 /* OrgRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = D15155840D18B4FA1FBC0895 /* OrgRole.swift */; };
@@ -64,6 +67,13 @@
 			remoteGlobalIDString = F849610CD8D69DC6DED6FE70;
 			remoteInfo = AgentRefinementApp;
 		};
+		FAF9458823564C060DD707A9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4A0FF7D4AFB594A3799DC351 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F849610CD8D69DC6DED6FE70;
+			remoteInfo = AgentRefinementApp;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -84,6 +94,7 @@
 		3E086982F6166F00A7D9225A /* TemplatesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplatesScreen.swift; sourceTree = "<group>"; };
 		40FA89D600F17D3A3E7ED7CE /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
 		4245980176744D448136136A /* AgentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTests.swift; sourceTree = "<group>"; };
+		4813A6E189BC31504647259E /* AgentRefinementAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentRefinementAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D069F16200F37A5D9C270C3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		4F7B60BDC9694F483CCC6F9A /* DataStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStoreTests.swift; sourceTree = "<group>"; };
 		53088B394A026A9C5D085906 /* ExecutionLogTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionLogTable.swift; sourceTree = "<group>"; };
@@ -95,6 +106,7 @@
 		7DB36C33BF0DFC8198BA6D33 /* RoleBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleBadge.swift; sourceTree = "<group>"; };
 		7E03563B5A43C73B01E69B8C /* AgentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCard.swift; sourceTree = "<group>"; };
 		7F78005B414EAAD4E0370025 /* DetailPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPanelView.swift; sourceTree = "<group>"; };
+		81A76C7C3F38430EA9AB9258 /* AgentRefinementAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRefinementAppUITests.swift; sourceTree = "<group>"; };
 		8A0B952FCE84134A68937D53 /* AgentRefinementAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentRefinementAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		95364E38E38DE864733C74B4 /* PromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptBuilder.swift; sourceTree = "<group>"; };
 		9844049FE3C47F00723E2F29 /* BottomPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomPanelView.swift; sourceTree = "<group>"; };
@@ -112,8 +124,10 @@
 		D15155840D18B4FA1FBC0895 /* OrgRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrgRole.swift; sourceTree = "<group>"; };
 		D280DD6AC1ECCCC5E79A5C23 /* Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workflow.swift; sourceTree = "<group>"; };
 		D3AAAD6A3728561CD9BDF952 /* Orchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Orchestrator.swift; sourceTree = "<group>"; };
+		D80AD890A70FA90157749316 /* MultilineComposerKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultilineComposerKeyTests.swift; sourceTree = "<group>"; };
 		DC6D6E674653F7F48ED527BF /* WorkflowPropertiesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowPropertiesPanel.swift; sourceTree = "<group>"; };
 		EFD382520FCE550B5A1022E1 /* CLIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIProvider.swift; sourceTree = "<group>"; };
+		F16EE950C56D1AD95823991D /* MultilineComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultilineComposer.swift; sourceTree = "<group>"; };
 		F38440F22A69939B2DF49A68 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		F8B67A33AFAAC6637F318FB2 /* WorkflowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowTests.swift; sourceTree = "<group>"; };
 		FC14648DEA46EBB6D2950B02 /* EvaluationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvaluationView.swift; sourceTree = "<group>"; };
@@ -138,6 +152,7 @@
 			children = (
 				C371A07857A9D2C791B52F0F /* AgentRefinementApp */,
 				642A032CBE44DDCBB31D3AE5 /* AgentRefinementAppTests */,
+				512E35B912DCE0FD147592B1 /* AgentRefinementAppUITests */,
 				FDA75BA3CAE37251C410AB46 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -164,6 +179,14 @@
 			path = Engine;
 			sourceTree = "<group>";
 		};
+		512E35B912DCE0FD147592B1 /* AgentRefinementAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				81A76C7C3F38430EA9AB9258 /* AgentRefinementAppUITests.swift */,
+			);
+			path = AgentRefinementAppUITests;
+			sourceTree = "<group>";
+		};
 		5B63B1FBE2CAFA828DDDD4CD /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -186,8 +209,17 @@
 				4BFCBB6D04B3DDB7E222C6E7 /* Engine */,
 				9BF8AE930E3EB01790B27113 /* Models */,
 				B441B388D70344930CA5AE14 /* Services */,
+				7F78B3CD42EB1BE5209BB50B /* Views */,
 			);
 			path = AgentRefinementAppTests;
+			sourceTree = "<group>";
+		};
+		7F78B3CD42EB1BE5209BB50B /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				D80AD890A70FA90157749316 /* MultilineComposerKeyTests.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		9BF8AE930E3EB01790B27113 /* Models */ = {
@@ -241,6 +273,7 @@
 				FC14648DEA46EBB6D2950B02 /* EvaluationView.swift */,
 				53088B394A026A9C5D085906 /* ExecutionLogTable.swift */,
 				9AB3932CB4088CCC729C97E7 /* FileTreeView.swift */,
+				F16EE950C56D1AD95823991D /* MultilineComposer.swift */,
 				2286E16A5138BC3E81C57281 /* NewProjectSheet.swift */,
 				7DB36C33BF0DFC8198BA6D33 /* RoleBadge.swift */,
 				5CAD572E6B86A712E6722CD8 /* RoleFilterBar.swift */,
@@ -257,6 +290,7 @@
 			children = (
 				10B3B258D4BEC0766448FAF2 /* AgentRefinementApp.app */,
 				8A0B952FCE84134A68937D53 /* AgentRefinementAppTests.xctest */,
+				4813A6E189BC31504647259E /* AgentRefinementAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -275,6 +309,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		350C8F09EFE700345E65BE87 /* AgentRefinementAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D633C917F774343CBD0471EF /* Build configuration list for PBXNativeTarget "AgentRefinementAppUITests" */;
+			buildPhases = (
+				EC19FE90F8FACF7E0ECB93D3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A7ACB6BE44DD920FD9BDB478 /* PBXTargetDependency */,
+			);
+			name = AgentRefinementAppUITests;
+			packageProductDependencies = (
+			);
+			productName = AgentRefinementAppUITests;
+			productReference = 4813A6E189BC31504647259E /* AgentRefinementAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		74F44D727C48382088A7E704 /* AgentRefinementAppTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 32E32A637FA69A583AE18EC4 /* Build configuration list for PBXNativeTarget "AgentRefinementAppTests" */;
@@ -319,6 +371,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					350C8F09EFE700345E65BE87 = {
+						TestTargetID = F849610CD8D69DC6DED6FE70;
+					};
 					F849610CD8D69DC6DED6FE70 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -340,6 +395,7 @@
 			targets = (
 				F849610CD8D69DC6DED6FE70 /* AgentRefinementApp */,
 				74F44D727C48382088A7E704 /* AgentRefinementAppTests */,
+				350C8F09EFE700345E65BE87 /* AgentRefinementAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -368,6 +424,7 @@
 				A871F29B2C4436E97FAB0055 /* FileTreeView.swift in Sources */,
 				55343811D8A5D0648477D5D3 /* GitHelper.swift in Sources */,
 				69C5607EF6C7D51300D23100 /* MainTabView.swift in Sources */,
+				398C889F9E3849E0929DA1AF /* MultilineComposer.swift in Sources */,
 				C98914516B79E241E1E11C22 /* NewProjectSheet.swift in Sources */,
 				EB4F23673C3EE7963599FA4F /* Orchestrator.swift in Sources */,
 				71E9E1EFE0CB8B346DB6B639 /* OrgRole.swift in Sources */,
@@ -398,11 +455,20 @@
 				886AED866B4058396749B0E8 /* CLIProviderTests.swift in Sources */,
 				82DD52EB8DC7888A84BF9495 /* DataStoreTests.swift in Sources */,
 				4FA3333C12182C688AADEF51 /* GitHelperTests.swift in Sources */,
+				5A26B10134D5E95EE90859AA /* MultilineComposerKeyTests.swift in Sources */,
 				24D22BAF357CCD3570D08E3A /* OrchestratorTests.swift in Sources */,
 				91A8433F0512F1C0E649D640 /* OrgRoleTests.swift in Sources */,
 				5417D0DAF753C0A19D6190E5 /* ProjectTests.swift in Sources */,
 				B2B8DCC80B15CFC8A9133F47 /* PromptBuilderTests.swift in Sources */,
 				E385561FFC4BDA243C4FE983 /* WorkflowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EC19FE90F8FACF7E0ECB93D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				51279B1980A04BDCFC8CF7FF /* AgentRefinementAppUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,6 +479,11 @@
 			isa = PBXTargetDependency;
 			target = F849610CD8D69DC6DED6FE70 /* AgentRefinementApp */;
 			targetProxy = 2735121EA9158986524D13E1 /* PBXContainerItemProxy */;
+		};
+		A7ACB6BE44DD920FD9BDB478 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F849610CD8D69DC6DED6FE70 /* AgentRefinementApp */;
+			targetProxy = FAF9458823564C060DD707A9 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -432,8 +503,43 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.agentrefinement.app;
+				PRODUCT_MODULE_NAME = AgentRefinementApp;
 				PRODUCT_NAME = "Agent Refinement";
 				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		091C49ECD537CD7F611DEAAB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentrefinement.app.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = AgentRefinementApp;
+			};
+			name = Release;
+		};
+		0C27064479D2944DC4BE5A52 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentrefinement.app.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = AgentRefinementApp;
 			};
 			name = Debug;
 		};
@@ -442,6 +548,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -577,6 +684,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -603,6 +711,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.agentrefinement.app;
+				PRODUCT_MODULE_NAME = AgentRefinementApp;
 				PRODUCT_NAME = "Agent Refinement";
 				SDKROOT = macosx;
 			};
@@ -634,6 +743,15 @@
 			buildConfigurations = (
 				02C9A040BEF26FF6C2B104D7 /* Debug */,
 				E5777E2BBF68947709A2D3BB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D633C917F774343CBD0471EF /* Build configuration list for PBXNativeTarget "AgentRefinementAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C27064479D2944DC4BE5A52 /* Debug */,
+				091C49ECD537CD7F611DEAAB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

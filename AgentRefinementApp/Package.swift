@@ -8,6 +8,11 @@ let package = Package(
         .executableTarget(
             name: "AgentRefinementApp",
             path: "AgentRefinementApp",
+            // Xcode app-only metadata files are not SwiftPM build inputs.
+            exclude: [
+                "Info.plist",
+                "AgentRefinementApp.entitlements"
+            ],
             resources: [
                 .copy("Resources/workflow-canvas")
             ]

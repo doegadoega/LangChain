@@ -11,7 +11,7 @@ PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 from app.models import (
     AgentConfig,
-    AgentMode,
+    OrgRole,
     OrchestrationMode,
     RefineRequest,
     RefineResponse,
@@ -84,7 +84,7 @@ def _build_system_directive(agent: AgentConfig) -> str:
         mcp_block = "MCP設定:\n- 有効化: 無効\n"
     return (
         f"あなたは {agent.name} です。\n"
-        f"役割: {agent.mode.value}\n"
+        f"組織ロール: {agent.org_role.value}\n"
         f"ペルソナ:\n{persona_block}\n\n"
         f"活用するスキル:\n{skills_block}\n"
         f"{mcp_block}"
@@ -169,25 +169,31 @@ def _build_task_prompt(
     agent: AgentConfig,
     context: RunContext,
     round_index: int,
-    review_notes: list[str],
     round_outputs: dict[str, str],
     has_working_dir: bool = False,
 ) -> str:
     objective = context.request.objective.strip() or "特になし"
     global_instruction = context.request.global_instruction.strip() or "特になし"
-    notes = "\n\n".join(review_notes) if review_notes else "なし"
     workflow_mode = context.request.workflow_mode
     dep_block = _build_dependency_context_block(agent, round_outputs)
+    output_history = (
+        "\n\n".join(
+            f"[{agent_id}]\n{_truncate_output(text)}"
+            for agent_id, text in round_outputs.items()
+            if text
+        )
+        if round_outputs
+        else "なし"
+    )
 
     if workflow_mode == WorkflowMode.CODING:
         code_block = _build_code_context_block(context)
-        if has_working_dir:
-            mode_instruction = _build_coding_live_instruction(agent)
-        else:
-            mode_instruction = _build_coding_text_instruction(agent)
+        role_instruction = _build_coding_instruction(
+            org_role=agent.org_role, has_working_dir=has_working_dir
+        )
     else:
         code_block = "コーディングコンテキスト: writingモードのため未使用\n"
-        mode_instruction = _build_writing_instruction(agent)
+        role_instruction = _build_writing_instruction(org_role=agent.org_role)
 
     return (
         f"{_build_system_directive(agent)}\n"
@@ -198,69 +204,47 @@ def _build_task_prompt(
         f"グローバル指示:\n{global_instruction}\n\n"
         f"{code_block}\n"
         f"{dep_block}\n"
-        f"これまでのレビュー指摘:\n{notes}\n\n"
+        f"これまでの依存出力サマリー:\n{output_history}\n\n"
         f"現在の状態:\n<<DRAFT>>\n{context.draft}\n<</DRAFT>>\n\n"
-        f"タスク:\n{mode_instruction}"
+        f"タスク:\n{role_instruction}"
     )
 
 
-def _build_coding_live_instruction(agent: AgentConfig) -> str:
-    if agent.mode == AgentMode.REVIEWER:
+def _build_coding_instruction(*, org_role: OrgRole, has_working_dir: bool) -> str:
+    role_hint = {
+        OrgRole.CEO: "最終判断者として、優先順位と受け入れ基準を明確化してください。",
+        OrgRole.MANAGER: "計画整合と分解可能性を重視し、実行指示を具体化してください。",
+        OrgRole.PMO: "計画の抜け漏れ・依存リスク・進捗リスクを明示してください。",
+        OrgRole.QA: "テスト観点と品質ゲート観点を最優先で確認してください。",
+    }.get(org_role, "担当ロールとして成果物を前進させる具体的な変更を出してください。")
+
+    if has_working_dir:
         return (
-            "リポジトリの現在の変更内容をレビューしてください。\n"
-            "重大度順に指摘を箇条書きで返してください。\n"
-            "可能なら `file:line` 形式で対象箇所を示し、"
-            "バグ・リスク・不足テストを優先してください。"
+            "リポジトリで直接作業してください。\n"
+            "必要なファイルを作成・修正し、変更内容を要約してください。\n"
+            "テストコマンドがある場合は実行して結果を含めてください。\n"
+            f"{role_hint}"
         )
-    if agent.mode == AgentMode.WRITER:
-        return (
-            "リポジトリで直接コードを実装してください。\n"
-            "必要なファイルを作成・修正してください。\n"
-            "テストコードも可能な限り含めてください。\n"
-            "作業完了後、変更内容の要約を出力してください。"
-        )
+
     return (
-        "レビュー指摘を踏まえてリポジトリのコードを修正・統合してください。\n"
-        "テストコマンドが指定されている場合は実行して確認してください。\n"
-        "最終的な変更内容の要約を出力してください。"
+        "現在のドラフトを実装計画として改善してください。\n"
+        "出力は以下の見出しを含めてください: "
+        "`変更概要` `変更ファイル` `実装手順` `テスト計画` `リスク`。\n"
+        f"{role_hint}"
     )
 
 
-def _build_coding_text_instruction(agent: AgentConfig) -> str:
-    if agent.mode == AgentMode.REVIEWER:
-        return (
-            "現在のドラフトをコードレビューしてください。"
-            "重大度順に3〜8個の指摘を箇条書きで返してください。"
-            "可能なら `file:line` 形式で対象箇所を示し、"
-            "バグ・リスク・不足テストを優先してください。"
-        )
-    if agent.mode == AgentMode.WRITER:
-        return (
-            "現在のドラフトを実装方針として更新してください。"
-            "出力は以下の見出しを必ず含めてください: "
-            "`変更概要` `変更ファイル` `実装手順` `テスト計画`。"
-        )
+def _build_writing_instruction(*, org_role: OrgRole) -> str:
+    role_hint = {
+        OrgRole.CEO: "意思決定しやすい簡潔さを重視してください。",
+        OrgRole.MANAGER: "段取りと依存関係が伝わる構成にしてください。",
+        OrgRole.PMO: "抜け漏れと曖昧表現を排除してください。",
+        OrgRole.QA: "検証観点が明確になるようにしてください。",
+    }.get(org_role, "読み手に伝わる明瞭さを重視してください。")
     return (
-        "レビュー指摘を統合して最終実装案を作ってください。"
-        "出力は以下の見出しを必ず含めてください: "
-        "`最終方針` `ファイル別変更` `リスク` `受け入れ確認`。"
-    )
-
-
-def _build_writing_instruction(agent: AgentConfig) -> str:
-    if agent.mode == AgentMode.REVIEWER:
-        return (
-            "現在の下書きをレビューし、改善点を3〜7個の箇条書きで返してください。"
-            "出力は指摘のみで、書き直し本文は出力しないでください。"
-        )
-    if agent.mode == AgentMode.WRITER:
-        return (
-            "現在の下書きを目的に合わせて書き直してください。"
-            "出力は完成した本文のみを返してください。前置きは不要です。"
-        )
-    return (
-        "レビュー指摘を反映して下書きを統合・推敲してください。"
-        "出力は完成した本文のみを返してください。前置きは不要です。"
+        "現在の下書きを改善してください。\n"
+        "必要なら修正案と本文をまとめて返してください。\n"
+        f"{role_hint}"
     )
 
 
@@ -326,10 +310,20 @@ def _execution_batches(request: RefineRequest) -> list[list[AgentConfig]]:
         return [[agent] for agent in agents]
 
     if request.orchestration_mode == OrchestrationMode.ROLE_BASED:
-        role_order = [AgentMode.WRITER, AgentMode.REVIEWER, AgentMode.EDITOR]
+        role_order = [
+            OrgRole.CEO,
+            OrgRole.MANAGER,
+            OrgRole.WORKER,
+            OrgRole.PMO,
+            OrgRole.QA,
+            OrgRole.UI_DESIGNER,
+            OrgRole.SYSTEM_DESIGNER,
+            OrgRole.OPS_DESIGNER,
+            OrgRole.OTHER,
+        ]
         batches: list[list[AgentConfig]] = []
         for role in role_order:
-            role_agents = [agent for agent in agents if agent.mode == role]
+            role_agents = [agent for agent in agents if agent.org_role == role]
             if role_agents:
                 batches.append(role_agents)
         return batches
@@ -410,7 +404,6 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
 
     for round_index in range(1, request.rounds + 1):
         turns: list[TurnResult] = []
-        review_notes: list[str] = []
         round_outputs: dict[str, str] = {}
         turn_index = 0
         yield {
@@ -441,7 +434,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     "turn_index": turn_index,
                     "agent_id": agent.id,
                     "agent_name": agent.name,
-                    "mode": agent.mode.value,
+                    "org_role": agent.org_role.value,
                     "provider": agent.provider.value,
                     "depends_on": agent.depends_on,
                     "mcp_enabled": agent.mcp_enabled,
@@ -451,7 +444,6 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     agent=agent,
                     context=context,
                     round_index=round_index,
-                    review_notes=review_notes,
                     round_outputs=round_outputs,
                     has_working_dir=has_working_dir,
                 )
@@ -470,7 +462,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     )
 
                 try:
-                    use_coding = has_working_dir and agent.mode != AgentMode.REVIEWER
+                    use_coding = has_working_dir
                     provider = resolve_provider(
                         provider_kind=agent.provider,
                         command_template=agent.command_template,
@@ -485,13 +477,13 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     ).strip()
 
                     file_changes = None
-                    if has_working_dir and agent.mode != AgentMode.REVIEWER:
+                    if has_working_dir:
                         file_changes = _capture_git_diff(working_dir)
 
                     turn = TurnResult(
                         agent_id=agent.id,
                         agent_name=agent.name,
-                        mode=agent.mode,
+                        org_role=agent.org_role,
                         provider=agent.provider,
                         output=output,
                         file_changes=file_changes,
@@ -503,19 +495,13 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     round_outputs[agent.id] = output
 
                     if not has_working_dir:
-                        if agent.mode == AgentMode.REVIEWER:
-                            review_notes.append(f"[{agent.name}]\n{output}")
-                        else:
-                            context.draft = output or context.draft
-                    else:
-                        if agent.mode == AgentMode.REVIEWER:
-                            review_notes.append(f"[{agent.name}]\n{output}")
+                        context.draft = output or context.draft
 
                 except ProviderError as exc:
                     turn = TurnResult(
                         agent_id=agent.id,
                         agent_name=agent.name,
-                        mode=agent.mode,
+                        org_role=agent.org_role,
                         provider=agent.provider,
                         output="",
                         error=str(exc),

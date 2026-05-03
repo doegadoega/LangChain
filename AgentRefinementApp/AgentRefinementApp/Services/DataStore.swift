@@ -9,7 +9,19 @@ final class DataStore: Sendable {
     private var workflowsDir: URL { baseDirectory.appendingPathComponent("workflows") }
 
     init(baseDirectory: URL? = nil) {
-        self.baseDirectory = baseDirectory ?? FileManager.default.homeDirectoryForCurrentUser
+        if let baseDirectory {
+            self.baseDirectory = baseDirectory
+            return
+        }
+
+        // UI tests can isolate persisted state by providing a custom data directory.
+        if let envDir = ProcessInfo.processInfo.environment["AGENT_REFINEMENT_DATA_DIR"],
+           !envDir.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            self.baseDirectory = URL(fileURLWithPath: envDir)
+            return
+        }
+
+        self.baseDirectory = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".agent-refinement")
     }
 

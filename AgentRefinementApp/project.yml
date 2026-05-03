@@ -27,6 +27,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.agentrefinement.app
+        PRODUCT_MODULE_NAME: AgentRefinementApp
         INFOPLIST_FILE: AgentRefinementApp/Info.plist
         CODE_SIGN_ENTITLEMENTS: AgentRefinementApp/AgentRefinementApp.entitlements
         CODE_SIGN_STYLE: Automatic
@@ -46,5 +47,19 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.agentrefinement.app.tests
+        GENERATE_INFOPLIST_FILE: true
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Agent Refinement.app/Contents/MacOS/Agent Refinement"
         BUNDLE_LOADER: "$(TEST_HOST)"
+
+  AgentRefinementAppUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: AgentRefinementAppUITests
+    dependencies:
+      - target: AgentRefinementApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.agentrefinement.app.uitests
+        TEST_TARGET_NAME: AgentRefinementApp
+        GENERATE_INFOPLIST_FILE: true

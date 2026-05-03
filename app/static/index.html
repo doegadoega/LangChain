@@ -1,123 +1,14 @@
 <!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agent Refinement Platform</title>
-  <link rel="stylesheet" href="/static/styles.css" />
-</head>
-<body>
-  <div id="app">
-    <!-- Left Panel -->
-    <aside id="leftPanel" class="left-panel">
-      <div class="project-header">
-        <span class="project-title">📁 案件</span>
-        <button id="addProjectBtn" class="icon-btn" title="新規案件">+</button>
-      </div>
-      <div id="projectList" class="project-list"></div>
-      <div class="sidebar-divider"></div>
-      <div class="explorer-header">
-        <span>📂 Explorer</span>
-      </div>
-      <div id="folderTree" class="folder-tree"></div>
-    </aside>
-
-    <!-- Resize handle -->
-    <div class="resize-handle" data-resize="left"></div>
-
-    <!-- Center -->
-    <main id="centerPanel" class="center-panel">
-      <!-- Tab bar -->
-      <nav class="tab-bar">
-        <button class="tab is-active" data-tab="requirements">📋 要件・実行</button>
-        <button class="tab" data-tab="templates">🏢 組織テンプレート</button>
-        <button class="tab" data-tab="agents">🤖 エージェント管理</button>
-        <button class="tab" data-tab="workflow">🔀 ワークフローエディタ</button>
-      </nav>
-
-      <!-- Tab content -->
-      <div class="tab-content">
-        <!-- Requirements -->
-        <section id="tabRequirements" class="tab-pane is-active">
-          <div class="requirements-bar">
-            <label class="req-label">要件</label>
-            <input id="requirementsInput" type="text" class="req-input" placeholder="要件を入力..." />
-            <button id="runBtn" class="btn-primary">▶ 実行</button>
-          </div>
-          <div id="executionLog" class="execution-log">
-            <div class="empty-state">📋 要件を入力して実行してください</div>
-          </div>
-          <div class="ceo-chat">
-            <div class="ceo-chat-header">💬 CEO レポート</div>
-            <div id="ceoChatMessages" class="ceo-chat-messages"></div>
-            <div class="ceo-chat-input">
-              <input id="ceoChatInput" type="text" placeholder="メッセージを入力..." />
-              <button id="ceoChatSend" class="btn-small">送信</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- Templates -->
-        <section id="tabTemplates" class="tab-pane">
-          <div class="templates-layout">
-            <div class="template-list-panel">
-              <div class="panel-header">
-                <span>テンプレート</span>
-                <button id="addTemplateBtn" class="btn-small">+ 新規</button>
-              </div>
-              <div id="templateList" class="template-list"></div>
-            </div>
-            <div id="templateDetail" class="template-detail">
-              <div class="empty-state">テンプレートを選択してください</div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Agents -->
-        <section id="tabAgents" class="tab-pane">
-          <div class="agents-toolbar">
-            <div class="search-box">
-              <span>🔍</span>
-              <input id="agentSearch" type="text" placeholder="検索..." />
-            </div>
-            <div id="roleFilters" class="role-filters"></div>
-            <button id="addAgentBtn" class="btn-primary">+ 新規エージェント</button>
-          </div>
-          <div id="agentGrid" class="agent-grid"></div>
-        </section>
-
-        <!-- Workflow -->
-        <section id="tabWorkflow" class="tab-pane">
-          <div class="empty-state">🔀 ワークフローエディタ（準備中）</div>
-        </section>
-      </div>
-
-      <!-- Bottom panel -->
-      <div class="bottom-panel">
-        <div class="bottom-tabs">
-          <button class="bottom-tab is-active" data-btab="carousel">🤖 エージェント</button>
-          <button class="bottom-tab" data-btab="terminal">⬛ ターミナル</button>
-        </div>
-        <div id="agentCarousel" class="agent-carousel">
-          <button id="carouselAddBtn" class="carousel-add">+</button>
-        </div>
-        <div id="terminalPanel" class="terminal-panel" hidden>
-          <div class="terminal-content">ターミナル準備中...</div>
-        </div>
-      </div>
-    </main>
-
-    <!-- Resize handle -->
-    <div class="resize-handle" data-resize="right"></div>
-
-    <!-- Right Panel -->
-    <aside id="rightPanel" class="right-panel">
-      <div id="agentDetail" class="agent-detail">
-        <div class="empty-state">エージェントを選択</div>
-      </div>
-    </aside>
-  </div>
-
-  <script src="/static/js/app.js"></script>
-</body>
+<html lang="ja" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent Refinement Platform</title>
+    <meta name="description" content="AI Agent Orchestration Platform" />
+    <script type="module" crossorigin src="/static/assets/index-Cf3qQoGu.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/assets/index-BKprcblJ.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

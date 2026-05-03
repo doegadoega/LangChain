@@ -55,10 +55,7 @@ struct BottomPanelView: View {
                 case .agents:
                     agentCarousel
                 case .terminal:
-                    Text("ターミナル（Phase 2で実装）")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    TerminalView()
                 }
             }
         }

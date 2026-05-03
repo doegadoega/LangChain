@@ -20,11 +20,16 @@ enum MainTab: String, CaseIterable, Identifiable {
 
 struct MainTabView: View {
     @Binding var selectedTab: MainTab
+    @AppStorage("ui.simple_mode") private var simpleMode: Bool = true
+
+    private var visibleTabs: [MainTab] {
+        simpleMode ? [.requirements, .templates] : MainTab.allCases
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                ForEach(MainTab.allCases) { tab in
+                ForEach(visibleTabs) { tab in
                     Button {
                         selectedTab = tab
                     } label: {
@@ -49,6 +54,24 @@ struct MainTabView: View {
                     .buttonStyle(.plain)
                 }
                 Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        simpleMode.toggle()
+                        if simpleMode, selectedTab == .agents || selectedTab == .workflow {
+                            selectedTab = .requirements
+                        }
+                    }
+                } label: {
+                    Text(simpleMode ? "詳細設定を表示" : "かんたん表示に戻す")
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 10)
             }
             .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
 

@@ -7,7 +7,9 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Image(systemName: "folder").foregroundStyle(.blue)
-                Text("Explorer").font(.system(size: 14, weight: .bold)).textCase(.uppercase).foregroundStyle(.secondary)
+                Text("作業フォルダ")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
 

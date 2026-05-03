@@ -2,9 +2,12 @@ import SwiftUI
 
 struct RequirementsScreen: View {
     @EnvironmentObject var appState: AppState
-    @State private var requirementsText: String = ""
+    @AppStorage("ui.simple_mode") private var simpleMode: Bool = true
     @State private var logEntries: [ExecutionLogEntry] = []
     @State private var chatMessages: [ChatMessage] = []
+    @State private var detailedOutputs: [DetailedAgentOutput] = []
+    @State private var finalResult: FinalExecutionResult?
+    @State private var showDetailedOutputs = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,28 +16,93 @@ struct RequirementsScreen: View {
             executionArea
             ceoChatArea
         }
+        .sheet(isPresented: $showDetailedOutputs) {
+            DetailedOutputsSheet(
+                outputs: detailedOutputs,
+                finalResult: finalResult
+            )
+        }
+        .onAppear {
+            applyStoredProjectRequirementsIfNeeded()
+        }
+        .onChange(of: appState.selectedProjectId) {
+            applyStoredProjectRequirementsIfNeeded()
+        }
+        .onChange(of: appState.pendingRequirementsAutoRunToken) {
+            // New-project wizard sets a token to request immediate execution.
+            startExecution()
+        }
     }
 
     private var requirementsBar: some View {
-        HStack(spacing: 8) {
-            Text("要件").font(.system(size: 16, weight: .bold)).foregroundStyle(.secondary)
-            TextField("要件を入力...", text: $requirementsText)
-                .textFieldStyle(.roundedBorder).font(.system(size: 14))
-            Button {
-                startExecution()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "play.fill").font(.system(size: 15))
-                    Text("実行")
-                }
-                .font(.system(size: 14, weight: .bold))
-                .padding(.horizontal, 14).padding(.vertical, 5)
-                .background(appState.isExecuting ? Color.gray : Color.accentColor)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+        VStack(alignment: .leading, spacing: 4) {
+            if simpleMode {
+                Text("やりたいことを1文で入力して「実行」を押すだけです。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .disabled(appState.isExecuting || requirementsText.trimmingCharacters(in: .whitespaces).isEmpty)
+
+            HStack(alignment: .bottom, spacing: 8) {
+                Text(simpleMode ? "やりたいこと" : "要件")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.secondary)
+                MultilineComposer(
+                    text: $appState.requirementsDraft,
+                    placeholder: simpleMode
+                        ? "例: 最高の晩餐について、3つの案を提案して"
+                        : "要件を入力...",
+                    minHeight: 36,
+                    maxHeight: 140,
+                    isEnabled: !appState.isExecuting
+                ) {
+                    startExecution()
+                }
+                .frame(maxWidth: .infinity)
+
+                Button {
+                    startExecution()
+                } label: {
+                    HStack(spacing: 4) {
+                        if appState.isExecuting {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "play.fill").font(.system(size: 15))
+                        }
+                        Text(appState.isExecuting ? "実行中..." : "実行")
+                    }
+                    .font(.system(size: 14, weight: .bold))
+                    .padding(.horizontal, 14).padding(.vertical, 5)
+                    .background(appState.isExecuting ? Color.gray : Color.accentColor)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .disabled(appState.isExecuting || appState.requirementsDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button {
+                    showDetailedOutputs = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.text.magnifyingglass").font(.system(size: 14))
+                        Text("出力全文")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.horizontal, 12).padding(.vertical, 5)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .foregroundStyle(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .disabled(detailedOutputs.isEmpty && finalResult == nil)
+            }
+
+            HStack {
+                Spacer()
+                Text("⌘+Enter で実行")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
     }
@@ -54,18 +122,31 @@ struct RequirementsScreen: View {
     }
 
     private var ceoChatArea: some View {
-        CEOChatView(messages: chatMessages) { message in
+        CEOChatView(inputText: $appState.chatDraft, messages: chatMessages) { message in
             chatMessages.append(ChatMessage(sender: "あなた", icon: "👤", content: message, isUser: true))
         }
-        .frame(height: 100)
+        .frame(height: 140)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
     }
 
     private func startExecution() {
-        let requirements = requirementsText.trimmingCharacters(in: .whitespaces)
-        guard !requirements.isEmpty else { return }
+        guard appState.selectedProject != nil else {
+            chatMessages.append(ChatMessage(
+                sender: "Director",
+                icon: "👑",
+                content: "先に左上の + から案件を作成してください。",
+                isUser: false
+            ))
+            return
+        }
 
-        logEntries = appState.agents.enumerated().map { index, agent in
+        guard let requirements = appState.consumeRequirementsDraft() else { return }
+        appState.updateSelectedProjectRequirements(requirements)
+        detailedOutputs = []
+        finalResult = nil
+
+        let executionAgents = appState.executionAgentsForSelectedProject()
+        logEntries = executionAgents.enumerated().map { index, agent in
             ExecutionLogEntry(
                 agentName: agent.name,
                 agentIcon: agent.primaryRole?.icon ?? "🤖",
@@ -102,7 +183,13 @@ struct RequirementsScreen: View {
                     if let name = agentName {
                         let success = event["success"] as? Bool ?? false
                         if success {
+                            if let preview = event["output"] as? String, !preview.isEmpty {
+                                agentLogs[name, default: []].append(preview)
+                            }
                             agentLogs[name, default: []].append("✓ 完了")
+                            if let fullOutput = event["full_output"] as? String, !fullOutput.isEmpty {
+                                detailedOutputs.append(.init(agentName: name, output: fullOutput))
+                            }
                         } else {
                             let errorMsg = event["error"] as? String ?? "エラー"
                             agentLogs[name, default: []].append("✗ " + errorMsg)
@@ -110,6 +197,9 @@ struct RequirementsScreen: View {
                         completedAgents.insert(name)
                     }
                 case "run_completed":
+                    let finalText = (event["final_text"] as? String) ?? ""
+                    let diff = (event["diff"] as? String) ?? ""
+                    finalResult = FinalExecutionResult(finalText: finalText, diff: diff)
                     chatMessages.append(ChatMessage(
                         sender: "Director", icon: "👑",
                         content: "全エージェントの実行が完了しました。",
@@ -127,7 +217,7 @@ struct RequirementsScreen: View {
                 }
             }
 
-            updatedEntries = appState.agents.map { agent in
+            updatedEntries = executionAgents.map { agent in
                 let logs = agentLogs[agent.name] ?? ["— 未実行"]
                 let status: ExecutionStatus = completedAgents.contains(agent.name)
                     ? .done
@@ -142,5 +232,96 @@ struct RequirementsScreen: View {
             }
             logEntries = updatedEntries
         }
+    }
+
+    private func applyStoredProjectRequirementsIfNeeded() {
+        guard
+            appState.requirementsDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            let requirements = appState.selectedProject?.requirements?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !requirements.isEmpty
+        else {
+            return
+        }
+        appState.requirementsDraft = requirements
+    }
+}
+
+private struct DetailedAgentOutput: Identifiable {
+    let id = UUID()
+    let agentName: String
+    let output: String
+}
+
+private struct FinalExecutionResult {
+    let finalText: String
+    let diff: String
+}
+
+private struct DetailedOutputsSheet: View {
+    let outputs: [DetailedAgentOutput]
+    let finalResult: FinalExecutionResult?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("推論結果（全文）")
+                    .font(.system(size: 18, weight: .bold))
+                Spacer()
+                Button("閉じる") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if outputs.isEmpty {
+                        Text("まだ出力はありません。")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(Array(outputs.enumerated()), id: \.element.id) { index, item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(index + 1). \(item.agentName)")
+                                .font(.system(size: 14, weight: .semibold))
+                            selectableBlock(item.output)
+                        }
+                    }
+
+                    if let finalResult {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("最終結果")
+                                .font(.system(size: 14, weight: .bold))
+                            selectableBlock(finalResult.finalText.isEmpty ? "(空)" : finalResult.finalText)
+
+                            if !finalResult.diff.isEmpty {
+                                Text("差分")
+                                    .font(.system(size: 13, weight: .semibold))
+                                selectableBlock(finalResult.diff)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .padding(16)
+        .frame(minWidth: 760, minHeight: 520)
+    }
+
+    private func selectableBlock(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, design: .monospaced))
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Color(nsColor: .textBackgroundColor))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(nsColor: .separatorColor))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }

@@ -9,7 +9,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "AgentRefinement",
-            path: "AgentRefinement"
+            path: "AgentRefinement",
+            resources: [
+                .copy("Views/workflow-canvas")
+            ]
         ),
         .testTarget(
             name: "AgentRefinementTests",

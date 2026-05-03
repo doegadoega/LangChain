@@ -2,6 +2,10 @@ import Foundation
 
 enum GitHelper {
 
+    static func canRunGit() -> Bool {
+        runGit(["--version"], cwd: FileManager.default.homeDirectoryForCurrentUser.path, timeout: 5) != nil
+    }
+
     static func isGitRepo(path: String) -> Bool {
         runGit(["rev-parse", "--git-dir"], cwd: path, timeout: 10) != nil
     }

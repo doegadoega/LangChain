@@ -22,6 +22,14 @@ class FileStore:
         return self._base / "projects"
 
     @property
+    def _requests_dir(self) -> Path:
+        return self._base / "requests"
+
+    @property
+    def _chats_dir(self) -> Path:
+        return self._base / "chats"
+
+    @property
     def _templates_dir(self) -> Path:
         return self._base / "templates"
 
@@ -49,6 +57,30 @@ class FileStore:
 
     def delete_project(self, project_id: str) -> None:
         self._delete(self._projects_dir, project_id)
+
+    def save_request(self, data: dict[str, Any]) -> None:
+        self._save(self._requests_dir, data["id"], data)
+
+    def load_requests(self) -> list[dict[str, Any]]:
+        return self._load_all(self._requests_dir)
+
+    def load_request(self, request_id: str) -> dict[str, Any] | None:
+        return self._load_one(self._requests_dir, request_id)
+
+    def delete_request(self, request_id: str) -> None:
+        self._delete(self._requests_dir, request_id)
+
+    def save_chat(self, data: dict[str, Any]) -> None:
+        self._save(self._chats_dir, data["id"], data)
+
+    def load_chats(self) -> list[dict[str, Any]]:
+        return self._load_all(self._chats_dir)
+
+    def load_chat(self, chat_id: str) -> dict[str, Any] | None:
+        return self._load_one(self._chats_dir, chat_id)
+
+    def delete_chat(self, chat_id: str) -> None:
+        self._delete(self._chats_dir, chat_id)
 
     def save_template(self, data: dict[str, Any]) -> None:
         self._save(self._templates_dir, data["id"], data)

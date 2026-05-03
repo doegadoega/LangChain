@@ -1,11 +1,44 @@
 import SwiftUI
 
+private struct OrchestrationOption: Identifiable {
+    let id: String
+    let title: String
+    let description: String
+}
+
+private let orchestrationOptions: [OrchestrationOption] = [
+    .init(
+        id: "sequential",
+        title: "1人ずつ順番に実行",
+        description: "初めてならこの設定がおすすめです。分かりやすく順番に進みます。"
+    ),
+    .init(
+        id: "dependency_graph",
+        title: "依存関係に沿って実行",
+        description: "前提タスクが終わった順に進みます。エージェント設計に慣れた方向けです。"
+    ),
+    .init(
+        id: "role_based",
+        title: "役割ごとにまとめて実行",
+        description: "CEO→Manager→Worker…のグループ単位で進みます。"
+    ),
+]
+
+private func orchestrationOption(for mode: String) -> OrchestrationOption {
+    orchestrationOptions.first { $0.id == mode } ?? orchestrationOptions[0]
+}
+
 struct TemplatesScreen: View {
     @EnvironmentObject var appState: AppState
+    @AppStorage("ui.simple_mode") private var simpleMode: Bool = true
     @State private var selectedTemplateId: UUID?
 
     private var selectedTemplate: OrganizationTemplate? {
         appState.templates.first { $0.id == selectedTemplateId }
+    }
+
+    private var hasDefaultTemplate: Bool {
+        appState.templates.contains { $0.isPreset && $0.name == "標準チーム" }
     }
 
     var body: some View {
@@ -18,8 +51,25 @@ struct TemplatesScreen: View {
     private var templateList: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("テンプレート").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
+                Text("チーム設定").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
                 Spacer()
+                Button {
+                    selectedTemplateId = appState.installDefaultTeamPreset()
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(systemName: "sparkles")
+                        Text("おすすめ設定")
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(hasDefaultTemplate ? Color.gray.opacity(0.3) : Color.green.opacity(0.8))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+                .disabled(hasDefaultTemplate)
+
                 Button {
                     appState.addTemplate(name: "新規テンプレート")
                     selectedTemplateId = appState.templates.last?.id
@@ -46,7 +96,7 @@ struct TemplatesScreen: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(template.name).font(.system(size: 14, weight: .semibold))
-                                Text("\(template.slots.count)スロット · \(template.orchestrationMode)")
+                                Text("\(template.slots.count)スロット · \(orchestrationOption(for: template.orchestrationMode).title)")
                                     .font(.system(size: 15)).foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
@@ -86,6 +136,7 @@ struct TemplatesScreen: View {
 
 struct TemplateDetailView: View {
     @EnvironmentObject var appState: AppState
+    @AppStorage("ui.simple_mode") private var simpleMode: Bool = true
     let template: OrganizationTemplate
 
     @State private var name: String = ""
@@ -93,6 +144,15 @@ struct TemplateDetailView: View {
     @State private var workflowMode: String = "coding"
     @State private var rounds: Int = 1
     @State private var addSlotRole: OrgRole = .worker
+
+    private var selectedOrchestrationOption: OrchestrationOption {
+        orchestrationOption(for: orchestrationMode)
+    }
+
+    private var assignedAgentCount: Int {
+        // Slot間で同じエージェントが重複しても、実人数で説明できるように重複除去する。
+        Set(template.slots.flatMap(\.assignedAgentIds)).count
+    }
 
     var body: some View {
         ScrollView {
@@ -131,25 +191,40 @@ struct TemplateDetailView: View {
     private var settingsSection: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("オーケストレーション").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
+                Text("実行の進め方").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
                 Picker("", selection: $orchestrationMode) {
-                    Text("sequential").tag("sequential")
-                    Text("dependency_graph").tag("dependency_graph")
-                    Text("role_based").tag("role_based")
-                }.font(.system(size: 16))
+                    ForEach(orchestrationOptions) { option in
+                        Text(option.title).tag(option.id)
+                    }
+                }
+                .font(.system(size: 16))
+                Text(selectedOrchestrationOption.description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if assignedAgentCount < 2 {
+                    Text("現在の割り当ては \(assignedAgentCount) 人です。2人以上割り当てると違いが分かりやすくなります。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("ラウンド").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
-                Picker("", selection: $rounds) {
-                    ForEach(1...5, id: \.self) { n in Text("\(n)").tag(n) }
-                }.font(.system(size: 16))
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("モード").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
-                Picker("", selection: $workflowMode) {
-                    Text("writing").tag("writing")
-                    Text("coding").tag("coding")
-                }.font(.system(size: 16))
+            if !simpleMode {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ラウンド").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
+                    Picker("", selection: $rounds) {
+                        ForEach(1...5, id: \.self) { n in Text("\(n)").tag(n) }
+                    }
+                    .font(.system(size: 16))
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("作業タイプ").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
+                    Picker("", selection: $workflowMode) {
+                        Text("文章中心").tag("writing")
+                        Text("コード作成").tag("coding")
+                    }
+                    .font(.system(size: 16))
+                }
             }
         }
     }

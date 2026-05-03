@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @State private var showNewProjectSheet = false
+    @AppStorage("ui.simple_mode") private var simpleMode: Bool = true
 
     var body: some View {
         HSplitView {
@@ -13,19 +15,21 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 MainTabView(selectedTab: $appState.selectedTab)
 
-                BottomPanelView(
-                    selectedTab: $appState.bottomTab,
-                    agents: appState.agents,
-                    selectedAgentId: $appState.selectedAgentId,
-                    onAddAgent: {
-                        appState.addAgent(name: "New Agent", orgRoles: [.worker], mode: .writer, provider: .claudeCli)
-                    }
-                )
+                if !simpleMode {
+                    BottomPanelView(
+                        selectedTab: $appState.bottomTab,
+                        agents: appState.agents,
+                        selectedAgentId: $appState.selectedAgentId,
+                        onAddAgent: {
+                            appState.addAgent(name: "New Agent", orgRoles: [.worker], mode: .writer, provider: .claudeCli)
+                        }
+                    )
+                }
             }
             .frame(minWidth: 500)
 
             // Right: Detail panel (only when agent selected)
-            if appState.selectedAgentId != nil {
+            if !simpleMode, appState.selectedAgentId != nil {
                 DetailPanelView()
                     .frame(minWidth: 250, idealWidth: 300, maxWidth: 450)
             }
@@ -35,15 +39,32 @@ struct ContentView: View {
                 appState.selectedProjectId = appState.projects.first?.id
             }
         }
+        .sheet(isPresented: $showNewProjectSheet) {
+            NewProjectSheet(isPresented: $showNewProjectSheet)
+                .environmentObject(appState)
+        }
     }
 
     private var leftPanel: some View {
-        VStack(spacing: 0) {
-            projectHeader
+        HStack(spacing: 0) {
+            ActivityBar(
+                selectedProjectId: $appState.selectedProjectId,
+                projects: appState.projects,
+                onAddProject: { showNewProjectSheet = true },
+                onRenameProject: renameProject
+            )
             Divider()
-            projectList
-            Divider()
-            SidebarView(workingDirectory: appState.selectedProject?.workingDirectory)
+            VStack(spacing: 0) {
+                projectHeader
+                Divider()
+                projectList
+                Divider()
+                if simpleMode {
+                    simpleModeHintPanel
+                } else {
+                    SidebarView(workingDirectory: appState.selectedProject?.workingDirectory)
+                }
+            }
         }
     }
 
@@ -52,7 +73,7 @@ struct ContentView: View {
             Text("📁 案件")
                 .font(.system(size: 14, weight: .bold))
             Spacer()
-            Button(action: addProject) {
+            Button { showNewProjectSheet = true } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 16))
                     .foregroundStyle(.blue)
@@ -116,16 +137,30 @@ struct ContentView: View {
         }
     }
 
-    private func addProject() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.message = "案件の作業ディレクトリを選択"
-        panel.prompt = "選択"
+    private func renameProject(_ project: Project, _ newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
 
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.addProject(name: url.lastPathComponent, workingDirectory: url.path)
+        var updated = project
+        updated.name = trimmed
+        updated.updatedAt = Date()
+        appState.updateProject(updated)
+    }
+
+    private var simpleModeHintPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("かんたんモード")
+                .font(.system(size: 13, weight: .bold))
+            Text("1. 左上の + で案件作成")
+                .font(.system(size: 12))
+            Text("2. 要件・実行で内容入力")
+                .font(.system(size: 12))
+            Text("3. 実行して結果確認")
+                .font(.system(size: 12))
+            Spacer()
         }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(10)
     }
 }

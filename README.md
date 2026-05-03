@@ -10,6 +10,7 @@ V2 の全体仕様（組織体制、インフラ構成、アプリ構成、構�
 - [docs/PROJECT_SUMMARY_2026-04-14.md](/Users/sfidante-he/workspace/LangChain/docs/PROJECT_SUMMARY_2026-04-14.md)（ここまでの意思決定サマリー）
 - [docs/UI_SCREEN_SPEC_V1.md](/Users/sfidante-he/workspace/LangChain/docs/UI_SCREEN_SPEC_V1.md)（画面UI設計）
 - [docs/MCP_SETUP.md](/Users/sfidante-he/workspace/LangChain/docs/MCP_SETUP.md)（MCP連携設定）
+- [docs/NOTION_IMPORT_2026-04-18_AI_AGENT_EXTENSIONS.md](/Users/sfidante-he/workspace/LangChain/docs/NOTION_IMPORT_2026-04-18_AI_AGENT_EXTENSIONS.md)（Notion取り込み: 開発向け拡張ツール）
 
 - 既定フロー: `Drafter -> Critic -> Editor` (初期Providerは `codex_cli`)
 - 追加エージェント: **最大5人**
@@ -20,7 +21,7 @@ V2 の全体仕様（組織体制、インフラ構成、アプリ構成、構�
 - コーディングモード: `workflow_mode=coding` で実装/設計向けプロンプトに切替
 - オーケストレーション: `orchestration_mode` で実行順を制御
   - `sequential` (登録順)
-  - `role_based` (`writer -> reviewer -> editor`)
+  - `role_based` (`ceo -> manager -> worker -> pmo -> qa`)
   - `dependency_graph` (`depends_on` で依存グラフ実行)
 - Providerをエージェントごとに切替可能
   - `gemini_cli` (月額プラン前提のCLI運用向け)
@@ -131,7 +132,7 @@ MCP連携時、`command_template` と `mcp_context_command` では以下のプ�
   - `working_directory`: 実コード生成を行う作業ディレクトリ (任意)
 - `rounds`: ラウンド数 (1-5)
 - `agents`: エージェント配列
-  - `name`, `mode(writer/reviewer/editor)`, `provider`
+  - `name`, `org_role(ceo/manager/worker/pmo/qa/ui_designer/system_designer/ops_designer/other)`, `provider`
   - `persona`, `skills[]`, `depends_on[]`, `command_template`, `model`, `is_custom`
   - `mcp_enabled`, `mcp_config_path`, `mcp_servers[]`
   - `mcp_instruction`, `mcp_context_command`, `mcp_timeout_sec`
@@ -139,13 +140,12 @@ MCP連携時、`command_template` と `mcp_context_command` では以下のプ�
 制約:
 
 - `is_custom=true` のエージェントは最大5
-- editorモードのエージェントを最低1つ必須
 
 ## 5. 仕組み
 
 1. 各ラウンドでオーケストレーションモードに応じて実行順を決定
-2. reviewerは改善指摘を出力
-3. writer/editorは本文を書き換え
+2. 各エージェントが `org_role` に応じた観点で出力
+3. 出力を依存関係に沿って引き継ぎ
 4. 最終稿と差分、会話ログを返却
 
 `/api/refine/stream` は以下イベントを順次返します。

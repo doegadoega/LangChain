@@ -3,14 +3,19 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var sidecarManager: SidecarManager
+    @State private var showingNewProject = false
 
     var body: some View {
         HStack(spacing: 0) {
             ActivityBar(
                 selectedProjectId: $appState.selectedProjectId,
                 projects: appState.projects,
-                onAddProject: {
-                    appState.addProject(name: "New Project", workingDirectory: "/tmp")
+                onAddProject: { showingNewProject = true },
+                onRenameProject: { project, newName in
+                    var updated = project
+                    updated.name = newName
+                    updated.updatedAt = Date()
+                    appState.updateProject(updated)
                 }
             )
 
@@ -36,6 +41,10 @@ struct ContentView: View {
             Divider()
 
             DetailPanelView()
+        }
+        .sheet(isPresented: $showingNewProject) {
+            NewProjectSheet(isPresented: $showingNewProject)
+                .environmentObject(appState)
         }
         .onAppear {
             if appState.selectedProjectId == nil {

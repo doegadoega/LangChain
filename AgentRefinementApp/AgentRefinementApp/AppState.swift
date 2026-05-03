@@ -3,6 +3,47 @@ import SwiftUI
 
 @MainActor
 final class AppState: ObservableObject {
+    private static let requiredAgentSkills = ["Swift", "SwiftUI"]
+    private static let defaultTemplateName = "標準チーム"
+    private static let defaultAgentSeeds: [DefaultAgentSeed] = [
+        .init(
+            id: "default-ceo",
+            name: "Default CEO",
+            role: .ceo,
+            mode: .writer,
+            provider: .claudeCli,
+            dependsOn: [],
+            persona: "全体方針と優先順位を決める責任者。"
+        ),
+        .init(
+            id: "default-manager",
+            name: "Default Manager",
+            role: .manager,
+            mode: .writer,
+            provider: .claudeCli,
+            dependsOn: ["default-ceo"],
+            persona: "CEOの方針を分解し、実行計画に落とす。"
+        ),
+        .init(
+            id: "default-worker",
+            name: "Default Worker",
+            role: .worker,
+            mode: .writer,
+            provider: .codexCli,
+            dependsOn: ["default-manager"],
+            persona: "実装を担当し、差分を作る。"
+        ),
+        .init(
+            id: "default-qa",
+            name: "Default QA",
+            role: .qa,
+            mode: .reviewer,
+            provider: .claudeCli,
+            dependsOn: ["default-worker"],
+            persona: "変更を検証し、リスクを報告する。"
+        ),
+    ]
+
     @Published var agents: [MasterAgent] = []
     @Published var projects: [Project] = []
     @Published var templates: [OrganizationTemplate] = []
@@ -17,8 +58,13 @@ final class AppState: ObservableObject {
     @Published var roleFilter: OrgRole?
     @Published var agentSearchText: String = ""
 
+    @Published var requirementsDraft: String = ""
+    @Published var chatDraft: String = ""
+    @Published var terminalDraft: String = ""
+
     @Published var isExecuting: Bool = false
     @Published var executionEvents: [[String: Any]] = []
+    @Published var pendingRequirementsAutoRunToken: UUID?
 
     let dataStore: DataStore
 
@@ -55,10 +101,25 @@ final class AppState: ObservableObject {
 
     func loadAll() {
         do {
-            agents = try dataStore.loadAgents()
+            let loadedAgents = try dataStore.loadAgents()
+            var updatedAgents: [MasterAgent] = []
+            agents = loadedAgents.map { agent in
+                let normalizedSkills = mergedRequiredSkills(into: agent.skills)
+                guard normalizedSkills != agent.skills else { return agent }
+                var updated = agent
+                updated.skills = normalizedSkills
+                updated.updatedAt = Date()
+                updatedAgents.append(updated)
+                return updated
+            }
+
+            for agent in updatedAgents {
+                try? dataStore.saveAgent(agent)
+            }
             projects = try dataStore.loadProjects()
             templates = try dataStore.loadTemplates()
             workflows = try dataStore.loadWorkflows()
+            bootstrapDefaultsIfNeeded()
         } catch {
             // empty state on first launch is fine
         }
@@ -66,7 +127,14 @@ final class AppState: ObservableObject {
 
     func addAgent(name: String, orgRoles: [OrgRole], mode: AgentMode, provider: ProviderKind) {
         let id = "\(name.lowercased().replacingOccurrences(of: " ", with: "-"))-\(UUID().uuidString.prefix(8))"
-        let agent = MasterAgent(id: id, name: name, orgRoles: orgRoles, mode: mode, provider: provider)
+        let agent = MasterAgent(
+            id: id,
+            name: name,
+            orgRoles: orgRoles,
+            mode: mode,
+            provider: provider,
+            skills: mergedRequiredSkills(into: [])
+        )
         agents.append(agent)
         try? dataStore.saveAgent(agent)
         selectedAgentId = agent.id
@@ -114,8 +182,20 @@ final class AppState: ObservableObject {
         selectedAgentId = copy.id
     }
 
-    func addProject(name: String, workingDirectory: String) {
-        let project = Project(name: name, workingDirectory: workingDirectory)
+    func addProject(
+        name: String,
+        workingDirectory: String,
+        templateId: UUID? = nil,
+        requirements: String? = nil
+    ) {
+        let trimmedRequirements = requirements?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let project = Project(
+            name: name,
+            workingDirectory: workingDirectory,
+            templateId: templateId?.uuidString,
+            requirements: (trimmedRequirements?.isEmpty == false) ? trimmedRequirements : nil
+        )
         projects.append(project)
         try? dataStore.saveProject(project)
         selectedProjectId = project.id
@@ -130,6 +210,47 @@ final class AppState: ObservableObject {
     func updateProject(_ project: Project) {
         projects = projects.map { $0.id == project.id ? project : $0 }
         try? dataStore.saveProject(project)
+    }
+
+    func updateSelectedProjectRequirements(_ requirements: String) {
+        guard let selectedProject else { return }
+        var updated = selectedProject
+        updated.requirements = requirements
+        updated.updatedAt = Date()
+        updateProject(updated)
+    }
+
+    func queueRequirementsRun(_ requirements: String) {
+        let trimmed = requirements.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        // RequirementsScreen consumes this draft and starts execution when token changes.
+        requirementsDraft = trimmed
+        selectedTab = .requirements
+        pendingRequirementsAutoRunToken = UUID()
+    }
+
+    func templateCopyApplyingDefaultAgents(
+        templateId: UUID?,
+        defaultAgentsBySlotId: [UUID: String]
+    ) -> OrganizationTemplate? {
+        guard
+            let templateId,
+            var template = templates.first(where: { $0.id == templateId })
+        else {
+            return nil
+        }
+
+        template.slots = template.slots.map { slot in
+            var updated = slot
+            if let assignedAgentId = defaultAgentsBySlotId[slot.id] {
+                updated.assignedAgentIds = [assignedAgentId]
+            } else {
+                updated.assignedAgentIds = []
+            }
+            return updated
+        }
+        template.updatedAt = Date()
+        return template
     }
 
     func addWorkflow(name: String) {
@@ -158,6 +279,63 @@ final class AppState: ObservableObject {
         try? dataStore.saveTemplate(template)
     }
 
+    @discardableResult
+    func installDefaultTeamPreset() -> UUID {
+        var assignedIdsByRole: [OrgRole: String] = [:]
+        let useAutomatedTestPreset = ProcessInfo.processInfo.environment["AGENT_REFINEMENT_AUTOMATED_TEST"] == "1"
+
+        for seed in Self.defaultAgentSeeds {
+            if let existing = agents.first(where: { $0.id == seed.id }) {
+                assignedIdsByRole[seed.role] = existing.id
+                continue
+            }
+
+            let provider: ProviderKind = useAutomatedTestPreset ? .customCli : seed.provider
+            let commandTemplate = useAutomatedTestPreset ? automatedTestCommandTemplate(for: seed.role) : nil
+
+            let agent = MasterAgent(
+                id: seed.id,
+                name: seed.name,
+                orgRoles: [seed.role],
+                mode: seed.mode,
+                provider: provider,
+                persona: seed.persona,
+                skills: mergedRequiredSkills(into: []),
+                dependsOn: seed.dependsOn,
+                commandTemplate: commandTemplate
+            )
+            agents.append(agent)
+            try? dataStore.saveAgent(agent)
+            assignedIdsByRole[seed.role] = agent.id
+        }
+
+        if let existingTemplate = templates.first(where: { $0.isPreset && $0.name == Self.defaultTemplateName }) {
+            return existingTemplate.id
+        }
+
+        // Default template is pre-wired so selecting it immediately yields a working team.
+        let slots = Self.defaultAgentSeeds.map { seed in
+            Slot(
+                orgRole: seed.role,
+                minCount: 1,
+                maxCount: 1,
+                required: true,
+                assignedAgentIds: assignedIdsByRole[seed.role].map { [$0] } ?? []
+            )
+        }
+        let template = OrganizationTemplate(
+            name: Self.defaultTemplateName,
+            isPreset: true,
+            orchestrationMode: "role_based",
+            workflowMode: useAutomatedTestPreset ? "writing" : "coding",
+            rounds: 1,
+            slots: slots
+        )
+        templates.insert(template, at: 0)
+        try? dataStore.saveTemplate(template)
+        return template.id
+    }
+
     func updateTemplate(_ template: OrganizationTemplate) {
         templates = templates.map { $0.id == template.id ? template : $0 }
         try? dataStore.saveTemplate(template)
@@ -173,30 +351,36 @@ final class AppState: ObservableObject {
     func executeRefinement(requirements: String) async {
         guard !isExecuting else { return }
         isExecuting = true
+        // Reset per-run event stream so UI can render the current execution only.
+        executionEvents = []
+
+        let template = templateForSelectedProject()
+        let executionAgents = agentsForExecution(using: template)
 
         let config = Orchestrator.RunConfig(
-            agents: agents,
+            agents: executionAgents,
             sourceText: requirements,
             objective: "",
             globalInstruction: "",
-            workflowMode: "coding",
-            orchestrationMode: "sequential",
-            rounds: 1,
+            workflowMode: template?.workflowMode ?? "coding",
+            orchestrationMode: template?.orchestrationMode ?? "sequential",
+            rounds: max(1, template?.rounds ?? 1),
             workingDirectory: selectedProject?.workingDirectory
         )
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global().async {
+                var capturedEvents: [[String: Any]] = []
                 Orchestrator.run(config: config) { event in
-                    Task { @MainActor in
-                        var entry: [String: Any] = ["type": event.type]
-                        for (key, value) in event.data {
-                            entry[key] = value
-                        }
-                        self.executionEvents.append(entry)
+                    var entry: [String: Any] = ["type": event.type]
+                    for (key, value) in event.data {
+                        entry[key] = value
                     }
+                    capturedEvents.append(entry)
                 }
                 Task { @MainActor in
+                    // Publish the whole run atomically to avoid missing trailing events.
+                    self.executionEvents = capturedEvents
                     self.isExecuting = false
                     continuation.resume()
                 }
@@ -240,4 +424,95 @@ final class AppState: ObservableObject {
             try? dataStore.saveProject(project)
         }
     }
+
+    func consumeRequirementsDraft() -> String? {
+        consumeDraft(&requirementsDraft)
+    }
+
+    func consumeChatDraft() -> String? {
+        consumeDraft(&chatDraft)
+    }
+
+    func consumeTerminalDraft() -> String? {
+        consumeDraft(&terminalDraft)
+    }
+
+    private func mergedRequiredSkills(into skills: [String]) -> [String] {
+        var merged = skills
+        for required in Self.requiredAgentSkills where !merged.contains(required) {
+            merged.append(required)
+        }
+        return merged
+    }
+
+    private func automatedTestCommandTemplate(for role: OrgRole) -> String {
+        let output: String
+        switch role {
+        case .ceo:
+            output = "最高の晩餐について: 体験全体のテーマを決める。"
+        case .manager:
+            output = "最高の晩餐について: 進行と提供順を設計する。"
+        case .worker:
+            output = "最高の晩餐について: 料理の主軸と食材を提案する。"
+        case .qa:
+            output = "最高の晩餐について: 最終提案の品質を検証する。"
+        default:
+            output = "最高の晩餐について: 担当観点から提案を補強する。"
+        }
+        return "sh -lc \"echo '\(output)'\""
+    }
+
+    private func bootstrapDefaultsIfNeeded() {
+        // Auto-bootstrap only on first run to avoid surprising existing users.
+        guard agents.isEmpty, templates.isEmpty else { return }
+        _ = installDefaultTeamPreset()
+    }
+
+    private func templateForSelectedProject() -> OrganizationTemplate? {
+        guard
+            let templateString = selectedProject?.templateId,
+            let templateUUID = UUID(uuidString: templateString)
+        else {
+            return nil
+        }
+        return templates.first { $0.id == templateUUID }
+    }
+
+    func executionAgentsForSelectedProject() -> [MasterAgent] {
+        agentsForExecution(using: templateForSelectedProject())
+    }
+
+    private func agentsForExecution(using template: OrganizationTemplate?) -> [MasterAgent] {
+        guard let template else { return agents }
+
+        let orderedIds = template.slots.flatMap(\.assignedAgentIds)
+        guard !orderedIds.isEmpty else { return agents }
+
+        var selected: [MasterAgent] = []
+        var seen: Set<String> = []
+        for id in orderedIds where seen.insert(id).inserted {
+            if let agent = agents.first(where: { $0.id == id }) {
+                selected.append(agent)
+            }
+        }
+        return selected.isEmpty ? agents : selected
+    }
+
+    private func consumeDraft(_ draft: inout String) -> String? {
+        // Shared submit rule for all composers: trim, reject blank, then clear.
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        draft = ""
+        return trimmed
+    }
+}
+
+private struct DefaultAgentSeed {
+    let id: String
+    let name: String
+    let role: OrgRole
+    let mode: AgentMode
+    let provider: ProviderKind
+    let dependsOn: [String]
+    let persona: String
 }

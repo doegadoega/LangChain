@@ -3,6 +3,7 @@ import SwiftUI
 struct ActivityBar: View {
     @EnvironmentObject var appState: AppState
     @Binding var selectedProjectId: UUID?
+    
     let projects: [Project]
     let onAddProject: () -> Void
     let onRenameProject: (Project, String) -> Void
@@ -63,6 +64,7 @@ struct ActivityBar: View {
             }
             .buttonStyle(.plain)
             .help("新規案件")
+            .accessibilityIdentifier("project.add")
 
             Divider()
 

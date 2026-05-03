@@ -60,7 +60,7 @@
 - 目的: エージェント個別設定とスキル管理
 - 主要コンポーネント:
   - エージェント一覧テーブル
-  - 編集フォーム（name, org_role, mode, provider, model, persona）
+  - 編集フォーム（name, org_role, provider, model, persona）
   - スキルカタログ（タグ検索）
   - MCP設定（ON/OFF, server list, config path, context command, instruction）
   - 依存関係設定（depends_on）

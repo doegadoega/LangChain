@@ -2,8 +2,8 @@ import SwiftUI
 import Foundation
 
 struct TerminalView: View {
+    @EnvironmentObject var appState: AppState
     @State private var output = "$ "
-    @State private var inputText = ""
     @State private var process: Process?
     @State private var stdinPipe: Pipe?
 
@@ -30,10 +30,13 @@ struct TerminalView: View {
                 Text("$")
                     .font(.system(size: 15, design: .monospaced))
                     .foregroundStyle(.secondary)
-                TextField("", text: $inputText)
-                    .font(.system(size: 15, design: .monospaced))
-                    .textFieldStyle(.plain)
-                    .onSubmit { sendCommand() }
+                MultilineComposer(
+                    text: $appState.terminalDraft,
+                    placeholder: "コマンドを入力...",
+                    minHeight: 30,
+                    maxHeight: 120,
+                    onSubmit: sendCommand
+                )
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -70,8 +73,7 @@ struct TerminalView: View {
     }
 
     private func sendCommand() {
-        let cmd = inputText
-        inputText = ""
+        guard let cmd = appState.consumeTerminalDraft() else { return }
         output += cmd + "\n"
         guard let data = (cmd + "\n").data(using: .utf8) else { return }
         stdinPipe?.fileHandleForWriting.write(data)

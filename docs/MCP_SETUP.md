@@ -25,7 +25,7 @@
 {
   "id": "architect",
   "name": "Architect",
-  "mode": "writer",
+  "org_role": "worker",
   "provider": "custom_cli",
   "persona": "設計を担当",
   "skills": ["アーキテクチャ設計"],
