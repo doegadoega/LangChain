@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
+import { ModelPicker } from "../components/ModelPicker";
 import { newAgent, useApp } from "../state/store";
 import { PROVIDER_LABEL, ROLE_ACCENT, ROLE_LABEL } from "../lib/format";
 import { api } from "../api/client";
@@ -277,7 +278,7 @@ function AgentEditor({
             <Label>provider</Label>
             <Select
               value={agent.provider}
-              onChange={(e) => onChange({ provider: e.target.value as ProviderKind })}
+              onChange={(e) => onChange({ provider: e.target.value as ProviderKind, model: null })}
             >
               {(Object.keys(PROVIDER_LABEL) as ProviderKind[]).map((p) => (
                 <option key={p} value={p}>
@@ -286,13 +287,12 @@ function AgentEditor({
               ))}
             </Select>
           </div>
-          <div>
-            <Label>model</Label>
-            <Input
-              value={agent.model ?? ""}
-              onChange={(e) => onChange({ model: e.target.value })}
-            />
-          </div>
+          <ModelPicker
+            provider={agent.provider}
+            value={agent.model}
+            placeholder="例: qwen2.5-coder-3b-instruct / qwen3:8b"
+            onChange={(model) => onChange({ model })}
+          />
           <div>
             <Label>model_decision</Label>
             <Select

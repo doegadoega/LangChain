@@ -36,6 +36,8 @@ class ProviderKind(str, Enum):
     GEMINI_CLI = "gemini_cli"
     CLAUDE_CLI = "claude_cli"
     CODEX_CLI = "codex_cli"
+    OLLAMA = "ollama"
+    LM_STUDIO = "lm_studio"
     CUSTOM_CLI = "custom_cli"
 
 

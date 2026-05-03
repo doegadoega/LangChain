@@ -29,7 +29,14 @@ const ORG_ROLES: OrgRole[] = [
   "ops_designer",
   "other",
 ];
-const PROVIDERS: ProviderKind[] = ["gemini_cli", "claude_cli", "codex_cli", "custom_cli"];
+const PROVIDERS: ProviderKind[] = [
+  "gemini_cli",
+  "claude_cli",
+  "codex_cli",
+  "ollama",
+  "lm_studio",
+  "custom_cli",
+];
 const MODEL_DECISIONS: ModelDecision[] = ["fixed", "ceo_decides"];
 
 const isOrgRole = (value: unknown): value is OrgRole =>

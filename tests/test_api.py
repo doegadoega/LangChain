@@ -45,3 +45,28 @@ def test_create_project(client):
     project = {"id": "proj-1", "name": "Test", "working_directory": "/tmp", "status": "active"}
     resp = client.post("/api/projects", json=project)
     assert resp.status_code == 201
+
+
+def test_list_provider_models_returns_models(client, monkeypatch):
+    def fake_list_provider_models(provider):
+        assert provider == "lm_studio"
+        return {
+            "provider": "lm_studio",
+            "models": [
+                {"id": "qwen2.5-coder-3b-instruct", "name": "Qwen2.5 Coder 3B"}
+            ],
+            "error": None,
+        }
+
+    monkeypatch.setattr("app.main.list_provider_models", fake_list_provider_models)
+
+    resp = client.get("/api/providers/lm_studio/models")
+
+    assert resp.status_code == 200
+    assert resp.json()["models"][0]["id"] == "qwen2.5-coder-3b-instruct"
+
+
+def test_list_provider_models_rejects_unknown_provider(client):
+    resp = client.get("/api/providers/not-a-provider/models")
+
+    assert resp.status_code == 400

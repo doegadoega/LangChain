@@ -3,6 +3,8 @@ import type {
   ChatMessageRequest,
   ChatSession,
   ManagedRequest,
+  ProviderKind,
+  ProviderModelsResponse,
   Project,
   Template,
   Workflow,
@@ -34,6 +36,10 @@ export const api = {
   updateAgent: (id: string, a: AgentConfig) =>
     req<AgentConfig>(`/api/agents/${id}`, { method: "PUT", body: JSON.stringify(a) }),
   deleteAgent: (id: string) => req<void>(`/api/agents/${id}`, { method: "DELETE" }),
+
+  // providers
+  listProviderModels: (provider: ProviderKind) =>
+    req<ProviderModelsResponse>(`/api/providers/${provider}/models`),
 
   // projects
   listProjects: () => req<Project[]>("/api/projects"),

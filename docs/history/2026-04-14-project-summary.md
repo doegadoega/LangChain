@@ -76,9 +76,9 @@
 
 ## 9. 現在の成果物
 - V2詳細仕様書:
-  - [V2_SYSTEM_SPEC.md](/Users/sfidante-he/workspace/LangChain/docs/V2_SYSTEM_SPEC.md)
+  - [docs/specs/v2-system.md](../specs/v2-system.md)
 - 本サマリー:
-  - [PROJECT_SUMMARY_2026-04-14.md](/Users/sfidante-he/workspace/LangChain/docs/PROJECT_SUMMARY_2026-04-14.md)
+  - [docs/history/2026-04-14-project-summary.md](2026-04-14-project-summary.md)
 
 ## 10. 次に実装する優先項目（提案）
 1. `CEO決定ロジック`（チーム構成 + モデル選定）の実装

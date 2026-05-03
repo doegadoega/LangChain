@@ -13,6 +13,7 @@ from app.models import (
     AgentConfig,
     OrgRole,
     OrchestrationMode,
+    ProviderKind,
     RefineRequest,
     RefineResponse,
     RoundResult,
@@ -20,6 +21,13 @@ from app.models import (
     WorkflowMode,
 )
 from app.providers import CLITemplateProvider, ProviderError, resolve_provider
+
+DIRECT_EDIT_PROVIDERS = {
+    ProviderKind.GEMINI_CLI,
+    ProviderKind.CLAUDE_CLI,
+    ProviderKind.CODEX_CLI,
+    ProviderKind.CUSTOM_CLI,
+}
 
 
 @dataclass
@@ -171,6 +179,7 @@ def _build_task_prompt(
     round_index: int,
     round_outputs: dict[str, str],
     has_working_dir: bool = False,
+    can_edit_files: bool = False,
 ) -> str:
     objective = context.request.objective.strip() or "特になし"
     global_instruction = context.request.global_instruction.strip() or "特になし"
@@ -189,7 +198,9 @@ def _build_task_prompt(
     if workflow_mode == WorkflowMode.CODING:
         code_block = _build_code_context_block(context)
         role_instruction = _build_coding_instruction(
-            org_role=agent.org_role, has_working_dir=has_working_dir
+            org_role=agent.org_role,
+            has_working_dir=has_working_dir,
+            can_edit_files=can_edit_files,
         )
     else:
         code_block = "コーディングコンテキスト: writingモードのため未使用\n"
@@ -210,7 +221,9 @@ def _build_task_prompt(
     )
 
 
-def _build_coding_instruction(*, org_role: OrgRole, has_working_dir: bool) -> str:
+def _build_coding_instruction(
+    *, org_role: OrgRole, has_working_dir: bool, can_edit_files: bool
+) -> str:
     role_hint = {
         OrgRole.CEO: "最終判断者として、優先順位と受け入れ基準を明確化してください。",
         OrgRole.MANAGER: "計画整合と分解可能性を重視し、実行指示を具体化してください。",
@@ -218,11 +231,20 @@ def _build_coding_instruction(*, org_role: OrgRole, has_working_dir: bool) -> st
         OrgRole.QA: "テスト観点と品質ゲート観点を最優先で確認してください。",
     }.get(org_role, "担当ロールとして成果物を前進させる具体的な変更を出してください。")
 
-    if has_working_dir:
+    if has_working_dir and can_edit_files:
         return (
             "リポジトリで直接作業してください。\n"
             "必要なファイルを作成・修正し、変更内容を要約してください。\n"
             "テストコマンドがある場合は実行して結果を含めてください。\n"
+            f"{role_hint}"
+        )
+
+    if has_working_dir:
+        return (
+            "ローカルLLMはこの実行環境で直接ファイルを書き換えられません。\n"
+            "対象ファイル、変更方針、最小diff案、テストコマンドを具体的に出してください。\n"
+            "出力は以下の見出しを含めてください: "
+            "`変更概要` `対象ファイル` `diff案` `テストコマンド` `Codex向け指示`。\n"
             f"{role_hint}"
         )
 
@@ -377,6 +399,9 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
     is_coding = request.workflow_mode == WorkflowMode.CODING
     working_dir = _resolve_working_dir(request.code_context.working_directory.strip())
     has_working_dir = bool(is_coding and working_dir)
+    direct_edit_agents = [
+        agent.id for agent in request.agents if agent.provider in DIRECT_EDIT_PROVIDERS
+    ]
 
     if has_working_dir:
         try:
@@ -398,6 +423,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
         "mcp_enabled_agents": [
             agent.id for agent in request.agents if agent.mcp_enabled
         ],
+        "direct_edit_agents": direct_edit_agents,
         "total_turns": total_turns,
         "has_working_dir": has_working_dir,
     }
@@ -415,7 +441,8 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
         for batch_index, batch in enumerate(batches, start=1):
             for agent in batch:
                 turn_index += 1
-                if has_working_dir:
+                can_edit_files = agent.provider in DIRECT_EDIT_PROVIDERS
+                if has_working_dir and can_edit_files:
                     current_diff = _capture_git_diff(working_dir)
                     if current_diff:
                         context.draft = (
@@ -446,6 +473,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     round_index=round_index,
                     round_outputs=round_outputs,
                     has_working_dir=has_working_dir,
+                    can_edit_files=can_edit_files,
                 )
                 cwd = working_dir if has_working_dir else None
                 mcp_context = ""
@@ -477,7 +505,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     ).strip()
 
                     file_changes = None
-                    if has_working_dir:
+                    if has_working_dir and can_edit_files:
                         file_changes = _capture_git_diff(working_dir)
 
                     turn = TurnResult(
@@ -494,7 +522,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     turns.append(turn)
                     round_outputs[agent.id] = output
 
-                    if not has_working_dir:
+                    if not has_working_dir or not can_edit_files:
                         context.draft = output or context.draft
 
                 except ProviderError as exc:
@@ -524,7 +552,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                 }
 
         round_draft = context.draft
-        if has_working_dir:
+        if has_working_dir and direct_edit_agents:
             round_diff = _capture_git_diff(working_dir)
             round_draft = round_diff or context.draft
 
@@ -541,7 +569,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
         }
 
     total_file_changes = ""
-    if has_working_dir:
+    if has_working_dir and direct_edit_agents:
         total_file_changes = _capture_git_diff(working_dir)
 
     final_text = context.draft

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
+import { ModelPicker } from "../components/ModelPicker";
 import { newAgent, useApp } from "../state/store";
 import { PROVIDER_LABEL, ROLE_ACCENT, ROLE_LABEL } from "../lib/format";
 import type { AgentConfig, OrgRole, ProviderKind } from "../types";
@@ -292,7 +293,9 @@ function TeamAgentRow({
           <Label>provider</Label>
           <Select
             value={agent.provider}
-            onChange={(event) => onUpdate({ provider: event.target.value as ProviderKind })}
+            onChange={(event) =>
+              onUpdate({ provider: event.target.value as ProviderKind, model: null })
+            }
           >
             {(Object.keys(PROVIDER_LABEL) as ProviderKind[]).map((provider) => (
               <option key={provider} value={provider}>
@@ -301,14 +304,12 @@ function TeamAgentRow({
             ))}
           </Select>
         </div>
-        <div>
-          <Label>model</Label>
-          <Input
-            placeholder="gpt-5 / sonnet-4 ..."
-            value={agent.model ?? ""}
-            onChange={(event) => onUpdate({ model: event.target.value })}
-          />
-        </div>
+        <ModelPicker
+          provider={agent.provider}
+          value={agent.model}
+          placeholder="gpt-5 / qwen2.5-coder-3b-instruct / qwen3:8b"
+          onChange={(model) => onUpdate({ model })}
+        />
         <div>
           <Label>decision</Label>
           <Select

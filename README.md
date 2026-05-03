@@ -6,11 +6,17 @@ AIエージェント同士を会話させながら文章を推敲するローカ
 
 V2 の全体仕様（組織体制、インフラ構成、アプリ構成、構成図、データフロー、通信フロー）は以下を参照してください。
 
-- [docs/V2_SYSTEM_SPEC.md](/Users/sfidante-he/workspace/LangChain/docs/V2_SYSTEM_SPEC.md)
-- [docs/PROJECT_SUMMARY_2026-04-14.md](/Users/sfidante-he/workspace/LangChain/docs/PROJECT_SUMMARY_2026-04-14.md)（ここまでの意思決定サマリー）
-- [docs/UI_SCREEN_SPEC_V1.md](/Users/sfidante-he/workspace/LangChain/docs/UI_SCREEN_SPEC_V1.md)（画面UI設計）
-- [docs/MCP_SETUP.md](/Users/sfidante-he/workspace/LangChain/docs/MCP_SETUP.md)（MCP連携設定）
-- [docs/NOTION_IMPORT_2026-04-18_AI_AGENT_EXTENSIONS.md](/Users/sfidante-he/workspace/LangChain/docs/NOTION_IMPORT_2026-04-18_AI_AGENT_EXTENSIONS.md)（Notion取り込み: 開発向け拡張ツール）
+ドキュメント索引: [docs/README.md](docs/README.md)
+タスク管理: [docs/TODO.md](docs/TODO.md)
+
+主要仕様:
+
+- [docs/specs/v2-system.md](docs/specs/v2-system.md) — V2 全体仕様
+- [docs/specs/macos-app.md](docs/specs/macos-app.md) — macOS アプリ仕様
+- [docs/specs/ui-screens-v1.md](docs/specs/ui-screens-v1.md) — 画面UI設計
+- [docs/specs/skill-package-manager.md](docs/specs/skill-package-manager.md) — Skill Package Manager
+- [docs/setup/mcp.md](docs/setup/mcp.md) — MCP連携設定
+- [docs/setup/superpowers-local-llm.md](docs/setup/superpowers-local-llm.md) — SuperPowersWUI + ローカルLLM設定
 
 - 既定フロー: `Drafter -> Critic -> Editor` (初期Providerは `codex_cli`)
 - 追加エージェント: **最大5人**
@@ -27,6 +33,8 @@ V2 の全体仕様（組織体制、インフラ構成、アプリ構成、構�
   - `gemini_cli` (月額プラン前提のCLI運用向け)
   - `claude_cli`
   - `codex_cli`
+  - `ollama` (Ollama HTTP API)
+  - `lm_studio` (LM Studio OpenAI互換API)
   - `custom_cli`
 - MCP連携（エージェント単位）
   - `mcp_enabled` でON/OFF
@@ -74,6 +82,21 @@ uvicorn app.main:app --reload --port 8000
 
 これらはエージェントのプロンプトに自動注入され、設計/実装レビュー向けの出力になります。
 
+## 2.2.1 SuperPowers Localプリセット
+
+Web UIの `Workspace` で `SuperPowers Local` を選ぶと、LM Studioのローカルモデルを使う設計前処理チームに切り替わります。
+
+- `Brainstorm`: 依頼の曖昧さ、対象ファイル、制約を整理
+- `Spec Writer`: 短い実装仕様を作成
+- `TDD Planner`: Codex向けの最小TDD計画を作成
+- `QA Reviewer`: 抜け漏れを確認し、短い英語のCodex指示へ圧縮
+
+軽いコード作業には `Local Coding Light` プリセットを使います。既定モデルIDは `qwen2.5-coder-3b-instruct` で、小さな修正案、diff案、テストコマンドの整理に使います。
+
+設計レビュー寄りの `SuperPowers Local` では、brainstorm/spec/planに `qwen2.5-coder-3b-instruct`、QA reviewに `qwen2.5-coder-7b-instruct` を使います。Ollamaで使う場合は、プリセット適用後に各エージェントのproviderを `ollama` に変更し、modelに `qwen3:8b` などを指定してください。
+
+Open WebUI版SuperPowersWUIをLM Studio/Ollamaへ接続する手順は [docs/setup/superpowers-local-llm.md](docs/setup/superpowers-local-llm.md) を参照してください。
+
 ## 2.3 CLI実行
 
 ブラウザUI以外に、CLI形式でも同じ実行ができます。
@@ -93,6 +116,38 @@ python -m app.cli run --config /path/to/request.json --stream
 python -m app.cli sample-config --path /tmp/langchain-request.sample.json
 ```
 
+## 2.4 相談チャットとエージェント設定の確認
+
+Web UI の `相談チャット` では、保存済みエージェントを選んで個別に会話できます。
+送信時は、画面で選択しているエージェント設定が `/api/chats/message` に渡され、バックエンド側で `name`、`org_role`、`persona`、`provider`、`model` を使って回答を生成します。
+
+保存済みエージェントとチャット履歴はローカルJSONとして保存されます。
+
+```text
+~/.agent-refinement/agents/<agent_id>.json
+~/.agent-refinement/chats/chat_<agent_id>.json
+```
+
+特定エージェントが回答しているか確認する例:
+
+```bash
+AGENT_ID="new-agent-7E8DA832_team_8tzir0"
+
+jq '{id,name,org_role,provider,model,enabled}' \
+  "$HOME/.agent-refinement/agents/${AGENT_ID}.json"
+
+jq '.messages[] | {role, agent_id, agent_name, created_at}' \
+  "$HOME/.agent-refinement/chats/chat_${AGENT_ID}.json"
+```
+
+API経由で確認する場合:
+
+```bash
+curl -s "http://127.0.0.1:8000/api/chats/chat_${AGENT_ID}" | jq
+```
+
+現在のチャット履歴には `agent_id` と `agent_name` が残ります。回答時点の `provider`、`model`、`persona` まで厳密に監査したい場合は、今後 `agent_snapshot` をメッセージ単位で保存する必要があります。
+
 ## 3. Gemini月額プラン前提で使う
 
 このMVPはAPIキー必須ではなく、CLI連携で動きます。
@@ -104,6 +159,21 @@ python -m app.cli sample-config --path /tmp/langchain-request.sample.json
 export GEMINI_CLI_CMD='gemini -p {prompt}'
 export CLAUDE_CLI_CMD='claude --print --output-format text {prompt}'
 export CODEX_CLI_CMD='codex exec -c model_reasoning_effort=high --skip-git-repo-check --sandbox read-only {prompt}'
+export OLLAMA_BASE_URL='http://localhost:11434/api'
+export OLLAMA_MODEL='qwen3:8b'
+export LM_STUDIO_BASE_URL='http://localhost:1234/v1'
+export LM_STUDIO_MODEL='your-loaded-model-id'
+```
+
+`ollama` provider は Ollama の `/api/chat` を使います。エージェントの `model` が未指定の場合は `OLLAMA_MODEL`、さらに未指定なら `qwen3:8b` を使います。
+
+`lm_studio` provider は LM Studio の OpenAI互換 `/v1/chat/completions` を使います。LM Studio側でローカルサーバーを起動し、エージェントの `model` または `LM_STUDIO_MODEL` にロード済みモデルIDを指定してください。
+
+Agent Studio と Teams では、provider選択後に該当providerのモデル候補を取得できます。LM Studioは `/v1/models`、Ollamaは `/api/tags` を使い、Ollama APIに接続できない場合は `ollama list` にフォールバックします。
+
+```bash
+curl -s "http://127.0.0.1:8000/api/providers/lm_studio/models" | jq
+curl -s "http://127.0.0.1:8000/api/providers/ollama/models" | jq
 ```
 
 `custom_cli` を選んだエージェントは、画面上で `command_template` を必ず設定してください。
@@ -136,6 +206,8 @@ MCP連携時、`command_template` と `mcp_context_command` では以下のプ�
   - `persona`, `skills[]`, `depends_on[]`, `command_template`, `model`, `is_custom`
   - `mcp_enabled`, `mcp_config_path`, `mcp_servers[]`
   - `mcp_instruction`, `mcp_context_command`, `mcp_timeout_sec`
+
+`provider` は `gemini_cli` / `claude_cli` / `codex_cli` / `ollama` / `lm_studio` / `custom_cli` を指定できます。
 
 制約:
 

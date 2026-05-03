@@ -16,6 +16,8 @@ export const PROVIDER_LABEL: Record<ProviderKind, string> = {
   codex_cli: "Codex CLI",
   claude_cli: "Claude CLI",
   gemini_cli: "Gemini CLI",
+  ollama: "Ollama",
+  lm_studio: "LM Studio",
   custom_cli: "Custom CLI",
 };
 

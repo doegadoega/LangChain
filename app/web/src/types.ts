@@ -9,7 +9,13 @@ export type OrgRole =
   | "ops_designer"
   | "other";
 
-export type ProviderKind = "gemini_cli" | "claude_cli" | "codex_cli" | "custom_cli";
+export type ProviderKind =
+  | "gemini_cli"
+  | "claude_cli"
+  | "codex_cli"
+  | "ollama"
+  | "lm_studio"
+  | "custom_cli";
 export type WorkflowMode = "writing" | "coding";
 export type OrchestrationMode = "sequential" | "role_based" | "dependency_graph";
 export type ModelDecision = "fixed" | "ceo_decides";
@@ -121,6 +127,17 @@ export interface ChatMessageRequest {
   question: string;
   web_search_enabled: boolean;
   attachments: ChatAttachment[];
+}
+
+export interface ProviderModel {
+  id: string;
+  name: string;
+}
+
+export interface ProviderModelsResponse {
+  provider: ProviderKind;
+  models: ProviderModel[];
+  error?: string | null;
 }
 
 export interface TurnResult {

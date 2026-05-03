@@ -30,6 +30,22 @@ export function Settings() {
               <Input placeholder="codex exec ... {prompt}" />
             </div>
             <div>
+              <Label>OLLAMA_BASE_URL</Label>
+              <Input placeholder="http://localhost:11434/api" />
+            </div>
+            <div>
+              <Label>OLLAMA_MODEL</Label>
+              <Input placeholder="qwen3:8b" />
+            </div>
+            <div>
+              <Label>LM_STUDIO_BASE_URL</Label>
+              <Input placeholder="http://localhost:1234/v1" />
+            </div>
+            <div>
+              <Label>LM_STUDIO_MODEL</Label>
+              <Input placeholder="例: qwen2.5-coder-3b-instruct" />
+            </div>
+            <div>
               <Label>MCP デフォルト config</Label>
               <Input placeholder="~/.config/mcp/config.json" />
             </div>

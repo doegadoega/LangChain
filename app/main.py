@@ -18,9 +18,9 @@ from app.evaluation import (
     create_evaluation,
     get_agent_evaluations_across_projects,
 )
-from app.models import AgentConfig, RefineRequest, RefineResponse
+from app.models import AgentConfig, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
-from app.providers import ProviderError, resolve_provider
+from app.providers import ProviderError, list_provider_models, resolve_provider
 from app.store import FileStore
 
 
@@ -211,6 +211,15 @@ def refine_stream(payload: RefineRequest) -> StreamingResponse:
             ) + "\n"
 
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+
+
+@app.get("/api/providers/{provider}/models")
+def provider_models(provider: str):
+    try:
+        provider_kind = ProviderKind(provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Unsupported provider") from exc
+    return list_provider_models(provider_kind)
 
 
 # -- Agent CRUD --
@@ -407,7 +416,7 @@ def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
         answer = (
             "回答の生成中に問題が発生しました。\n"
             f"{assistant_error}\n\n"
-            "エージェント設定の provider / command_template / CLI の認証状態を確認してください。"
+            "エージェント設定の provider / model / command_template と、CLI またはローカルLLMサーバーの起動状態を確認してください。"
         )
 
     assistant_message = _make_chat_message(

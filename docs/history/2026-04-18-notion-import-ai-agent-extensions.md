@@ -73,7 +73,7 @@ pip install macafm
 
 ## 5. このリポジトリでの適用ルール
 - MCPを使うエージェントは `mcp_servers` に `playwright`, `context7` を明示
-- 追加ルールは [docs/MCP_SETUP.md](/Users/sfidante-he/workspace/LangChain/docs/MCP_SETUP.md) に準拠
+- 追加ルールは [docs/setup/mcp.md](../setup/mcp.md) に準拠
 - 保留項目は「対象リポジトリ確定後」に再評価して追記
 
 ## 6. 最小チェックリスト
