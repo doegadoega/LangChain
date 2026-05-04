@@ -9,8 +9,12 @@ import { Download, Search } from "lucide-react";
 export function Logs() {
   const turns = useApp((s) => s.run.turns);
   const events = useApp((s) => s.run.events);
+  const managedRequests = useApp((s) => s.managedRequests);
+  const selectedManagedRequestId = useApp((s) => s.selectedManagedRequestId);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
+  const selectedRequest = managedRequests.find((item) => item.id === selectedManagedRequestId);
+  const feedback = selectedRequest?.verification_feedback ?? [];
 
   const rows = useMemo(
     () =>
@@ -34,7 +38,7 @@ export function Logs() {
   );
 
   const exportRun = () => {
-    const data = { events, turns };
+    const data = { events, turns, verification_feedback: feedback };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -131,17 +135,37 @@ export function Logs() {
         <CardHeader>
           <CardTitle>プレビュー</CardTitle>
         </CardHeader>
-        <CardBody className="flex-1 overflow-auto">
-          {selected === null ? (
-            <div className="grid h-full place-items-center text-xs text-[var(--color-fg-subtle)]">
-              ログを選択
-            </div>
-          ) : (
-            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">
-              {turns[selected]?.output ?? ""}
-              {turns[selected]?.error ? `\n\nERROR: ${turns[selected]?.error}` : ""}
-            </pre>
-          )}
+        <CardBody className="flex-1 space-y-4 overflow-auto">
+          <div>
+            {selected === null ? (
+              <div className="grid min-h-48 place-items-center rounded-md border border-dashed border-[var(--color-border)] text-xs text-[var(--color-fg-subtle)]">
+                ログを選択
+              </div>
+            ) : (
+              <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">
+                {turns[selected]?.output ?? ""}
+                {turns[selected]?.error ? `\n\nERROR: ${turns[selected]?.error}` : ""}
+              </pre>
+            )}
+          </div>
+          <div className="border-t border-[var(--color-border)] pt-3">
+            <div className="mb-2 text-xs font-semibold">保存済みフィードバック</div>
+            {feedback.length === 0 ? (
+              <div className="text-xs text-[var(--color-fg-subtle)]">フィードバックはありません。</div>
+            ) : (
+              <div className="space-y-2">
+                {feedback.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-xs"
+                  >
+                    <div className="mb-1 font-semibold">{item.kind}</div>
+                    <div className="whitespace-pre-wrap text-[var(--color-fg-muted)]">{item.comment}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardBody>
       </Card>
     </div>

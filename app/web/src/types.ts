@@ -13,6 +13,8 @@ export type ProviderKind =
   | "gemini_cli"
   | "claude_cli"
   | "codex_cli"
+  | "openai_api"
+  | "anthropic_api"
   | "ollama"
   | "lm_studio"
   | "custom_cli";
@@ -63,11 +65,80 @@ export interface RefineRequest {
 
 export type ManagedRequestStatus = "draft" | "running" | "completed" | "paused";
 
+export interface WorkspaceVersion {
+  id: string;
+  version_no: number;
+  title: string;
+  created_at: string;
+  request: RefineRequest;
+  parent_version_id?: string;
+  review_feedback?: VerificationFeedback;
+  final_text?: string;
+  diff?: string;
+  file_changes?: string;
+  agent_turns?: TurnResult[];
+  stream_events?: StreamEvent[];
+  flow_json?: SubworkFlowJson;
+  run_started_at?: string;
+  run_ended_at?: string;
+}
+
+export type SubworkFlowEventType =
+  | "run_started"
+  | "round_started"
+  | "agent_started"
+  | "agent_completed"
+  | "round_completed"
+  | "run_completed"
+  | "run_failed";
+
+export interface SubworkFlowEvent {
+  id: string;
+  sequence: number;
+  type: SubworkFlowEventType;
+  timestamp: string;
+  round_index?: number;
+  batch_index?: number;
+  turn_index?: number;
+  agent_id?: string;
+  agent_name?: string;
+  org_role?: OrgRole;
+  provider?: ProviderKind;
+  summary?: string;
+  input?: string;
+  output?: string;
+  error?: string;
+  file_changes?: string;
+  raw_event?: StreamEvent;
+}
+
+export interface SubworkFlowJson {
+  schema_version: 1;
+  work_id: string;
+  subwork_id: string;
+  parent_subwork_id?: string;
+  version_no: number;
+  title: string;
+  created_at: string;
+  run_started_at?: string;
+  run_ended_at?: string;
+  request: RefineRequest;
+  agents: AgentConfig[];
+  events: SubworkFlowEvent[];
+  final_text?: string;
+  diff?: string;
+  file_changes?: string;
+}
+
 export interface ManagedRequest {
   id: string;
   title: string;
   status: ManagedRequestStatus;
+  template_id?: string;
   request: RefineRequest;
+  original_request?: RefineRequest;
+  previous_request?: RefineRequest;
+  versions?: WorkspaceVersion[];
   created_at: string;
   updated_at: string;
   last_run_at?: string;
@@ -166,7 +237,7 @@ export interface RefineResponse {
   file_changes: string;
 }
 
-export type StreamEvent =
+export type StreamEvent = (
   | { type: "run_started"; plan?: unknown }
   | { type: "round_started"; round_index: number }
   | { type: "turn_started"; agent_id: string; agent_name: string; org_role: OrgRole; provider: ProviderKind }
@@ -181,7 +252,8 @@ export type StreamEvent =
     }
   | { type: "round_completed"; round_index: number; draft_after_round: string }
   | { type: "run_completed"; result: RefineResponse }
-  | { type: "run_failed"; error: string };
+  | { type: "run_failed"; error: string }
+) & { received_at?: string; sequence?: number };
 
 export type QAJudgement = "PASS" | "REWORK" | "ESCALATE";
 
@@ -197,6 +269,14 @@ export interface Template {
   name: string;
   description?: string;
   agents: AgentConfig[];
+  workflow_mode?: WorkflowMode;
+  orchestration_mode?: OrchestrationMode;
+  rounds?: number;
+  is_builtin?: boolean;
+  locked?: boolean;
+  category?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Workflow {

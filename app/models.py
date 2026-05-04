@@ -4,6 +4,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.skills.models import SkillReference
+
 
 MAX_CUSTOM_AGENTS = 5
 MAX_ROUNDS = 5
@@ -36,6 +38,8 @@ class ProviderKind(str, Enum):
     GEMINI_CLI = "gemini_cli"
     CLAUDE_CLI = "claude_cli"
     CODEX_CLI = "codex_cli"
+    OPENAI_API = "openai_api"
+    ANTHROPIC_API = "anthropic_api"
     OLLAMA = "ollama"
     LM_STUDIO = "lm_studio"
     CUSTOM_CLI = "custom_cli"
@@ -48,6 +52,7 @@ class AgentConfig(BaseModel):
     provider: ProviderKind
     persona: str = Field(default="", max_length=2000)
     skills: list[str] = Field(default_factory=list)
+    skill_refs: list[SkillReference] = Field(default_factory=list)
     depends_on: list[str] = Field(default_factory=list)
     command_template: str | None = Field(default=None, max_length=2000)
     model: str | None = Field(default=None, max_length=100)
@@ -124,6 +129,8 @@ class AgentConfig(BaseModel):
     def normalize_org_role(cls, value: object) -> object:
         if value is None:
             return OrgRole.WORKER.value
+        if isinstance(value, OrgRole):
+            return value.value
         raw = str(value).strip().lower()
         legacy_map = {
             "writer": OrgRole.WORKER.value,

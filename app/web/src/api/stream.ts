@@ -17,6 +17,12 @@ export async function* streamRefine(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let sequence = 0;
+  const withTimelineMeta = (event: StreamEvent): StreamEvent => ({
+    ...event,
+    received_at: new Date().toISOString(),
+    sequence: sequence++,
+  });
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -27,7 +33,7 @@ export async function* streamRefine(
       buffer = buffer.slice(nl + 1);
       if (!line) continue;
       try {
-        yield JSON.parse(line) as StreamEvent;
+        yield withTimelineMeta(JSON.parse(line) as StreamEvent);
       } catch {
         // ignore malformed
       }
@@ -36,7 +42,7 @@ export async function* streamRefine(
   const tail = buffer.trim();
   if (tail) {
     try {
-      yield JSON.parse(tail) as StreamEvent;
+      yield withTimelineMeta(JSON.parse(tail) as StreamEvent);
     } catch {
       // ignore
     }

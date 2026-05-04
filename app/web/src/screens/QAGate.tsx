@@ -13,6 +13,10 @@ export function QAGate() {
   const turns = useApp((s) => s.run.turns);
   const verdicts = useApp((s) => s.qaVerdicts);
   const setQaVerdict = useApp((s) => s.setQaVerdict);
+  const managedRequests = useApp((s) => s.managedRequests);
+  const selectedManagedRequestId = useApp((s) => s.selectedManagedRequestId);
+  const selectedRequest = managedRequests.find((item) => item.id === selectedManagedRequestId);
+  const feedback = selectedRequest?.verification_feedback ?? [];
 
   const qaList = useMemo(
     () => agents.filter((a) => a.org_role === "qa" && a.enabled !== false),
@@ -92,6 +96,38 @@ export function QAGate() {
               <Send className="h-3.5 w-3.5" /> CEO へエスカレーション
             </Button>
           )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>保存済みフィードバック</CardTitle>
+          <span className="text-xs text-[var(--color-fg-muted)]">{feedback.length}件</span>
+        </CardHeader>
+        <CardBody className="space-y-2">
+          {feedback.length === 0 && (
+            <div className="text-xs text-[var(--color-fg-subtle)]">
+              Workspaceで保存したフィードバックはありません。
+            </div>
+          )}
+          {feedback.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[10px] font-semibold text-[var(--color-fg-muted)]">
+                  {item.kind}
+                </span>
+                <span className="text-[10px] text-[var(--color-fg-subtle)]">
+                  {new Date(item.created_at).toLocaleString("ja-JP")}
+                </span>
+              </div>
+              <div className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-fg-muted)]">
+                {item.comment}
+              </div>
+            </div>
+          ))}
         </CardBody>
       </Card>
     </div>

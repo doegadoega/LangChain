@@ -3,12 +3,12 @@ import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { ModelPicker } from "../components/ModelPicker";
-import { newAgent, useApp } from "../state/store";
+import { builtinAgents, newAgent, useApp } from "../state/store";
 import { PROVIDER_LABEL, ROLE_ACCENT, ROLE_LABEL } from "../lib/format";
 import { api } from "../api/client";
 import type { AgentConfig, OrgRole, ProviderKind } from "../types";
 import clsx from "clsx";
-import { Plus, Save, Search, Trash2, X } from "lucide-react";
+import { CopyPlus, Plus, Save, Search, Trash2, X } from "lucide-react";
 
 export function AgentStudio() {
   const savedAgents = useApp((s) => s.agents);
@@ -23,9 +23,16 @@ export function AgentStudio() {
   const [saveMessage, setSaveMessage] = useState("");
 
   const savedIds = useMemo(() => new Set(savedAgents.map((agent) => agent.id)), [savedAgents]);
+  const builtins = useMemo(() => builtinAgents(), []);
+  const builtinIds = useMemo(() => new Set(builtins.map((agent) => agent.id)), [builtins]);
+  const builtinsNotShadowed = useMemo(
+    () => builtins.filter((agent) => !savedIds.has(agent.id)),
+    [builtins, savedIds],
+  );
+  const isBuiltin = (id: string) => builtinIds.has(id) && !savedIds.has(id);
   const listAgents = useMemo<AgentConfig[]>(
-    () => (draft ? [draft, ...savedAgents] : savedAgents),
-    [draft, savedAgents],
+    () => [...(draft ? [draft] : []), ...savedAgents, ...builtinsNotShadowed],
+    [draft, savedAgents, builtinsNotShadowed],
   );
 
   const filtered = useMemo(() => {
@@ -44,13 +51,16 @@ export function AgentStudio() {
   const sourceForId = (id: string | null): AgentConfig | undefined => {
     if (!id) return undefined;
     if (draft && draft.id === id) return draft;
-    return savedAgents.find((a) => a.id === id);
+    const saved = savedAgents.find((a) => a.id === id);
+    if (saved) return saved;
+    return builtins.find((a) => a.id === id);
   };
 
   const baseSelected = sourceForId(selectedId) ?? filtered[0];
   const selected: AgentConfig | undefined =
     editing && baseSelected && editing.id === baseSelected.id ? editing : baseSelected;
   const isDraft = !!(selected && draft && selected.id === draft.id);
+  const isSelectedBuiltin = !!selected && isBuiltin(selected.id);
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
@@ -60,12 +70,27 @@ export function AgentStudio() {
 
   const handleChange = (patch: Partial<AgentConfig>) => {
     if (!selected) return;
+    if (isSelectedBuiltin) return;
     const next = { ...selected, ...patch };
     if (isDraft) {
       setDraft(next);
     } else {
       setEditing(next);
     }
+  };
+
+  const handleCloneFromBuiltin = () => {
+    if (!selected) return;
+    const copy: AgentConfig = {
+      ...selected,
+      id: `${selected.id}_user_${Math.random().toString(36).slice(2, 8)}`,
+      name: `${selected.name} (コピー)`,
+      is_custom: true,
+    };
+    setDraft(copy);
+    setSelectedId(copy.id);
+    setEditing(null);
+    setSaveMessage("Built-in をコピーしました。編集して保存してください。");
   };
 
   const handleNew = () => {
@@ -144,7 +169,14 @@ export function AgentStudio() {
               )}
             >
               <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">{a.name}</div>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <div className="truncate text-sm font-semibold">{a.name}</div>
+                  {isBuiltin(a.id) && (
+                    <span className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-2)] px-1.5 py-[1px] text-[9px] uppercase tracking-widest text-[var(--color-fg-muted)]">
+                      Built-in
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
                   {ROLE_LABEL[a.org_role]}
                 </span>
@@ -154,7 +186,11 @@ export function AgentStudio() {
               </div>
               <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
                 {PROVIDER_LABEL[a.provider]} · {a.skills.length} skills ·{" "}
-                {savedIds.has(a.id) ? "ライブラリ" : "未保存ドラフト"}
+                {isBuiltin(a.id)
+                  ? "Built-in"
+                  : savedIds.has(a.id)
+                    ? "ライブラリ"
+                    : "未保存ドラフト"}
               </div>
             </button>
           ))}
@@ -172,10 +208,12 @@ export function AgentStudio() {
           <AgentEditor
             agent={selected}
             isSaved={savedIds.has(selected.id)}
+            isBuiltin={isSelectedBuiltin}
             saveMessage={saveMessage}
             onChange={handleChange}
             onSave={() => void saveAgent(selected)}
             onRemove={() => void handleDelete()}
+            onClone={handleCloneFromBuiltin}
           />
         ) : (
           <div className="grid h-full place-items-center text-sm text-[var(--color-fg-subtle)]">
@@ -216,35 +254,53 @@ function RoleChip({
 function AgentEditor({
   agent,
   isSaved,
+  isBuiltin,
   saveMessage,
   onChange,
   onSave,
   onRemove,
+  onClone,
 }: {
   agent: AgentConfig;
   isSaved: boolean;
+  isBuiltin: boolean;
   saveMessage: string;
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onRemove: () => void;
+  onClone: () => void;
 }) {
+  const status = isBuiltin
+    ? "Built-in（読み取り専用 / コピーして編集できます）"
+    : isSaved
+      ? "ライブラリ保存済み"
+      : "未保存ドラフト（保存でライブラリに登録）";
+
   return (
-    <div className="space-y-4">
+    <div className={clsx("space-y-4", isBuiltin && "pointer-events-none opacity-90")}>
       <Card>
         <CardHeader>
           <div>
             <CardTitle>基本情報</CardTitle>
             <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
-              {isSaved ? "ライブラリ保存済み" : "未保存ドラフト（保存でライブラリに登録）"}
+              {status}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="primary" size="sm" onClick={onSave}>
-              <Save className="h-3.5 w-3.5" /> 保存
-            </Button>
-            <Button variant="danger" size="sm" onClick={onRemove}>
-              <Trash2 className="h-3.5 w-3.5" /> 削除
-            </Button>
+          <div className="pointer-events-auto flex items-center gap-2">
+            {isBuiltin ? (
+              <Button variant="primary" size="sm" onClick={onClone}>
+                <CopyPlus className="h-3.5 w-3.5" /> コピーして編集
+              </Button>
+            ) : (
+              <>
+                <Button variant="primary" size="sm" onClick={onSave}>
+                  <Save className="h-3.5 w-3.5" /> 保存
+                </Button>
+                <Button variant="danger" size="sm" onClick={onRemove}>
+                  <Trash2 className="h-3.5 w-3.5" /> 削除
+                </Button>
+              </>
+            )}
           </div>
         </CardHeader>
         <CardBody className="grid grid-cols-2 gap-3">

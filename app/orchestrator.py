@@ -21,6 +21,7 @@ from app.models import (
     WorkflowMode,
 )
 from app.providers import CLITemplateProvider, ProviderError, resolve_provider
+from app.skills import SkillDocument, SkillStore, render_skills
 
 DIRECT_EDIT_PROVIDERS = {
     ProviderKind.GEMINI_CLI,
@@ -74,9 +75,25 @@ def _is_git_repo(path: str) -> bool:
         return False
 
 
-def _build_system_directive(agent: AgentConfig) -> str:
+def _build_system_directive(
+    agent: AgentConfig,
+    installed_skills: list[SkillDocument] | None = None,
+) -> str:
     persona_block = agent.persona.strip() or "なし"
     skills_block = "\n".join(f"- {skill}" for skill in agent.skills) or "- なし"
+    rendered_skills = ""
+    if installed_skills and agent.skill_refs:
+        rendered_skills = render_skills(
+            skills=installed_skills,
+            references=agent.skill_refs,
+            provider=agent.provider.value,
+            role=agent.org_role.value,
+        ).strip()
+    skill_section = (
+        f"\nインストール済みスキル:\n{rendered_skills}\n"
+        if rendered_skills
+        else ""
+    )
     if agent.mcp_enabled:
         mcp_servers = ", ".join(agent.mcp_servers) or "未指定"
         mcp_instruction = agent.mcp_instruction.strip() or "特になし"
@@ -93,8 +110,11 @@ def _build_system_directive(agent: AgentConfig) -> str:
     return (
         f"あなたは {agent.name} です。\n"
         f"組織ロール: {agent.org_role.value}\n"
-        f"ペルソナ:\n{persona_block}\n\n"
+        "人格・振る舞い指示:\n"
+        "以下のペルソナを会話全体で維持してください。\n"
+        f"{persona_block}\n\n"
         f"活用するスキル:\n{skills_block}\n"
+        f"{skill_section}"
         f"{mcp_block}"
     )
 
@@ -180,6 +200,7 @@ def _build_task_prompt(
     round_outputs: dict[str, str],
     has_working_dir: bool = False,
     can_edit_files: bool = False,
+    installed_skills: list[SkillDocument] | None = None,
 ) -> str:
     objective = context.request.objective.strip() or "特になし"
     global_instruction = context.request.global_instruction.strip() or "特になし"
@@ -204,10 +225,16 @@ def _build_task_prompt(
         )
     else:
         code_block = "コーディングコンテキスト: writingモードのため未使用\n"
-        role_instruction = _build_writing_instruction(org_role=agent.org_role)
+        role_instruction = _build_writing_instruction(
+            org_role=agent.org_role,
+            collaboration_style=_detect_collaboration_style(
+                objective=objective,
+                global_instruction=global_instruction,
+            ),
+        )
 
     return (
-        f"{_build_system_directive(agent)}\n"
+        f"{_build_system_directive(agent, installed_skills=installed_skills)}\n"
         f"ワークフローモード: {workflow_mode.value}\n"
         f"オーケストレーション: {context.request.orchestration_mode.value}\n"
         f"ラウンド: {round_index}\n"
@@ -256,13 +283,38 @@ def _build_coding_instruction(
     )
 
 
-def _build_writing_instruction(*, org_role: OrgRole) -> str:
+def _detect_collaboration_style(*, objective: str, global_instruction: str) -> str:
+    raw = f"{objective}\n{global_instruction}".lower()
+    if "ディベート" in raw or "debate" in raw:
+        return "debate"
+    if "議論" in raw or "ディスカッション" in raw or "discussion" in raw:
+        return "discussion"
+    return ""
+
+
+def _build_writing_instruction(*, org_role: OrgRole, collaboration_style: str = "") -> str:
     role_hint = {
         OrgRole.CEO: "意思決定しやすい簡潔さを重視してください。",
         OrgRole.MANAGER: "段取りと依存関係が伝わる構成にしてください。",
         OrgRole.PMO: "抜け漏れと曖昧表現を排除してください。",
         OrgRole.QA: "検証観点が明確になるようにしてください。",
     }.get(org_role, "読み手に伝わる明瞭さを重視してください。")
+    if collaboration_style == "debate":
+        return (
+            "現在の下書きをディベート対象として扱ってください。\n"
+            "自分のロールの観点から、賛成論点・反対論点・リスク・反論を分けて出してください。\n"
+            "他エージェントの出力がある場合は、それに対する同意点と反論を明示してください。\n"
+            "最後に、意思決定に使える判断材料と暫定結論を短くまとめてください。\n"
+            f"{role_hint}"
+        )
+    if collaboration_style == "discussion":
+        return (
+            "現在の下書きをチーム議論の対象として扱ってください。\n"
+            "自分のロールの観点から論点、補足、懸念、次の提案を出してください。\n"
+            "他エージェントの出力がある場合は、それを踏まえて合意点・未解決点を整理してください。\n"
+            "最後に、チームとしてのまとめと次の行動を短く提示してください。\n"
+            f"{role_hint}"
+        )
     return (
         "現在の下書きを改善してください。\n"
         "必要なら修正案と本文をまとめて返してください。\n"
@@ -413,6 +465,11 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
             }
             return
 
+    try:
+        installed_skills = SkillStore().load_installed_skills()
+    except Exception:
+        installed_skills = []
+
     yield {
         "type": "run_started",
         "workflow_mode": request.workflow_mode.value,
@@ -474,6 +531,7 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     round_outputs=round_outputs,
                     has_working_dir=has_working_dir,
                     can_edit_files=can_edit_files,
+                    installed_skills=installed_skills,
                 )
                 cwd = working_dir if has_working_dir else None
                 mcp_context = ""

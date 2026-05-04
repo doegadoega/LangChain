@@ -10,6 +10,8 @@ export type RequestPresetId =
   | "improve_writing"
   | "organize_ideas"
   | "review"
+  | "discussion"
+  | "debate"
   | "implementation"
   | "fix_code"
   | "local_coding_light"
@@ -202,6 +204,30 @@ export const REQUEST_PRESETS: RequestPreset[] = [
     resultOptions: ["問題点を出す", "改善案を出す", "リスクを見る", "優先順位を付ける"],
   },
   {
+    id: "discussion",
+    label: "議論したい",
+    description: "各エージェントの観点から論点を出し、合意点と次の行動をまとめます。",
+    workflowMode: "writing",
+    orchestrationMode: "role_based",
+    rounds: 2,
+    defaultObjective: "議論して、各エージェントの観点から論点・懸念・合意点をまとめる",
+    defaultInstruction:
+      "各エージェントは自分のロールの観点から発言する。他エージェントの出力を踏まえ、合意点、未解決点、次の行動を最後にまとめる。",
+    resultOptions: ["合意点を出す", "論点を整理する", "未解決点を出す", "次の行動にする"],
+  },
+  {
+    id: "debate",
+    label: "ディベートしたい",
+    description: "賛成・反対・反論を分け、判断材料と暫定結論をまとめます。",
+    workflowMode: "writing",
+    orchestrationMode: "role_based",
+    rounds: 2,
+    defaultObjective: "ディベートして、各エージェントの観点から賛否・反論・判断材料をまとめる",
+    defaultInstruction:
+      "各エージェントは自分のロールの観点から賛成論点、反対論点、リスク、反論を出す。他エージェントの出力を踏まえ、最後に判断材料と暫定結論をまとめる。",
+    resultOptions: ["賛否を出す", "反論を出す", "判断材料にする", "暫定結論を出す"],
+  },
+  {
     id: "implementation",
     label: "実装方法を相談したい",
     description: "作りたい機能を実装できる手順に分解します。",
@@ -285,14 +311,15 @@ export const applyPresetToRequest = (
   request: RefineRequest,
   preset: RequestPreset,
 ): Partial<RefineRequest> => {
+  const shouldReplaceInstruction =
+    preset.id === "superpowers_local" || preset.id === "discussion" || preset.id === "debate";
   const next: Partial<RefineRequest> = {
     workflow_mode: preset.workflowMode,
-    objective:
-      preset.id === "superpowers_local"
-        ? preset.defaultObjective
-        : request.objective || preset.defaultObjective,
+    objective: shouldReplaceInstruction
+      ? preset.defaultObjective
+      : request.objective || preset.defaultObjective,
     global_instruction:
-      preset.id === "superpowers_local"
+      shouldReplaceInstruction
         ? preset.defaultInstruction
         : request.global_instruction || preset.defaultInstruction,
     code_context: preset.codeContextDefaults

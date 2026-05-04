@@ -10,6 +10,8 @@
 - [macos-app.md](specs/macos-app.md) — macOS ネイティブアプリ仕様
 - [ui-screens-v1.md](specs/ui-screens-v1.md) — 画面UI設計
 - [skill-package-manager.md](specs/skill-package-manager.md) — Skill Package Manager（パッケージ化・候補承認・Resolver）
+- [skill-management-web-python-brief.md](specs/skill-management-web-python-brief.md) — Web/Python 版 Skill 管理の現状・実装ブリーフ
+- [orchestration-cli.md](specs/orchestration-cli.md) — Orchestration CLI（`run.md` と `team.md` をベースに実行・同期）
 
 ## setup/ — セットアップ・運用手順
 

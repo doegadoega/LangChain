@@ -15,6 +15,24 @@ struct PromptBuilderTests {
         #expect(directive.contains("Swift"))
     }
 
+    @Test("System directive explicitly tells the model to follow persona")
+    func systemDirectiveEnforcesPersonaBehavior() {
+        let agent = MasterAgent(
+            id: "mako",
+            name: "まこ",
+            orgRoles: [.worker],
+            mode: .writer,
+            provider: .claudeCli,
+            persona: "短く明確に答える。"
+        )
+
+        let directive = PromptBuilder.buildSystemDirective(agent: agent)
+
+        #expect(directive.contains("人格・振る舞い指示"))
+        #expect(directive.contains("以下のペルソナを会話全体で維持してください。"))
+        #expect(directive.contains("短く明確に答える。"))
+    }
+
     @Test("Coding instruction includes role hint for CEO")
     func codingInstructionCeo() {
         let instruction = PromptBuilder.buildCodingInstruction(orgRole: .ceo, hasWorkingDir: true)

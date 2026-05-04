@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   AgentConfig,
+  ManagedRequest,
   ModelDecision,
   OrgRole,
   ProviderKind,
@@ -11,6 +12,7 @@ import type {
   StreamEvent,
   Template,
   TurnResult,
+  VerificationFeedback,
   Workflow,
 } from "../types";
 import { api } from "../api/client";
@@ -33,6 +35,8 @@ const PROVIDERS: ProviderKind[] = [
   "gemini_cli",
   "claude_cli",
   "codex_cli",
+  "openai_api",
+  "anthropic_api",
   "ollama",
   "lm_studio",
   "custom_cli",
@@ -131,6 +135,84 @@ const normalizeAgent = (value: unknown): AgentConfig => {
   };
 };
 
+const normalizeTemplate = (value: unknown): Template => {
+  const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const workflowMode = raw.workflow_mode === "coding" || raw.workflow_mode === "writing"
+    ? raw.workflow_mode
+    : undefined;
+  const orchestrationMode =
+    raw.orchestration_mode === "sequential" ||
+    raw.orchestration_mode === "role_based" ||
+    raw.orchestration_mode === "dependency_graph"
+      ? raw.orchestration_mode
+      : undefined;
+
+  return {
+    id: typeof raw.id === "string" && raw.id.trim() ? raw.id : `team_${uid()}`,
+    name: typeof raw.name === "string" && raw.name.trim() ? raw.name : "Untitled Team",
+    description: typeof raw.description === "string" ? raw.description : "",
+    agents: Array.isArray(raw.agents) ? raw.agents.map(normalizeAgent) : [],
+    workflow_mode: workflowMode,
+    orchestration_mode: orchestrationMode,
+    rounds: typeof raw.rounds === "number" ? raw.rounds : undefined,
+    is_builtin:
+      typeof raw.is_builtin === "boolean"
+        ? raw.is_builtin
+        : typeof raw.isBuiltin === "boolean"
+          ? raw.isBuiltin
+          : false,
+    locked: typeof raw.locked === "boolean" ? raw.locked : false,
+    category: typeof raw.category === "string" ? raw.category : undefined,
+    created_at: typeof raw.created_at === "string" ? raw.created_at : undefined,
+    updated_at: typeof raw.updated_at === "string" ? raw.updated_at : undefined,
+  };
+};
+
+const cloneAgentConfig = (agent: AgentConfig): AgentConfig => ({
+  ...agent,
+  skills: [...agent.skills],
+  depends_on: [...agent.depends_on],
+  mcp_servers: [...agent.mcp_servers],
+});
+
+const teamAgent = ({
+  id,
+  name,
+  org_role,
+  provider = "codex_cli",
+  persona,
+  skills = [],
+  depends_on = [],
+  model = null,
+  model_decision = "ceo_decides",
+}: {
+  id: string;
+  name: string;
+  org_role: OrgRole;
+  provider?: ProviderKind;
+  persona: string;
+  skills?: string[];
+  depends_on?: string[];
+  model?: string | null;
+  model_decision?: ModelDecision;
+}): AgentConfig => ({
+  id,
+  name,
+  org_role,
+  provider,
+  persona,
+  skills,
+  depends_on,
+  model,
+  model_decision,
+  enabled: true,
+  mcp_enabled: false,
+  mcp_servers: [],
+  mcp_instruction: "",
+  mcp_timeout_sec: 60,
+  is_custom: false,
+});
+
 const defaultAgents = (): AgentConfig[] => [
   {
     id: "ceo",
@@ -214,6 +296,228 @@ const defaultAgents = (): AgentConfig[] => [
   })),
 ];
 
+export const builtinAgents = (): AgentConfig[] => defaultAgents().map(cloneAgentConfig);
+
+const defaultTeamTemplates = (): Template[] => [
+  {
+    id: "builtin_standard_full",
+    name: "標準フルチーム",
+    description: "CEO、Manager、PMO、Worker x3、QA x3 の汎用構成。",
+    category: "Built-in",
+    is_builtin: true,
+    locked: true,
+    workflow_mode: "writing",
+    orchestration_mode: "role_based",
+    rounds: 1,
+    agents: defaultAgents().map(cloneAgentConfig),
+  },
+  {
+    id: "builtin_local_coding_light",
+    name: "軽量ローカルコーディング",
+    description: "LM Studio/Ollama で小さな修正方針やdiff案を作る軽量構成。",
+    category: "Built-in",
+    is_builtin: true,
+    locked: true,
+    workflow_mode: "coding",
+    orchestration_mode: "dependency_graph",
+    rounds: 1,
+    agents: [
+      teamAgent({
+        id: "local_manager",
+        name: "Local Manager",
+        org_role: "manager",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "依頼を小さな実装単位に分解し、対象ファイルと制約を明確にする。",
+        skills: ["planning", "prompt-compression"],
+      }),
+      teamAgent({
+        id: "local_coder",
+        name: "Local Coder",
+        org_role: "worker",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "軽いコード変更案、最小diff案、Codex向け指示を短く作る。",
+        skills: ["coding", "diff-proposal"],
+        depends_on: ["local_manager"],
+      }),
+      teamAgent({
+        id: "local_qa",
+        name: "Local QA",
+        org_role: "qa",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "変更案の抜け漏れ、テスト観点、リスクを短く確認する。",
+        skills: ["review", "testing"],
+        depends_on: ["local_coder"],
+      }),
+    ],
+  },
+  {
+    id: "builtin_codex_implementation",
+    name: "Codex実装チーム",
+    description: "ローカルLLMで整理し、Codex Worker が本命実装を行う構成。",
+    category: "Built-in",
+    is_builtin: true,
+    locked: true,
+    workflow_mode: "coding",
+    orchestration_mode: "dependency_graph",
+    rounds: 1,
+    agents: [
+      teamAgent({
+        id: "codex_ceo",
+        name: "CEO",
+        org_role: "ceo",
+        persona: "目的、優先順位、受け入れ条件を決める。",
+        skills: ["decision", "acceptance-criteria"],
+        model_decision: "fixed",
+      }),
+      teamAgent({
+        id: "codex_manager",
+        name: "Manager",
+        org_role: "manager",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "Codexに渡す実装指示を短く明確に整理する。",
+        skills: ["planning", "prompt-compression"],
+        depends_on: ["codex_ceo"],
+      }),
+      teamAgent({
+        id: "codex_worker",
+        name: "Codex Worker",
+        org_role: "worker",
+        provider: "codex_cli",
+        persona: "対象ファイルを限定し、不要なリファクタを避けて最小diffで実装する。",
+        skills: ["implementation", "minimal-diff"],
+        depends_on: ["codex_manager"],
+      }),
+      teamAgent({
+        id: "codex_qa",
+        name: "QA",
+        org_role: "qa",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "実装結果のテスト観点、回帰リスク、受け入れ条件を確認する。",
+        skills: ["review", "testing"],
+        depends_on: ["codex_worker"],
+      }),
+    ],
+  },
+  {
+    id: "builtin_design_review",
+    name: "設計レビュー",
+    description: "UI、システム、PMO、QA 観点で仕様やリファクタ方針を確認する構成。",
+    category: "Built-in",
+    is_builtin: true,
+    locked: true,
+    workflow_mode: "writing",
+    orchestration_mode: "role_based",
+    rounds: 1,
+    agents: [
+      teamAgent({
+        id: "design_system",
+        name: "System Designer",
+        org_role: "system_designer",
+        persona: "アーキテクチャ、責務分離、拡張性、運用リスクを確認する。",
+        skills: ["architecture", "refactoring"],
+      }),
+      teamAgent({
+        id: "design_ui",
+        name: "UI Designer",
+        org_role: "ui_designer",
+        persona: "画面構成、情報設計、操作導線、視認性を確認する。",
+        skills: ["ui-review", "interaction-design"],
+      }),
+      teamAgent({
+        id: "design_pmo",
+        name: "PMO",
+        org_role: "pmo",
+        persona: "計画の抜け漏れ、依存関係、実装順序を確認する。",
+        skills: ["risk", "process"],
+      }),
+      teamAgent({
+        id: "design_qa",
+        name: "QA",
+        org_role: "qa",
+        persona: "検証観点、受け入れ条件、失敗ケースを整理する。",
+        skills: ["quality", "acceptance-criteria"],
+      }),
+    ],
+  },
+  {
+    id: "builtin_superpowers_workflow",
+    name: "SuperPowers風ワークフロー",
+    description: "Brainstorm、Spec、Plan、Implement、Review の段階で依頼を前進させる構成。",
+    category: "Built-in",
+    is_builtin: true,
+    locked: true,
+    workflow_mode: "coding",
+    orchestration_mode: "dependency_graph",
+    rounds: 1,
+    agents: [
+      teamAgent({
+        id: "sp_brainstorm",
+        name: "Brainstorm",
+        org_role: "manager",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "曖昧な依頼を目的、制約、成功条件に分解する。",
+        skills: ["brainstorming"],
+      }),
+      teamAgent({
+        id: "sp_spec",
+        name: "Spec Writer",
+        org_role: "system_designer",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "合意した内容を短く明確な仕様にする。",
+        skills: ["specification"],
+        depends_on: ["sp_brainstorm"],
+      }),
+      teamAgent({
+        id: "sp_plan",
+        name: "Plan Writer",
+        org_role: "pmo",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "仕様を小さく実装可能な手順に分ける。",
+        skills: ["planning"],
+        depends_on: ["sp_spec"],
+      }),
+      teamAgent({
+        id: "sp_implementer",
+        name: "Implementer",
+        org_role: "worker",
+        provider: "codex_cli",
+        persona: "計画に沿って対象を限定し、最小diffで実装する。",
+        skills: ["implementation"],
+        depends_on: ["sp_plan"],
+      }),
+      teamAgent({
+        id: "sp_reviewer",
+        name: "Reviewer",
+        org_role: "qa",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona: "変更差分、テスト、リスク、仕様逸脱を確認する。",
+        skills: ["review", "verification"],
+        depends_on: ["sp_implementer"],
+      }),
+    ],
+  },
+];
+
+const mergeTemplatesWithBuiltIns = (templates: Template[]): Template[] => {
+  const builtIns = defaultTeamTemplates();
+  const builtInIds = new Set(builtIns.map((template) => template.id));
+  return [
+    ...builtIns,
+    ...templates
+      .map(normalizeTemplate)
+      .filter((template) => !builtInIds.has(template.id)),
+  ];
+};
+
 export interface RunState {
   status: "idle" | "running" | "completed" | "failed";
   events: StreamEvent[];
@@ -255,6 +559,25 @@ interface AppState {
   removeAgent: (id: string) => void;
   deleteSavedAgent: (id: string) => Promise<void>;
   setAgents: (list: AgentConfig[]) => void;
+  saveCurrentTeamTemplate: (input: {
+    id?: string;
+    name: string;
+    description?: string;
+  }) => Promise<Template>;
+  loadTeamTemplate: (id: string) => void;
+  deleteTeamTemplate: (id: string) => Promise<void>;
+
+  managedRequests: ManagedRequest[];
+  selectedManagedRequestId?: string;
+  loadManagedRequests: () => Promise<void>;
+  selectManagedRequest: (id?: string) => void;
+  saveManagedRequest: (record: ManagedRequest) => Promise<ManagedRequest>;
+  deleteManagedRequest: (id: string) => Promise<void>;
+  addManagedRequestFeedback: (
+    record: ManagedRequest,
+    feedback: VerificationFeedback,
+  ) => Promise<ManagedRequest>;
+  deleteManagedRequestFeedback: (requestId: string, feedbackId: string) => Promise<ManagedRequest>;
 
   run: RunState;
   abortCtrl?: AbortController;
@@ -295,7 +618,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   agents: defaultAgents(),
   projects: [],
-  templates: [],
+  templates: defaultTeamTemplates(),
   workflows: [],
   selectedProjectId: undefined,
   selectProject: (id) => set({ selectedProjectId: id }),
@@ -337,6 +660,121 @@ export const useApp = create<AppState>((set, get) => ({
     }));
   },
   setAgents: (list) => set({ request: { ...get().request, agents: list } }),
+  saveCurrentTeamTemplate: async ({ id, name, description }) => {
+    const state = get();
+    const now = new Date().toISOString();
+    const existing = id ? state.templates.find((template) => template.id === id) : undefined;
+    const canOverwrite = existing && !existing.locked;
+    const template: Template = {
+      id: canOverwrite ? existing.id : `team_${uid()}`,
+      name: name.trim() || `Team ${new Date().toLocaleString("ja-JP")}`,
+      description: description?.trim() || "",
+      agents: state.request.agents.map(cloneAgentConfig),
+      workflow_mode: state.request.workflow_mode,
+      orchestration_mode: state.request.orchestration_mode,
+      rounds: state.request.rounds,
+      created_at: canOverwrite ? existing.created_at : now,
+      updated_at: now,
+    };
+    const saved = normalizeTemplate(await api.createTemplate(template));
+    set((current) => ({ templates: [saved, ...current.templates.filter((t) => t.id !== saved.id)] }));
+    return saved;
+  },
+  loadTeamTemplate: (id) => {
+    const template = get().templates.find((item) => item.id === id);
+    if (!template) return;
+    set((state) => ({
+      request: {
+        ...state.request,
+        agents: template.agents.map(cloneAgentConfig),
+        workflow_mode: template.workflow_mode ?? state.request.workflow_mode,
+        orchestration_mode: template.orchestration_mode ?? state.request.orchestration_mode,
+        rounds: template.rounds ?? state.request.rounds,
+      },
+    }));
+  },
+  deleteTeamTemplate: async (id) => {
+    const target = get().templates.find((template) => template.id === id);
+    if (target?.locked) return;
+    await api.deleteTemplate(id);
+    set((state) => ({ templates: state.templates.filter((template) => template.id !== id) }));
+  },
+
+  managedRequests: [],
+  selectedManagedRequestId: undefined,
+  loadManagedRequests: async () => {
+    try {
+      const list = await api.listRequests();
+      set({
+        managedRequests: list.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+      });
+    } catch {
+      // ignore — backend may be unreachable
+    }
+  },
+  selectManagedRequest: (id) => set({ selectedManagedRequestId: id }),
+  saveManagedRequest: async (record) => {
+    const exists = get().managedRequests.some((item) => item.id === record.id);
+    const saved = exists
+      ? await api.updateRequest(record.id, record)
+      : await api.createRequest(record);
+    set((state) => {
+      const others = state.managedRequests.filter((item) => item.id !== saved.id);
+      return {
+        managedRequests: [saved, ...others].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+        selectedManagedRequestId: saved.id,
+      };
+    });
+    return saved;
+  },
+  deleteManagedRequest: async (id) => {
+    await api.deleteRequest(id);
+    set((state) => ({
+      managedRequests: state.managedRequests.filter((item) => item.id !== id),
+      selectedManagedRequestId:
+        state.selectedManagedRequestId === id ? undefined : state.selectedManagedRequestId,
+    }));
+  },
+  addManagedRequestFeedback: async (record, feedback) => {
+    const existing = get().managedRequests.find((item) => item.id === record.id);
+    const base = existing ?? record;
+    const now = new Date().toISOString();
+    const next: ManagedRequest = {
+      ...base,
+      ...record,
+      updated_at: now,
+      verification_feedback: [feedback, ...(base.verification_feedback ?? [])],
+    };
+    const saved = existing
+      ? await api.updateRequest(next.id, next)
+      : await api.createRequest(next);
+    set((state) => {
+      const others = state.managedRequests.filter((item) => item.id !== saved.id);
+      return {
+        managedRequests: [saved, ...others].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+        selectedManagedRequestId: saved.id,
+      };
+    });
+    return saved;
+  },
+  deleteManagedRequestFeedback: async (requestId, feedbackId) => {
+    const existing = get().managedRequests.find((item) => item.id === requestId);
+    if (!existing) throw new Error("依頼が見つかりません。");
+    const next: ManagedRequest = {
+      ...existing,
+      updated_at: new Date().toISOString(),
+      verification_feedback: (existing.verification_feedback ?? []).filter(
+        (item) => item.id !== feedbackId,
+      ),
+    };
+    const saved = await api.updateRequest(next.id, next);
+    set((state) => ({
+      managedRequests: [saved, ...state.managedRequests.filter((item) => item.id !== saved.id)].sort(
+        (a, b) => b.updated_at.localeCompare(a.updated_at),
+      ),
+    }));
+    return saved;
+  },
 
   run: { status: "idle", events: [], turns: [], currentRound: 0 },
 
@@ -411,13 +849,22 @@ export const useApp = create<AppState>((set, get) => ({
 
   loadAll: async () => {
     try {
-      const [agents, projects, templates, workflows] = await Promise.all([
+      const [agents, projects, templates, workflows, managedRequests] = await Promise.all([
         api.listAgents().catch(() => []),
         api.listProjects().catch(() => []),
         api.listTemplates().catch(() => []),
         api.listWorkflows().catch(() => []),
+        api.listRequests().catch(() => [] as ManagedRequest[]),
       ]);
-      set({ agents: agents.map(normalizeAgent), projects, templates, workflows });
+      set({
+        agents: agents.map(normalizeAgent),
+        projects,
+        templates: mergeTemplatesWithBuiltIns(templates),
+        workflows,
+        managedRequests: managedRequests
+          .slice()
+          .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+      });
     } catch {
       // ignore
     }

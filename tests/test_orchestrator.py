@@ -1,7 +1,6 @@
 from app.models import (
     AgentConfig,
     CodeContext,
-    OrgRole,
     OrchestrationMode,
     ProviderKind,
     RefineRequest,
@@ -64,3 +63,66 @@ def test_local_llm_coding_with_working_dir_returns_diff_proposal(monkeypatch, tm
     assert prompts
     assert "直接ファイルを書き換えられません" in prompts[0]
     assert "diff案" in prompts[0]
+
+
+def test_agent_persona_is_embedded_as_behavior_instruction(monkeypatch):
+    prompts: list[str] = []
+
+    def fake_resolve_provider(**kwargs):
+        return DummyProvider("done", prompts)
+
+    monkeypatch.setattr(orchestrator, "resolve_provider", fake_resolve_provider)
+
+    request = RefineRequest(
+        workflow_mode=WorkflowMode.WRITING,
+        orchestration_mode=OrchestrationMode.SEQUENTIAL,
+        source_text="相談内容",
+        agents=[
+            AgentConfig(
+                id="mako",
+                name="まこ",
+                org_role="worker",
+                provider=ProviderKind.LM_STUDIO,
+                persona="短く明確に答える。",
+            )
+        ],
+    )
+
+    orchestrator.run_refinement(request)
+
+    assert prompts
+    assert "人格・振る舞い指示" in prompts[0]
+    assert "以下のペルソナを会話全体で維持してください。" in prompts[0]
+    assert "短く明確に答える。" in prompts[0]
+
+
+def test_debate_request_prompts_agents_to_respond_from_their_viewpoint(monkeypatch):
+    prompts: list[str] = []
+
+    def fake_resolve_provider(**kwargs):
+        return DummyProvider("debate output", prompts)
+
+    monkeypatch.setattr(orchestrator, "resolve_provider", fake_resolve_provider)
+
+    request = RefineRequest(
+        workflow_mode=WorkflowMode.WRITING,
+        orchestration_mode=OrchestrationMode.ROLE_BASED,
+        source_text="新機能を入れるべきか検討したい",
+        objective="ディベートして、各エージェントの観点から賛否と判断材料をまとめる",
+        global_instruction="反論と合意点を分けてください。",
+        agents=[
+            AgentConfig(
+                id="manager",
+                name="Manager",
+                org_role="manager",
+                provider=ProviderKind.LM_STUDIO,
+            )
+        ],
+    )
+
+    orchestrator.run_refinement(request)
+
+    assert prompts
+    assert "自分のロールの観点" in prompts[0]
+    assert "他エージェントの出力" in prompts[0]
+    assert "反論" in prompts[0]

@@ -3,14 +3,38 @@ import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { ModelPicker } from "../components/ModelPicker";
-import { newAgent, useApp } from "../state/store";
+import { useApp, builtinAgents } from "../state/store";
 import { PROVIDER_LABEL, ROLE_ACCENT, ROLE_LABEL } from "../lib/format";
-import type { AgentConfig, OrgRole, ProviderKind } from "../types";
+import type { AgentConfig, OrgRole, ProviderKind, Template } from "../types";
 import clsx from "clsx";
-import { AlertTriangle, CheckCircle2, CopyPlus, Plus, Search, UserMinus } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CopyPlus,
+  Plus,
+  Save,
+  Search,
+  Trash2,
+  UserMinus,
+} from "lucide-react";
 
 const ROLE_OPTIONS = Object.keys(ROLE_LABEL) as OrgRole[];
 const uid = () => Math.random().toString(36).slice(2, 8);
+type TeamTab = "builtin" | "custom";
+
+const timestampPrefix = () => {
+  const now = new Date();
+  const pad = (value: number) => value.toString().padStart(2, "0");
+  return [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    "-",
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds()),
+  ].join("");
+};
 
 export function TeamComposer() {
   const teamAgents = useApp((s) => s.request.agents);
@@ -18,18 +42,40 @@ export function TeamComposer() {
   const upsertAgent = useApp((s) => s.upsertAgent);
   const removeAgent = useApp((s) => s.removeAgent);
   const toggleAgentEnabled = useApp((s) => s.toggleAgentEnabled);
+  const setAgents = useApp((s) => s.setAgents);
+  const templates = useApp((s) => s.templates);
+  const saveCurrentTeamTemplate = useApp((s) => s.saveCurrentTeamTemplate);
+  const loadTeamTemplate = useApp((s) => s.loadTeamTemplate);
+  const deleteTeamTemplate = useApp((s) => s.deleteTeamTemplate);
 
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<OrgRole | "all">("all");
   const [filterProvider, setFilterProvider] = useState<ProviderKind | "all">("all");
+  const [teamName, setTeamName] = useState("");
+  const [teamDescription, setTeamDescription] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateStatus, setTemplateStatus] = useState("");
+  const [teamTab, setTeamTab] = useState<TeamTab>("builtin");
+  const [sourceTemplateId, setSourceTemplateId] = useState("");
 
   const enabledAgents = teamAgents.filter((agent) => agent.enabled !== false);
   const qaCount = enabledAgents.filter((agent) => agent.org_role === "qa").length;
   const warnings = getTeamWarnings(teamAgents);
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
+  const builtinTemplates = templates.filter((template) => template.locked || template.is_builtin);
+  const customTemplates = templates.filter((template) => !template.locked && !template.is_builtin);
+  const visibleTemplates = teamTab === "builtin" ? builtinTemplates : customTemplates;
+
+  const candidatePool = useMemo(() => {
+    const builtins = builtinAgents().map((agent) => ({ ...agent, is_custom: false }));
+    const savedIds = new Set(savedAgents.map((agent) => agent.id));
+    const builtinsNotShadowed = builtins.filter((agent) => !savedIds.has(agent.id));
+    return [...builtinsNotShadowed, ...savedAgents];
+  }, [savedAgents]);
 
   const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return savedAgents.filter((agent) => {
+    return candidatePool.filter((agent) => {
       if (filterRole !== "all" && agent.org_role !== filterRole) return false;
       if (filterProvider !== "all" && agent.provider !== filterProvider) return false;
       if (!q) return true;
@@ -39,7 +85,7 @@ export function TeamComposer() {
         agent.skills.join(",").toLowerCase().includes(q)
       );
     });
-  }, [filterProvider, filterRole, query, savedAgents]);
+  }, [candidatePool, filterProvider, filterRole, query]);
 
   const addCandidateToTeam = (agent: AgentConfig) => {
     upsertAgent({
@@ -51,71 +97,201 @@ export function TeamComposer() {
     });
   };
 
+  const saveTeam = async (mode: "update" | "copy" = "update") => {
+    setTemplateStatus("");
+    try {
+      const saved = await saveCurrentTeamTemplate({
+        id: mode === "update" ? selectedTemplateId || undefined : undefined,
+        name: teamName,
+        description: teamDescription,
+      });
+      setSelectedTemplateId(saved.id);
+      setTeamName(saved.name);
+      setTeamDescription(saved.description ?? "");
+      setTeamTab("custom");
+      setTemplateStatus(
+        selectedTemplate?.locked && mode === "update"
+          ? "組み込みテンプレートをユーザーチームとして複製しました。"
+          : "チームを保存しました。",
+      );
+    } catch (error) {
+      setTemplateStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const loadTeam = (templateId: string) => {
+    loadTeamTemplate(templateId);
+    setSelectedTemplateId(templateId);
+    const template = templates.find((item) => item.id === templateId);
+    if (template) {
+      setTeamName(template.name);
+      setTeamDescription(template.description ?? "");
+      setTemplateStatus("保存済みチームを読み込みました。");
+    }
+  };
+
+  const startNewTeam = () => {
+    setAgents([]);
+    setSelectedTemplateId("");
+    setTeamName("");
+    setTeamDescription("");
+    setTeamTab("custom");
+    setTemplateStatus("新規チームを開始しました。候補からエージェントを追加してください。");
+  };
+
+  const deleteTeam = async () => {
+    if (!selectedTemplateId) return;
+    if (selectedTemplate?.locked) {
+      setTemplateStatus("組み込みテンプレートは削除できません。");
+      return;
+    }
+    setTemplateStatus("");
+    try {
+      await deleteTeamTemplate(selectedTemplateId);
+      setSelectedTemplateId("");
+      setTeamName("");
+      setTeamDescription("");
+      setTemplateStatus("保存済みチームを削除しました。");
+    } catch (error) {
+      setTemplateStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const startFromTemplate = () => {
+    const template = templates.find((item) => item.id === sourceTemplateId);
+    if (!template) {
+      setTemplateStatus("呼び出すテンプレートを選択してください。");
+      return;
+    }
+    loadTeamTemplate(template.id);
+    setSelectedTemplateId("");
+    setTeamName(`${timestampPrefix()}_${template.name}`);
+    setTeamDescription(template.description ?? "");
+    setTeamTab("custom");
+    setTemplateStatus(
+      `「${template.name}」をテンプレートとして呼び出しました。編集後、新しいチームとして保存できます。`,
+    );
+  };
+
   return (
-    <div className="grid h-full grid-cols-[320px_minmax(420px,1fr)_320px] gap-4 overflow-hidden p-4">
+    <div className="grid h-full grid-cols-[320px_minmax(420px,3fr)_minmax(320px,2fr)] gap-4 overflow-hidden p-4">
       <Card className="flex min-w-0 flex-col overflow-hidden">
         <CardHeader>
           <div>
-            <CardTitle>エージェント候補</CardTitle>
+            <CardTitle>チーム管理</CardTitle>
             <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
-              保存済みエージェントをチームへ追加します。
+              保存済みチームを選び、必要なエージェントを追加します。
             </p>
           </div>
+          <span className="text-[10px] text-[var(--color-fg-subtle)]">{templates.length} teams</span>
         </CardHeader>
-        <CardBody className="flex-1 space-y-3 overflow-y-auto">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-fg-muted)]" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="名前・ペルソナ・スキルで検索"
-              className="pl-7"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label>role</Label>
-              <Select
-                value={filterRole}
-                onChange={(event) => setFilterRole(event.target.value as OrgRole | "all")}
-              >
-                <option value="all">All</option>
-                {ROLE_OPTIONS.map((role) => (
-                  <option key={role} value={role}>
-                    {ROLE_LABEL[role]}
-                  </option>
-                ))}
-              </Select>
+        <CardBody className="flex-1 space-y-4 overflow-y-auto">
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold">保存済みチーム</div>
+              <Button variant="outline" size="sm" onClick={startNewTeam}>
+                <Plus className="h-3.5 w-3.5" />
+                新規
+              </Button>
             </div>
-            <div>
-              <Label>provider</Label>
-              <Select
-                value={filterProvider}
-                onChange={(event) => setFilterProvider(event.target.value as ProviderKind | "all")}
-              >
-                <option value="all">All</option>
-                {(Object.keys(PROVIDER_LABEL) as ProviderKind[]).map((provider) => (
-                  <option key={provider} value={provider}>
-                    {PROVIDER_LABEL[provider]}
-                  </option>
-                ))}
-              </Select>
+            <div className="grid grid-cols-2 gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1">
+              <TeamTabButton
+                active={teamTab === "builtin"}
+                label="Built-in"
+                count={builtinTemplates.length}
+                onClick={() => setTeamTab("builtin")}
+              />
+              <TeamTabButton
+                active={teamTab === "custom"}
+                label="Custom"
+                count={customTemplates.length}
+                onClick={() => setTeamTab("custom")}
+              />
             </div>
-          </div>
-          <Button variant="outline" className="w-full" onClick={() => upsertAgent(newAgent("worker"))}>
-            <Plus className="h-4 w-4" />
-            空のエージェントを追加
-          </Button>
-          <div className="space-y-2 border-t border-[var(--color-border)] pt-3">
-            {candidates.length === 0 && (
-              <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs text-[var(--color-fg-subtle)]">
-                保存済み候補がありません。Agent Studio で保存してください。
+            {visibleTemplates.length === 0 && (
+              <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs leading-relaxed text-[var(--color-fg-subtle)]">
+                {teamTab === "builtin"
+                  ? "組み込みテンプレートがありません。"
+                  : "カスタムチームはまだありません。中央で編成し、右側で保存してください。"}
               </div>
             )}
-            {candidates.map((agent) => (
-              <CandidateCard key={agent.id} agent={agent} onAdd={() => addCandidateToTeam(agent)} />
+            {visibleTemplates.map((template) => (
+              <TeamTemplateCard
+                key={template.id}
+                template={template}
+                selected={template.id === selectedTemplateId}
+                onLoad={() => loadTeam(template.id)}
+                onDelete={() => {
+                  if (template.locked) return;
+                  setSelectedTemplateId(template.id);
+                  void deleteTeamTemplate(template.id);
+                  if (template.id === selectedTemplateId) {
+                    setSelectedTemplateId("");
+                    setTeamName("");
+                    setTeamDescription("");
+                  }
+                }}
+              />
             ))}
-          </div>
+          </section>
+
+          <section className="space-y-3 border-t border-[var(--color-border)] pt-4">
+            <div>
+              <div className="text-xs font-semibold">エージェント候補</div>
+              <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
+                Agent Studio に保存したエージェントを選択中チームへ追加します。
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-fg-muted)]" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="名前・ペルソナ・スキルで検索"
+                className="pl-7"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>role</Label>
+                <Select
+                  value={filterRole}
+                  onChange={(event) => setFilterRole(event.target.value as OrgRole | "all")}
+                >
+                  <option value="all">All</option>
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role} value={role}>
+                      {ROLE_LABEL[role]}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label>provider</Label>
+                <Select
+                  value={filterProvider}
+                  onChange={(event) => setFilterProvider(event.target.value as ProviderKind | "all")}
+                >
+                  <option value="all">All</option>
+                  {(Object.keys(PROVIDER_LABEL) as ProviderKind[]).map((provider) => (
+                    <option key={provider} value={provider}>
+                      {PROVIDER_LABEL[provider]}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {candidates.length === 0 && (
+                <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs text-[var(--color-fg-subtle)]">
+                  保存済み候補がありません。Agent Studio で保存してください。
+                </div>
+              )}
+              {candidates.map((agent) => (
+                <CandidateCard key={agent.id} agent={agent} onAdd={() => addCandidateToTeam(agent)} />
+              ))}
+            </div>
+          </section>
         </CardBody>
       </Card>
 
@@ -124,7 +300,7 @@ export function TeamComposer() {
           <div>
             <CardTitle>現在のチーム編成</CardTitle>
             <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
-              実行に参加するエージェントを柔軟に編集します。
+              {selectedTemplate ? selectedTemplate.name : "未保存の新規チーム"} を編集しています。
             </p>
           </div>
           <span className="text-[10px] text-[var(--color-fg-subtle)]">
@@ -202,18 +378,207 @@ export function TeamComposer() {
               </div>
             )}
           </div>
+          <div className="border-t border-[var(--color-border)] pt-4">
+            <div className="mb-2 text-xs font-semibold">チーム保存</div>
+            <div className="space-y-2">
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
+                <div className="mb-2 text-xs font-semibold">テンプレートから開始</div>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <Select
+                    value={sourceTemplateId}
+                    onChange={(event) => setSourceTemplateId(event.target.value)}
+                  >
+                    <option value="">呼び出すチームを選択</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.locked ? "Built-in" : "Custom"} · {template.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button
+                    variant="outline"
+                    disabled={!sourceTemplateId}
+                    onClick={startFromTemplate}
+                  >
+                    <CopyPlus className="h-4 w-4" />
+                    呼び出し
+                  </Button>
+                </div>
+                <p className="mt-2 text-[10px] leading-relaxed text-[var(--color-fg-subtle)]">
+                  選択したチームの構成をコピーし、日時プレフィックス付きの新規チーム名で編集を開始します。
+                </p>
+              </div>
+              {selectedTemplate && (
+                <div className="rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 p-2 text-xs text-[var(--color-fg-muted)]">
+                  選択中: <span className="font-semibold text-[var(--color-fg)]">{selectedTemplate.name}</span>
+                </div>
+              )}
+              <div>
+                <Label>team name</Label>
+                <Input
+                  value={teamName}
+                  onChange={(event) => setTeamName(event.target.value)}
+                  placeholder="例: ローカルLLM開発チーム"
+                />
+              </div>
+              <div>
+                <Label>description</Label>
+                <Textarea
+                  rows={2}
+                  value={teamDescription}
+                  onChange={(event) => setTeamDescription(event.target.value)}
+                  placeholder="用途や前提を短くメモ"
+                  className="min-h-16 font-sans"
+                />
+              </div>
+              <Button className="w-full" onClick={() => void saveTeam("update")}>
+                <Save className="h-4 w-4" />
+                {selectedTemplate?.locked
+                  ? "組み込みを複製して保存"
+                  : selectedTemplateId
+                    ? "選択中チームを更新"
+                    : "新しいチームとして保存"}
+              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={() => void saveTeam("copy")}>
+                  <CopyPlus className="h-4 w-4" />
+                  別名保存
+                </Button>
+                <Button
+                  variant="danger"
+                  disabled={!selectedTemplateId || selectedTemplate?.locked}
+                  onClick={() => void deleteTeam()}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  削除
+                </Button>
+              </div>
+              {templateStatus && (
+                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-xs text-[var(--color-fg-muted)]">
+                  {templateStatus}
+                </div>
+              )}
+            </div>
+          </div>
         </CardBody>
       </Card>
     </div>
   );
 }
 
+function TeamTemplateCard({
+  template,
+  selected,
+  onLoad,
+  onDelete,
+}: {
+  template: Template;
+  selected: boolean;
+  onLoad: () => void;
+  onDelete: () => void;
+}) {
+  const enabledCount = template.agents.filter((agent) => agent.enabled !== false).length;
+  return (
+    <button
+      type="button"
+      onClick={onLoad}
+      className={clsx(
+        "w-full rounded-md border bg-[var(--color-surface-2)] p-3 text-left transition-colors hover:border-[var(--color-accent)]/60 hover:bg-[var(--color-surface-3)]",
+        selected ? "border-[var(--color-accent)] shadow-sm shadow-[var(--color-accent)]/10" : "border-[var(--color-border)]",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="truncate text-sm font-semibold">{template.name}</div>
+            {template.locked && (
+              <span className="shrink-0 rounded border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-[var(--color-accent)]">
+                Built-in
+              </span>
+            )}
+          </div>
+          <div className="mt-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+            {enabledCount}/{template.agents.length} enabled · {template.orchestration_mode ?? "current"}
+          </div>
+        </div>
+        {!template.locked && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                onDelete();
+              }
+            }}
+            className="rounded p-1 text-[var(--color-fg-muted)] hover:bg-red-500/20 hover:text-red-300"
+            title="チームを削除"
+          >
+            <Trash2 className="h-4 w-4" />
+          </span>
+        )}
+      </div>
+      <div className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--color-fg-muted)]">
+        {template.description || "説明なし"}
+      </div>
+    </button>
+  );
+}
+
+function TeamTabButton({
+  active,
+  label,
+  count,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "flex items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs transition-colors",
+        active
+          ? "bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20"
+          : "text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-3)] hover:text-[var(--color-fg)]",
+      )}
+    >
+      <span className="font-semibold">{label}</span>
+      <span
+        className={clsx(
+          "rounded-full px-1.5 py-0.5 text-[10px]",
+          active ? "bg-white/15 text-white" : "bg-[var(--color-surface-3)] text-[var(--color-fg-subtle)]",
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
 function CandidateCard({ agent, onAdd }: { agent: AgentConfig; onAdd: () => void }) {
+  const isBuiltin = agent.is_custom === false;
   return (
     <div className={clsx("rounded-md border bg-gradient-to-br p-3", ROLE_ACCENT[agent.org_role])}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{agent.name}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="truncate text-sm font-semibold">{agent.name}</div>
+            {isBuiltin && (
+              <span className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-2)] px-1.5 py-[1px] text-[9px] uppercase tracking-widest text-[var(--color-fg-muted)]">
+                Built-in
+              </span>
+            )}
+          </div>
           <div className="mt-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
             {ROLE_LABEL[agent.org_role]} · {PROVIDER_LABEL[agent.provider]}
           </div>

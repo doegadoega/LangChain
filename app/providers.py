@@ -42,7 +42,11 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/api")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
 LM_STUDIO_MODEL = os.getenv("LM_STUDIO_MODEL", "local-model")
-
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2-chat-latest")
+ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
+ANTHROPIC_VERSION = os.getenv("ANTHROPIC_VERSION", "2023-06-01")
 
 class ProviderError(RuntimeError):
     pass
@@ -50,6 +54,29 @@ class ProviderError(RuntimeError):
 
 def _model_item(model_id: str, name: str | None = None) -> dict[str, str]:
     return {"id": model_id, "name": name or model_id}
+
+
+OPENAI_API_MODELS = [
+    _model_item("gpt-5.2-chat-latest", "GPT-5.2 Chat"),
+    _model_item("gpt-5.2", "GPT-5.2"),
+    _model_item("gpt-5.2-pro", "GPT-5.2 Pro"),
+    _model_item("gpt-5.2-codex", "GPT-5.2 Codex"),
+    _model_item("gpt-5.1-chat-latest", "GPT-5.1 Chat"),
+    _model_item("gpt-5.1", "GPT-5.1"),
+    _model_item("gpt-5", "GPT-5"),
+    _model_item("gpt-5-mini", "GPT-5 mini"),
+    _model_item("gpt-5-nano", "GPT-5 nano"),
+    _model_item("gpt-4.1", "GPT-4.1"),
+]
+
+ANTHROPIC_API_MODELS = [
+    _model_item("claude-sonnet-4-5-20250929", "Claude Sonnet 4.5"),
+    _model_item("claude-opus-4-1-20250805", "Claude Opus 4.1"),
+    _model_item("claude-sonnet-4-20250514", "Claude Sonnet 4"),
+    _model_item("claude-opus-4-20250514", "Claude Opus 4"),
+    _model_item("claude-3-7-sonnet-20250219", "Claude Sonnet 3.7"),
+    _model_item("claude-3-5-haiku-20241022", "Claude Haiku 3.5"),
+]
 
 
 def _dedupe_models(models: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -160,12 +187,18 @@ def _join_url(base_url: str, path: str) -> str:
     return urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
 
 
-def _post_json(url: str, payload: dict[str, object], *, timeout_sec: int) -> dict[str, object]:
+def _post_json(
+    url: str,
+    payload: dict[str, object],
+    *,
+    timeout_sec: int,
+    headers: dict[str, str] | None = None,
+) -> dict[str, object]:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **(headers or {})},
         method="POST",
     )
     try:
@@ -264,6 +297,20 @@ def _list_ollama_models_from_command() -> list[dict[str, str]]:
 
 
 def list_provider_models(provider_kind: ProviderKind) -> dict[str, object]:
+    if provider_kind == ProviderKind.OPENAI_API:
+        return {
+            "provider": provider_kind.value,
+            "models": OPENAI_API_MODELS,
+            "error": None,
+        }
+
+    if provider_kind == ProviderKind.ANTHROPIC_API:
+        return {
+            "provider": provider_kind.value,
+            "models": ANTHROPIC_API_MODELS,
+            "error": None,
+        }
+
     if provider_kind == ProviderKind.LM_STUDIO:
         try:
             return {
@@ -384,6 +431,89 @@ class LMStudioProvider:
         raise ProviderError("LM Studio response did not include message.content")
 
 
+@dataclass
+class OpenAIAPIProvider:
+    base_url: str = OPENAI_BASE_URL
+    default_model: str = OPENAI_MODEL
+    timeout_sec: int = 300
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        model: str | None = None,
+        cwd: str | None = None,
+        mcp_config_path: str | None = None,
+        mcp_servers: list[str] | None = None,
+    ) -> str:
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise ProviderError("openai_api requires OPENAI_API_KEY")
+        data = _post_json(
+            _join_url(self.base_url, "chat/completions"),
+            {
+                "model": model or self.default_model,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout_sec=self.timeout_sec,
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise ProviderError("OpenAI response did not include choices")
+        first = choices[0]
+        if not isinstance(first, dict):
+            raise ProviderError("OpenAI response choice was not an object")
+        message = first.get("message")
+        if isinstance(message, dict) and isinstance(message.get("content"), str):
+            return message["content"].strip()
+        raise ProviderError("OpenAI response did not include message.content")
+
+
+@dataclass
+class AnthropicAPIProvider:
+    base_url: str = ANTHROPIC_BASE_URL
+    default_model: str = ANTHROPIC_MODEL
+    timeout_sec: int = 300
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        model: str | None = None,
+        cwd: str | None = None,
+        mcp_config_path: str | None = None,
+        mcp_servers: list[str] | None = None,
+    ) -> str:
+        api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        if not api_key:
+            raise ProviderError("anthropic_api requires ANTHROPIC_API_KEY")
+        data = _post_json(
+            _join_url(self.base_url, "messages"),
+            {
+                "model": model or self.default_model,
+                "max_tokens": 4096,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout_sec=self.timeout_sec,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": ANTHROPIC_VERSION,
+            },
+        )
+        content = data.get("content")
+        if isinstance(content, list):
+            text_parts = [
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("type") == "text"
+            ]
+            text = "\n".join(part for part in text_parts if part).strip()
+            if text:
+                return text
+        raise ProviderError("Anthropic response did not include text content")
+
+
 def resolve_provider(
     *,
     provider_kind: ProviderKind,
@@ -395,6 +525,12 @@ def resolve_provider(
 
     if provider_kind == ProviderKind.LM_STUDIO:
         return LMStudioProvider()
+
+    if provider_kind == ProviderKind.OPENAI_API:
+        return OpenAIAPIProvider()
+
+    if provider_kind == ProviderKind.ANTHROPIC_API:
+        return AnthropicAPIProvider()
 
     if provider_kind == ProviderKind.CUSTOM_CLI:
         if not command_template:

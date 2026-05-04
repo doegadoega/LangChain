@@ -15,6 +15,8 @@ V2 の全体仕様（組織体制、インフラ構成、アプリ構成、構�
 - [docs/specs/macos-app.md](docs/specs/macos-app.md) — macOS アプリ仕様
 - [docs/specs/ui-screens-v1.md](docs/specs/ui-screens-v1.md) — 画面UI設計
 - [docs/specs/skill-package-manager.md](docs/specs/skill-package-manager.md) — Skill Package Manager
+- [docs/specs/skill-management-web-python-brief.md](docs/specs/skill-management-web-python-brief.md) — Web/Python 版 Skill 管理ブリーフ
+- [docs/specs/orchestration-cli.md](docs/specs/orchestration-cli.md) — Orchestration CLI 仕様
 - [docs/setup/mcp.md](docs/setup/mcp.md) — MCP連携設定
 - [docs/setup/superpowers-local-llm.md](docs/setup/superpowers-local-llm.md) — SuperPowersWUI + ローカルLLM設定
 
@@ -85,6 +87,10 @@ uvicorn app.main:app --reload --port 8000
 ## 2.2.1 SuperPowers Localプリセット
 
 Web UIの `Workspace` で `SuperPowers Local` を選ぶと、LM Studioのローカルモデルを使う設計前処理チームに切り替わります。
+
+Workspace では、依頼内容を複数のワークスペースとして登録できます。左ペインの `ワークスペース管理` から登録・一覧検索・読み込み編集・削除を行い、選択中ワークスペースの入力内容、実行結果、フィードバックを保存できます。中央ペインはコンテンツ領域で、`作成・編集`、`エージェント進捗`、`履歴` のモードを切り替えます。`作成・編集` では実行チームを Built-in / Custom テンプレートから選択でき、選択したチームのエージェント構成をワークへコピーします。右ペインの `レビュー・ログ` はフィードバック、会話ログ、イベント、JSON確認用です。ワークスペースには `元々の依頼内容`、`前回の依頼内容`、実行結果のローカルバージョン履歴が保存され、過去バージョンの依頼内容を現在の編集状態へ戻せます。
+
+ワークスペースの `作業モード` を `coding` にすると、作業ディレクトリ、対象ファイル、技術スタック、受け入れ条件、テストコマンドを入力できます。これらは AI チームのコーディング相談・修正方針・実装レビュー用プロンプトに渡されます。
 
 - `Brainstorm`: 依頼の曖昧さ、対象ファイル、制約を整理
 - `Spec Writer`: 短い実装仕様を作成
@@ -175,6 +181,12 @@ Agent Studio と Teams では、provider選択後に該当providerのモデル�
 curl -s "http://127.0.0.1:8000/api/providers/lm_studio/models" | jq
 curl -s "http://127.0.0.1:8000/api/providers/ollama/models" | jq
 ```
+
+Teams 画面では、左カラムの保存済みチーム一覧から複数チームを管理できます。保存済みチームは `Built-in` と `Custom` のタブで切り替えられ、組み込みテンプレートと自分で保存したチームを分けて確認できます。チームを選ぶと中央で編成を編集でき、右カラムで更新保存・別名保存・削除できます。保存対象はエージェント一覧、enabled、persona、provider、model、depends_on、workflow_mode、orchestration_mode、rounds です。
+
+削除できない組み込みチームテンプレートとして、標準フルチーム、軽量ローカルコーディング、Codex実装チーム、設計レビュー、SuperPowers風ワークフローを用意しています。組み込みテンプレートを編集した場合、保存時にはユーザーチームとして複製されます。
+
+各エージェントの `persona` は、実行時プロンプトの「人格・振る舞い指示」としてローカルLLM/CLIに渡されます。チーム内で人格や回答方針を変えたい場合は、Teams または Agent Studio で persona を編集してください。
 
 `custom_cli` を選んだエージェントは、画面上で `command_template` を必ず設定してください。
 

@@ -3,7 +3,8 @@ import Foundation
 enum PromptBuilder {
 
     static func buildSystemDirective(agent: MasterAgent, renderedSkillsBlock: String = "") -> String {
-        let persona = agent.persona?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "なし"
+        let trimmedPersona = agent.persona?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let persona = trimmedPersona.isEmpty ? "なし" : trimmedPersona
         let skills = agent.skills.isEmpty ? "- なし" : agent.skills.map { "- \($0)" }.joined(separator: "\n")
         let orgRole = agent.orgRoles.first?.rawValue ?? "worker"
 
@@ -21,7 +22,7 @@ enum PromptBuilder {
             ? ""
             : "\n\nインストール済みスキル:\n\(trimmedSkillsBlock)"
 
-        return "あなたは \(agent.name) です。\n組織ロール: \(orgRole)\nペルソナ:\n\(persona)\n\n活用するスキル:\n\(skills)\(skillSection)\n\(mcpBlock)"
+        return "あなたは \(agent.name) です。\n組織ロール: \(orgRole)\n人格・振る舞い指示:\n以下のペルソナを会話全体で維持してください。\n\(persona)\n\n活用するスキル:\n\(skills)\(skillSection)\n\(mcpBlock)"
     }
 
     static func buildSystemDirective(

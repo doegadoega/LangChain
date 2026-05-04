@@ -21,7 +21,12 @@ from app.evaluation import (
 from app.models import AgentConfig, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
 from app.providers import ProviderError, list_provider_models, resolve_provider
+from app.skills import SkillSource, SkillStore, SkillStoreError
 from app.store import FileStore
+
+
+def get_skill_store() -> SkillStore:
+    return SkillStore()
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -124,7 +129,9 @@ def _build_chat_prompt(
     return (
         f"あなたは {agent.name} です。\n"
         f"ロール: {agent.org_role.value}\n"
-        f"ペルソナ:\n{agent.persona or 'なし'}\n\n"
+        "人格・振る舞い指示:\n"
+        "以下のペルソナを会話全体で維持してください。\n"
+        f"{agent.persona.strip() or 'なし'}\n\n"
         "ユーザーと普通のチャットとして会話してください。"
         "専門用語は必要な場合だけ使い、初心者にも分かる説明にしてください。"
         "Web検索結果を使う場合は、回答内で根拠URLに触れてください。\n\n"
@@ -220,6 +227,90 @@ def provider_models(provider: str):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Unsupported provider") from exc
     return list_provider_models(provider_kind)
+
+
+# -- Skills --
+@app.get("/api/skills")
+def list_skills(store: SkillStore = Depends(get_skill_store)):
+    return [doc.model_dump(mode="json") for doc in store.load_installed_skills()]
+
+
+@app.post("/api/skills/install", status_code=201)
+def install_skill(payload: JSONDict, store: SkillStore = Depends(get_skill_store)):
+    markdown = payload.get("markdown")
+    if not isinstance(markdown, str) or not markdown.strip():
+        raise HTTPException(status_code=400, detail="markdown required")
+    raw_source = payload.get("source", SkillSource.USER.value)
+    try:
+        source = SkillSource(raw_source)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="invalid source") from exc
+    try:
+        installed = store.install_skill_markdown(markdown, source=source)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return installed.model_dump(mode="json")
+
+
+@app.delete("/api/skills/{skill_id}", status_code=204)
+def delete_skill(skill_id: str, store: SkillStore = Depends(get_skill_store)):
+    _validate_record_id(skill_id)
+    store.remove_skill(skill_id)
+
+
+@app.delete("/api/skills/{skill_id}/versions/{version}", status_code=204)
+def delete_skill_version(
+    skill_id: str, version: str, store: SkillStore = Depends(get_skill_store)
+):
+    _validate_record_id(skill_id)
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", version):
+        raise HTTPException(status_code=400, detail="invalid version")
+    store.remove_skill_version(skill_id, version)
+
+
+@app.get("/api/skills/candidates")
+def list_skill_candidates(store: SkillStore = Depends(get_skill_store)):
+    return [batch.model_dump(mode="json") for batch in store.load_candidates()]
+
+
+@app.post("/api/skills/candidates/import-local")
+def import_local_skills(
+    payload: JSONDict, store: SkillStore = Depends(get_skill_store)
+):
+    path = payload.get("path")
+    if not isinstance(path, str) or not path.strip():
+        raise HTTPException(status_code=400, detail="path required")
+    try:
+        documents = store.import_local_directory_as_candidates(path)
+    except SkillStoreError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return [doc.model_dump(mode="json") for doc in documents]
+
+
+@app.post("/api/skills/candidates/{batch_id}/{skill_id}/approve", status_code=201)
+def approve_skill_candidate(
+    batch_id: str,
+    skill_id: str,
+    store: SkillStore = Depends(get_skill_store),
+):
+    _validate_record_id(batch_id)
+    _validate_record_id(skill_id)
+    try:
+        installed = store.approve_candidate(skill_id=skill_id, batch_id=batch_id)
+    except SkillStoreError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return installed.model_dump(mode="json")
+
+
+@app.delete("/api/skills/candidates/{batch_id}/{skill_id}", status_code=204)
+def discard_skill_candidate(
+    batch_id: str,
+    skill_id: str,
+    store: SkillStore = Depends(get_skill_store),
+):
+    _validate_record_id(batch_id)
+    _validate_record_id(skill_id)
+    store.discard_candidate(skill_id=skill_id, batch_id=batch_id)
 
 
 # -- Agent CRUD --
