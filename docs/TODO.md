@@ -261,10 +261,14 @@ Codex が `ProviderKind.OPENAI_API = "openai_api"` / `ProviderKind.ANTHROPIC_API
 
 ### Phase 2: Web UI
 
-- Status: pending
-- Priority: high（Phase 1 完了後）
+- Status: done
+- Priority: high
 
-ブリーフ §「Web UI Plan」と一致。Library / Candidates / Agent Studio の `skill_refs` エディタの 3 本。
+完了済み:
+
+- [x] Skill Library 画面（[Skills.tsx](../app/web/src/screens/Skills.tsx)）
+- [x] Candidates タブ（取り込み / 承認 / 破棄）
+- [x] Agent Studio の `skill_refs` エディタ（version 要求 / enabled / 不適合警告）
 
 ### Phase 3: 取り込み導線（GitHub / AI 探索）
 

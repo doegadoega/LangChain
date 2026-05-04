@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
@@ -6,9 +6,18 @@ import { ModelPicker } from "../components/ModelPicker";
 import { builtinAgents, newAgent, useApp } from "../state/store";
 import { PROVIDER_LABEL, ROLE_ACCENT, ROLE_LABEL } from "../lib/format";
 import { api } from "../api/client";
-import type { AgentConfig, OrgRole, ProviderKind } from "../types";
+import type {
+  AgentConfig,
+  OrgRole,
+  ProviderKind,
+  SkillDocument,
+  SkillReference,
+  SkillVersionRequirement,
+} from "../types";
 import clsx from "clsx";
-import { CopyPlus, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, CopyPlus, Plus, Save, Search, Trash2, X } from "lucide-react";
+
+type SortKey = "name_asc" | "name_desc" | "role" | "provider" | "type";
 
 export function AgentStudio() {
   const savedAgents = useApp((s) => s.agents);
@@ -17,10 +26,19 @@ export function AgentStudio() {
 
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<OrgRole | "all">("all");
+  const [sortKey, setSortKey] = useState<SortKey>("type");
   const [draft, setDraft] = useState<AgentConfig | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(savedAgents[0]?.id ?? null);
   const [editing, setEditing] = useState<AgentConfig | null>(null);
   const [saveMessage, setSaveMessage] = useState("");
+  const [installedSkills, setInstalledSkills] = useState<SkillDocument[]>([]);
+
+  useEffect(() => {
+    api
+      .listSkills()
+      .then(setInstalledSkills)
+      .catch(() => setInstalledSkills([]));
+  }, []);
 
   const savedIds = useMemo(() => new Set(savedAgents.map((agent) => agent.id)), [savedAgents]);
   const builtins = useMemo(() => builtinAgents(), []);
@@ -29,14 +47,17 @@ export function AgentStudio() {
     () => builtins.filter((agent) => !savedIds.has(agent.id)),
     [builtins, savedIds],
   );
-  const isBuiltin = (id: string) => builtinIds.has(id) && !savedIds.has(id);
+  const isBuiltin = useCallback(
+    (id: string) => builtinIds.has(id) && !savedIds.has(id),
+    [builtinIds, savedIds],
+  );
   const listAgents = useMemo<AgentConfig[]>(
     () => [...(draft ? [draft] : []), ...savedAgents, ...builtinsNotShadowed],
     [draft, savedAgents, builtinsNotShadowed],
   );
 
   const filtered = useMemo(() => {
-    return listAgents.filter((a) => {
+    const filteredList = listAgents.filter((a) => {
       if (filterRole !== "all" && a.org_role !== filterRole) return false;
       if (!query) return true;
       const q = query.toLowerCase();
@@ -46,7 +67,35 @@ export function AgentStudio() {
         a.skills.join(",").toLowerCase().includes(q)
       );
     });
-  }, [listAgents, query, filterRole]);
+    const collator = new Intl.Collator("ja", { sensitivity: "base" });
+    const sorted = filteredList.slice();
+    sorted.sort((a, b) => {
+      switch (sortKey) {
+        case "name_asc":
+          return collator.compare(a.name, b.name);
+        case "name_desc":
+          return collator.compare(b.name, a.name);
+        case "role":
+          return (
+            collator.compare(a.org_role, b.org_role) ||
+            collator.compare(a.name, b.name)
+          );
+        case "provider":
+          return (
+            collator.compare(a.provider, b.provider) ||
+            collator.compare(a.name, b.name)
+          );
+        case "type": {
+          const aBuiltin = isBuiltin(a.id) ? 1 : 0;
+          const bBuiltin = isBuiltin(b.id) ? 1 : 0;
+          return aBuiltin - bBuiltin || collator.compare(a.name, b.name);
+        }
+        default:
+          return 0;
+      }
+    });
+    return sorted;
+  }, [listAgents, query, filterRole, sortKey, isBuiltin]);
 
   const sourceForId = (id: string | null): AgentConfig | undefined => {
     if (!id) return undefined;
@@ -156,6 +205,20 @@ export function AgentStudio() {
               <RoleChip key={r} role={r} current={filterRole} setRole={setFilterRole} />
             ))}
           </div>
+          <div className="flex items-center gap-2">
+            <Label className="mb-0 shrink-0">並び替え</Label>
+            <Select
+              value={sortKey}
+              onChange={(event) => setSortKey(event.target.value as SortKey)}
+              className="text-xs"
+            >
+              <option value="type">種別（Custom → Built-in）</option>
+              <option value="name_asc">名前 (昇順)</option>
+              <option value="name_desc">名前 (降順)</option>
+              <option value="role">role</option>
+              <option value="provider">provider</option>
+            </Select>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {filtered.map((a) => (
@@ -210,6 +273,7 @@ export function AgentStudio() {
             isSaved={savedIds.has(selected.id)}
             isBuiltin={isSelectedBuiltin}
             saveMessage={saveMessage}
+            installedSkills={installedSkills}
             onChange={handleChange}
             onSave={() => void saveAgent(selected)}
             onRemove={() => void handleDelete()}
@@ -256,6 +320,7 @@ function AgentEditor({
   isSaved,
   isBuiltin,
   saveMessage,
+  installedSkills,
   onChange,
   onSave,
   onRemove,
@@ -265,6 +330,7 @@ function AgentEditor({
   isSaved: boolean;
   isBuiltin: boolean;
   saveMessage: string;
+  installedSkills: SkillDocument[];
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onRemove: () => void;
@@ -386,14 +452,14 @@ function AgentEditor({
 
       <Card>
         <CardHeader>
-          <CardTitle>スキル & 依存関係</CardTitle>
+          <CardTitle>タグ & 依存関係</CardTitle>
         </CardHeader>
         <CardBody className="space-y-3">
           <ChipsEditor
-            label="skills (max 20)"
+            label="skill tags (prompt注入なし)"
             values={agent.skills}
             onChange={(skills) => onChange({ skills })}
-            placeholder="スキル名 を入力して Enter"
+            placeholder="検索・分類用タグを入力して Enter"
           />
           <ChipsEditor
             label="depends_on (agent_id)"
@@ -403,6 +469,12 @@ function AgentEditor({
           />
         </CardBody>
       </Card>
+
+      <SkillRefsSection
+        agent={agent}
+        installedSkills={installedSkills}
+        onChange={(skill_refs) => onChange({ skill_refs })}
+      />
 
       <Card>
         <CardHeader>
@@ -520,4 +592,219 @@ function ChipsEditor({
       </div>
     </div>
   );
+}
+
+function SkillRefsSection({
+  agent,
+  installedSkills,
+  onChange,
+}: {
+  agent: AgentConfig;
+  installedSkills: SkillDocument[];
+  onChange: (refs: SkillReference[]) => void;
+}) {
+  const refs = agent.skill_refs ?? [];
+
+  const installedById = useMemo(() => {
+    const map = new Map<string, SkillDocument[]>();
+    for (const doc of installedSkills) {
+      const list = map.get(doc.metadata.id) ?? [];
+      list.push(doc);
+      map.set(doc.metadata.id, list);
+    }
+    for (const [, list] of map) {
+      list.sort((a, b) => b.metadata.version.localeCompare(a.metadata.version));
+    }
+    return map;
+  }, [installedSkills]);
+
+  const availableToAdd = useMemo(() => {
+    const usedIds = new Set(refs.map((ref) => ref.id));
+    return Array.from(installedById.keys()).filter((id) => !usedIds.has(id));
+  }, [installedById, refs]);
+
+  const addRef = (id: string) => {
+    if (!id) return;
+    const next: SkillReference[] = [
+      ...refs,
+      {
+        id,
+        source: "user",
+        version_requirement: { kind: "latest" },
+        enabled: true,
+      },
+    ];
+    onChange(next);
+  };
+
+  const updateRef = (index: number, patch: Partial<SkillReference>) => {
+    const next = refs.map((ref, i) => (i === index ? { ...ref, ...patch } : ref));
+    onChange(next);
+  };
+
+  const removeRef = (index: number) => {
+    onChange(refs.filter((_, i) => i !== index));
+  };
+
+  const updateVersion = (index: number, requirement: SkillVersionRequirement) => {
+    updateRef(index, { version_requirement: requirement });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>このエージェントに持たせるスキル</CardTitle>
+          <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
+            スキル管理で登録した SKILL.md をこのエージェントへ紐づけます。実行時に system prompt へ注入されます。
+          </div>
+        </div>
+        <div className="pointer-events-auto">
+          <Select
+            value=""
+            onChange={(event) => {
+              addRef(event.target.value);
+              event.target.value = "";
+            }}
+            disabled={availableToAdd.length === 0}
+            className="text-xs"
+          >
+            <option value="">
+              {availableToAdd.length === 0
+                ? installedSkills.length === 0
+                  ? "スキル管理が空です"
+                  : "全て追加済み"
+                : "+ 持たせるスキルを追加"}
+            </option>
+            {availableToAdd.map((id) => {
+              const doc = installedById.get(id)?.[0];
+              return (
+                <option key={id} value={id}>
+                  {doc?.metadata.name ?? id}
+                </option>
+              );
+            })}
+          </Select>
+        </div>
+      </CardHeader>
+      <CardBody className="space-y-2 text-xs">
+        {refs.length === 0 && (
+          <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-center text-[11px] text-[var(--color-fg-subtle)]">
+            このエージェントに持たせるスキルはまだありません。
+          </div>
+        )}
+        {refs.map((ref, index) => {
+          const versions = installedById.get(ref.id) ?? [];
+          const latest = versions[0];
+          const warning = computeSkillWarning(latest, agent);
+          return (
+            <div
+              key={`${ref.id}-${index}`}
+              className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 space-y-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-sm font-semibold">
+                    {latest?.metadata.name ?? ref.id}
+                  </span>
+                  {warning && (
+                    <span
+                      title={warning}
+                      className="flex items-center gap-0.5 rounded-sm border border-amber-500/40 bg-amber-500/10 px-1 py-[1px] text-[9px] uppercase tracking-widest text-amber-300"
+                    >
+                      <AlertTriangle className="h-3 w-3" /> mismatch
+                    </span>
+                  )}
+                  {!latest && (
+                    <span className="rounded-sm border border-red-500/40 bg-red-500/10 px-1 py-[1px] text-[9px] uppercase tracking-widest text-red-300">
+                      未登録
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-[10px]">
+                    <input
+                      type="checkbox"
+                      checked={ref.enabled}
+                      onChange={(event) =>
+                        updateRef(index, { enabled: event.target.checked })
+                      }
+                      className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+                    />
+                    enabled
+                  </label>
+                  <Button size="sm" variant="ghost" onClick={() => removeRef(index)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[10px]">version 要求</Label>
+                  <Select
+                    value={ref.version_requirement.kind}
+                    onChange={(event) =>
+                      updateVersion(index, {
+                        kind: event.target.value as SkillVersionRequirement["kind"],
+                        version:
+                          event.target.value === "exact"
+                            ? ref.version_requirement.version ?? latest?.metadata.version ?? ""
+                            : null,
+                      })
+                    }
+                    className="text-xs"
+                  >
+                    <option value="latest">latest</option>
+                    <option value="latest_compatible">latest_compatible</option>
+                    <option value="exact">exact</option>
+                  </Select>
+                </div>
+                {ref.version_requirement.kind === "exact" && (
+                  <div>
+                    <Label className="text-[10px]">version</Label>
+                    <Select
+                      value={ref.version_requirement.version ?? ""}
+                      onChange={(event) =>
+                        updateVersion(index, {
+                          kind: "exact",
+                          version: event.target.value,
+                        })
+                      }
+                      className="text-xs"
+                    >
+                      <option value="">選択</option>
+                      {versions.map((doc) => (
+                        <option key={doc.metadata.version} value={doc.metadata.version}>
+                          v{doc.metadata.version}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+              </div>
+              {warning && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-1.5 text-[10px] text-amber-200">
+                  {warning}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </CardBody>
+    </Card>
+  );
+}
+
+function computeSkillWarning(doc: SkillDocument | undefined, agent: AgentConfig): string | null {
+  if (!doc) return null;
+  const providers = doc.metadata.providers ?? [];
+  const roles = doc.metadata.roles ?? [];
+  const issues: string[] = [];
+  if (providers.length > 0 && !providers.includes(agent.provider)) {
+    issues.push(`provider ${agent.provider} 非対応 (対応: ${providers.join(", ")})`);
+  }
+  if (roles.length > 0 && !roles.includes(agent.org_role)) {
+    issues.push(`role ${agent.org_role} 非対応 (対応: ${roles.join(", ")})`);
+  }
+  return issues.length > 0 ? issues.join(" / ") : null;
 }

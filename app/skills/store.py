@@ -190,6 +190,31 @@ class SkillStore:
         results.sort(key=lambda doc: doc.metadata.name.casefold())
         return results
 
+    def import_markdown_as_candidate(
+        self,
+        markdown: str,
+        *,
+        batch_prefix: str = "external",
+        source_directory: str = "external",
+    ) -> SkillDocument:
+        parsed = build_skill_document(
+            markdown=markdown,
+            source=SkillSource.DISCOVERED,
+            root_directory=source_directory,
+        )
+        safe_prefix = "".join(
+            ch for ch in batch_prefix.lower() if ch.isalnum() or ch in {"-", "_"}
+        )[:24] or "external"
+        batch_dir = self.candidates_dir / f"{safe_prefix}-{_timestamp()}"
+        target_dir = batch_dir / parsed.metadata.id
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "SKILL.md").write_text(markdown, encoding="utf-8")
+        return build_skill_document(
+            markdown=markdown,
+            source=SkillSource.DISCOVERED,
+            root_directory=str(target_dir),
+        )
+
     def approve_candidate(
         self,
         skill_id: str,

@@ -29,6 +29,7 @@ export interface AgentConfig {
   provider: ProviderKind;
   persona: string;
   skills: string[];
+  skill_refs?: SkillReference[];
   depends_on: string[];
   command_template?: string | null;
   model?: string | null;
@@ -291,8 +292,49 @@ export type ScreenId =
   | "dashboard"
   | "team"
   | "agents"
+  | "skills"
   | "execution"
   | "qa"
   | "logs"
   | "settings"
   | "chat";
+
+export type SkillSource = "bundled" | "user" | "imported" | "discovered";
+
+export type SkillVersionKind = "exact" | "latest_compatible" | "latest";
+
+export interface SkillVersionRequirement {
+  kind: SkillVersionKind;
+  version?: string | null;
+}
+
+export interface SkillReference {
+  id: string;
+  source: SkillSource;
+  version_requirement: SkillVersionRequirement;
+  enabled: boolean;
+}
+
+export interface SkillMetadata {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  providers: string[];
+  roles: string[];
+  tags: string[];
+}
+
+export interface SkillDocument {
+  metadata: SkillMetadata;
+  source: SkillSource;
+  markdown: string;
+  body: string;
+  root_directory?: string | null;
+}
+
+export interface CandidateBatch {
+  id: string;
+  directory: string;
+  skills: SkillDocument[];
+}

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app, get_skill_store
+from app.main import app, get_skill_store, _normalize_external_skill_url
 from app.models import AgentConfig, OrgRole, ProviderKind
 from app.orchestrator import _build_system_directive
 from app.skills import (
@@ -331,3 +331,29 @@ def test_api_candidate_flow(api_client, tmp_path):
     assert approve_resp.status_code == 201
     installed = client.get("/api/skills").json()
     assert installed[0]["metadata"]["id"] == "api-design"
+
+
+def test_github_blob_url_normalizes_to_raw():
+    normalized = _normalize_external_skill_url(
+        "https://github.com/example/repo/blob/main/skills/api/SKILL.md"
+    )
+    assert normalized == "https://raw.githubusercontent.com/example/repo/main/skills/api/SKILL.md"
+
+
+def test_api_import_external_url_as_candidate(api_client, monkeypatch):
+    client, _store = api_client
+
+    def fake_fetch(url: str) -> str:
+        assert url == "https://example.com/SKILL.md"
+        return "---\nid: external-skill\nname: External Skill\nversion: 1.0.0\n---\nbody\n"
+
+    monkeypatch.setattr("app.main._fetch_external_skill_markdown", fake_fetch)
+    resp = client.post(
+        "/api/skills/candidates/import-url",
+        json={"url": "https://example.com/SKILL.md"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["metadata"]["id"] == "external-skill"
+
+    batches = client.get("/api/skills/candidates").json()
+    assert batches and batches[0]["skills"][0]["metadata"]["id"] == "external-skill"

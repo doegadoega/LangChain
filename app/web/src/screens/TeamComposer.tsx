@@ -21,6 +21,7 @@ import {
 const ROLE_OPTIONS = Object.keys(ROLE_LABEL) as OrgRole[];
 const uid = () => Math.random().toString(36).slice(2, 8);
 type TeamTab = "builtin" | "custom";
+type SortKey = "name_asc" | "name_desc" | "role" | "provider" | "type";
 
 const timestampPrefix = () => {
   const now = new Date();
@@ -51,6 +52,7 @@ export function TeamComposer() {
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<OrgRole | "all">("all");
   const [filterProvider, setFilterProvider] = useState<ProviderKind | "all">("all");
+  const [sortKey, setSortKey] = useState<SortKey>("type");
   const [teamName, setTeamName] = useState("");
   const [teamDescription, setTeamDescription] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
@@ -75,7 +77,7 @@ export function TeamComposer() {
 
   const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return candidatePool.filter((agent) => {
+    const filtered = candidatePool.filter((agent) => {
       if (filterRole !== "all" && agent.org_role !== filterRole) return false;
       if (filterProvider !== "all" && agent.provider !== filterProvider) return false;
       if (!q) return true;
@@ -85,7 +87,36 @@ export function TeamComposer() {
         agent.skills.join(",").toLowerCase().includes(q)
       );
     });
-  }, [candidatePool, filterProvider, filterRole, query]);
+    const collator = new Intl.Collator("ja", { sensitivity: "base" });
+    const sorted = filtered.slice();
+    sorted.sort((a, b) => {
+      switch (sortKey) {
+        case "name_asc":
+          return collator.compare(a.name, b.name);
+        case "name_desc":
+          return collator.compare(b.name, a.name);
+        case "role":
+          return (
+            collator.compare(a.org_role, b.org_role) ||
+            collator.compare(a.name, b.name)
+          );
+        case "provider":
+          return (
+            collator.compare(a.provider, b.provider) ||
+            collator.compare(a.name, b.name)
+          );
+        case "type": {
+          const aBuiltin = a.is_custom === false ? 1 : 0;
+          const bBuiltin = b.is_custom === false ? 1 : 0;
+          // user (custom) first, then built-in
+          return aBuiltin - bBuiltin || collator.compare(a.name, b.name);
+        }
+        default:
+          return 0;
+      }
+    });
+    return sorted;
+  }, [candidatePool, filterProvider, filterRole, query, sortKey]);
 
   const addCandidateToTeam = (agent: AgentConfig) => {
     upsertAgent({
@@ -280,6 +311,16 @@ export function TeamComposer() {
                   ))}
                 </Select>
               </div>
+            </div>
+            <div>
+              <Label>並び替え</Label>
+              <Select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
+                <option value="type">種別（Custom → Built-in）</option>
+                <option value="name_asc">名前 (昇順)</option>
+                <option value="name_desc">名前 (降順)</option>
+                <option value="role">role</option>
+                <option value="provider">provider</option>
+              </Select>
             </div>
             <div className="space-y-2">
               {candidates.length === 0 && (

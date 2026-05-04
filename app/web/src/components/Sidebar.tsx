@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  Library,
   Users,
   Bot,
   Play,
@@ -19,11 +20,12 @@ const items: { id: ScreenId; label: string; icon: React.ComponentType<{ classNam
   { id: "dashboard", label: "Runs", icon: LayoutDashboard, order: "2" },
   { id: "team", label: "Teams", icon: Users, order: "3" },
   { id: "agents", label: "Agent Studio", icon: Bot, order: "4" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, order: "5" },
-  { id: "execution", label: "Advanced Run", icon: Play, order: "6" },
-  { id: "logs", label: "Logs", icon: ScrollText, order: "7" },
-  { id: "qa", label: "QA Gate", icon: ShieldCheck, order: "8" },
-  { id: "chat", label: "相談チャット", icon: MessageSquareMore, order: "9" },
+  { id: "skills", label: "スキル管理", icon: Library, order: "5" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, order: "6" },
+  { id: "execution", label: "Advanced Run", icon: Play, order: "7" },
+  { id: "logs", label: "Logs", icon: ScrollText, order: "8" },
+  { id: "qa", label: "QA Gate", icon: ShieldCheck, order: "9" },
+  { id: "chat", label: "相談チャット", icon: MessageSquareMore, order: "0" },
 ];
 
 export function Sidebar() {

@@ -9,6 +9,7 @@ import type {
   QAJudgement,
   RefineRequest,
   ScreenId,
+  SkillReference,
   StreamEvent,
   Template,
   TurnResult,
@@ -55,6 +56,40 @@ const isModelDecision = (value: unknown): value is ModelDecision =>
 const asStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
+const isSkillSource = (value: unknown): value is SkillReference["source"] =>
+  value === "bundled" || value === "user" || value === "imported" || value === "discovered";
+
+const isSkillVersionKind = (value: unknown): value is SkillReference["version_requirement"]["kind"] =>
+  value === "exact" || value === "latest_compatible" || value === "latest";
+
+const normalizeSkillRefs = (value: unknown): SkillReference[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item): SkillReference | undefined => {
+      const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+      const id = typeof raw.id === "string" ? raw.id.trim() : "";
+      if (!id) return undefined;
+      const rawRequirement =
+        typeof raw.version_requirement === "object" && raw.version_requirement !== null
+          ? (raw.version_requirement as Record<string, unknown>)
+          : {};
+      const kind = isSkillVersionKind(rawRequirement.kind) ? rawRequirement.kind : "latest";
+      return {
+        id,
+        source: isSkillSource(raw.source) ? raw.source : "user",
+        version_requirement: {
+          kind,
+          version:
+            typeof rawRequirement.version === "string" && rawRequirement.version.trim()
+              ? rawRequirement.version.trim()
+              : null,
+        },
+        enabled: typeof raw.enabled === "boolean" ? raw.enabled : true,
+      };
+    })
+    .filter((item): item is SkillReference => Boolean(item));
+};
+
 const normalizeAgent = (value: unknown): AgentConfig => {
   const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   const orgRoles = asStringArray(raw.orgRoles);
@@ -86,6 +121,7 @@ const normalizeAgent = (value: unknown): AgentConfig => {
               ? raw.systemPrompt
               : "",
     skills: asStringArray(raw.skills),
+    skill_refs: normalizeSkillRefs(raw.skill_refs),
     depends_on: asStringArray(raw.depends_on).length
       ? asStringArray(raw.depends_on)
       : asStringArray(raw.dependsOn),
@@ -171,6 +207,10 @@ const normalizeTemplate = (value: unknown): Template => {
 const cloneAgentConfig = (agent: AgentConfig): AgentConfig => ({
   ...agent,
   skills: [...agent.skills],
+  skill_refs: agent.skill_refs?.map((ref) => ({
+    ...ref,
+    version_requirement: { ...ref.version_requirement },
+  })),
   depends_on: [...agent.depends_on],
   mcp_servers: [...agent.mcp_servers],
 });

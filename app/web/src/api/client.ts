@@ -1,11 +1,14 @@
 import type {
   AgentConfig,
+  CandidateBatch,
   ChatMessageRequest,
   ChatSession,
   ManagedRequest,
   ProviderKind,
   ProviderModelsResponse,
   Project,
+  SkillDocument,
+  SkillSource,
   Template,
   Workflow,
 } from "../types";
@@ -73,4 +76,30 @@ export const api = {
   createWorkflow: (w: Workflow) =>
     req<Workflow>("/api/workflows", { method: "POST", body: JSON.stringify(w) }),
   deleteWorkflow: (id: string) => req<void>(`/api/workflows/${id}`, { method: "DELETE" }),
+
+  // skills
+  listSkills: () => req<SkillDocument[]>("/api/skills"),
+  installSkill: (markdown: string, source: SkillSource = "user") =>
+    req<SkillDocument>("/api/skills/install", {
+      method: "POST",
+      body: JSON.stringify({ markdown, source }),
+    }),
+  deleteSkill: (id: string) => req<void>(`/api/skills/${id}`, { method: "DELETE" }),
+  deleteSkillVersion: (id: string, version: string) =>
+    req<void>(`/api/skills/${id}/versions/${encodeURIComponent(version)}`, { method: "DELETE" }),
+  listSkillCandidates: () => req<CandidateBatch[]>("/api/skills/candidates"),
+  importLocalSkills: (path: string) =>
+    req<SkillDocument[]>("/api/skills/candidates/import-local", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
+  importExternalSkill: (url: string) =>
+    req<SkillDocument>("/api/skills/candidates/import-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  approveSkillCandidate: (batchId: string, skillId: string) =>
+    req<SkillDocument>(`/api/skills/candidates/${batchId}/${skillId}/approve`, { method: "POST" }),
+  discardSkillCandidate: (batchId: string, skillId: string) =>
+    req<void>(`/api/skills/candidates/${batchId}/${skillId}`, { method: "DELETE" }),
 };

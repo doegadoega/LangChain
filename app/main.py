@@ -103,6 +103,37 @@ def _search_web(query: str) -> tuple[list[JSONDict], str | None]:
         return [], f"web search unavailable: {exc}"
 
 
+def _normalize_external_skill_url(url: str) -> str:
+    raw = url.strip()
+    parsed = urllib.parse.urlparse(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("http/https URL required")
+    if parsed.netloc == "github.com":
+        parts = [part for part in parsed.path.split("/") if part]
+        if len(parts) >= 5 and parts[2] == "blob":
+            owner, repo, _blob, branch = parts[:4]
+            path = "/".join(parts[4:])
+            return f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}"
+    return raw
+
+
+def _fetch_external_skill_markdown(url: str) -> str:
+    normalized = _normalize_external_skill_url(url)
+    request = urllib.request.Request(
+        normalized,
+        headers={"User-Agent": "AgentRefinementPlatform/0.1"},
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        content_type = response.headers.get("content-type", "")
+        data = response.read(1024 * 1024 + 1)
+    if len(data) > 1024 * 1024:
+        raise ValueError("SKILL.md is too large")
+    text = data.decode("utf-8", errors="replace")
+    if "text/html" in content_type.lower() and not text.lstrip().startswith("---"):
+        raise ValueError("URL did not return SKILL.md markdown")
+    return text
+
+
 def _build_chat_prompt(
     *,
     agent: AgentConfig,
@@ -285,6 +316,25 @@ def import_local_skills(
     except SkillStoreError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return [doc.model_dump(mode="json") for doc in documents]
+
+
+@app.post("/api/skills/candidates/import-url", status_code=201)
+def import_external_skill(
+    payload: JSONDict, store: SkillStore = Depends(get_skill_store)
+):
+    url = payload.get("url")
+    if not isinstance(url, str) or not url.strip():
+        raise HTTPException(status_code=400, detail="url required")
+    try:
+        markdown = _fetch_external_skill_markdown(url)
+        document = store.import_markdown_as_candidate(
+            markdown,
+            batch_prefix="url",
+            source_directory=_normalize_external_skill_url(url),
+        )
+    except (OSError, ValueError, SkillStoreError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return document.model_dump(mode="json")
 
 
 @app.post("/api/skills/candidates/{batch_id}/{skill_id}/approve", status_code=201)
