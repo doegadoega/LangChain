@@ -34,6 +34,12 @@ export interface RequestPreset {
 
 const LOCAL_CODING_MODEL = "qwen2.5-coder-3b-instruct";
 const LOCAL_REVIEW_MODEL = "qwen2.5-coder-7b-instruct";
+const researchDefaults = {
+  allow_web_search: false,
+  research_sources: [],
+  require_citations: true,
+  max_search_results: 5,
+};
 
 const localCodingLightAgents: AgentConfig[] = [
   {
@@ -49,6 +55,7 @@ const localCodingLightAgents: AgentConfig[] = [
     depends_on: [],
     command_template: null,
     enabled: true,
+    ...researchDefaults,
     mcp_enabled: false,
     mcp_config_path: null,
     mcp_servers: [],
@@ -70,6 +77,7 @@ const localCodingLightAgents: AgentConfig[] = [
     depends_on: ["local_coder_light"],
     command_template: null,
     enabled: true,
+    ...researchDefaults,
     mcp_enabled: false,
     mcp_config_path: null,
     mcp_servers: [],
@@ -94,6 +102,7 @@ const localSuperPowersAgents: AgentConfig[] = [
     depends_on: [],
     command_template: null,
     enabled: true,
+    ...researchDefaults,
     mcp_enabled: false,
     mcp_config_path: null,
     mcp_servers: [],
@@ -115,6 +124,7 @@ const localSuperPowersAgents: AgentConfig[] = [
     depends_on: ["superpowers_brainstorm"],
     command_template: null,
     enabled: true,
+    ...researchDefaults,
     mcp_enabled: false,
     mcp_config_path: null,
     mcp_servers: [],
@@ -136,6 +146,7 @@ const localSuperPowersAgents: AgentConfig[] = [
     depends_on: ["superpowers_spec"],
     command_template: null,
     enabled: true,
+    ...researchDefaults,
     mcp_enabled: false,
     mcp_config_path: null,
     mcp_servers: [],
@@ -157,6 +168,7 @@ const localSuperPowersAgents: AgentConfig[] = [
     depends_on: ["superpowers_plan"],
     command_template: null,
     enabled: true,
+    ...researchDefaults,
     mcp_enabled: false,
     mcp_config_path: null,
     mcp_servers: [],
@@ -206,25 +218,25 @@ export const REQUEST_PRESETS: RequestPreset[] = [
   {
     id: "discussion",
     label: "議論したい",
-    description: "各エージェントの観点から論点を出し、合意点と次の行動をまとめます。",
+    description: "各エージェントが互いの発言に反応し、合意点と次の行動をまとめます。",
     workflowMode: "writing",
-    orchestrationMode: "role_based",
-    rounds: 2,
-    defaultObjective: "議論して、各エージェントの観点から論点・懸念・合意点をまとめる",
+    orchestrationMode: "sequential",
+    rounds: 3,
+    defaultObjective: "議論して、論点・懸念・合意点・次の行動をまとめる",
     defaultInstruction:
-      "各エージェントは自分のロールの観点から発言する。他エージェントの出力を踏まえ、合意点、未解決点、次の行動を最後にまとめる。",
+      "縦割りの意見出しは禁止。各エージェントは他者の発言に同意・反論・補強し、目的に沿って論点を収束させる。合意点、未解決点、次の行動を最後にまとめる。",
     resultOptions: ["合意点を出す", "論点を整理する", "未解決点を出す", "次の行動にする"],
   },
   {
     id: "debate",
     label: "ディベートしたい",
-    description: "賛成・反対・反論を分け、判断材料と暫定結論をまとめます。",
+    description: "賛成・反対をぶつけ、反論と判断材料から暫定結論をまとめます。",
     workflowMode: "writing",
-    orchestrationMode: "role_based",
-    rounds: 2,
-    defaultObjective: "ディベートして、各エージェントの観点から賛否・反論・判断材料をまとめる",
+    orchestrationMode: "sequential",
+    rounds: 3,
+    defaultObjective: "ディベートして、賛否・反論・判断材料・暫定結論をまとめる",
     defaultInstruction:
-      "各エージェントは自分のロールの観点から賛成論点、反対論点、リスク、反論を出す。他エージェントの出力を踏まえ、最後に判断材料と暫定結論をまとめる。",
+      "縦割りの意見出しは禁止。各エージェントは他者の主張に同意・反論・補強し、目的に照らして採用すべき判断材料と捨てる論点を明確にする。最後に暫定結論をまとめる。",
     resultOptions: ["賛否を出す", "反論を出す", "判断材料にする", "暫定結論を出す"],
   },
   {

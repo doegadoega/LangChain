@@ -3,6 +3,7 @@ import {
   Activity,
   ChevronDown,
   ClipboardList,
+  Download,
   FileDiff,
   Loader2,
   MessageSquareText,
@@ -17,6 +18,7 @@ import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { formatDuration, PROVIDER_LABEL, ROLE_LABEL } from "../lib/format";
 import { useApp } from "../state/store";
+import type { RunState } from "../state/store";
 import type {
   AgentConfig,
   CodeContext,
@@ -58,10 +60,11 @@ type ContentMode = "edit" | "progress";
 interface SubWorkView {
   id: string;
   label: string;
-  status: "completed" | "running" | "not_started";
+  status: "completed" | "running" | "failed" | "not_started";
   createdAt?: string;
   input: string;
   result: string;
+  error?: string;
   diff?: string;
   fileChanges?: string;
   isCurrent?: boolean;
@@ -69,6 +72,44 @@ interface SubWorkView {
   parentId?: string;
   reviewFeedback?: VerificationFeedback;
   version?: WorkspaceVersion;
+}
+
+interface SubworkExportPayload {
+  schema_version: 1;
+  exported_at: string;
+  work: {
+    id: string;
+    title: string;
+  };
+  subwork: {
+    id: string;
+    label: string;
+    status: SubWorkView["status"];
+    created_at?: string;
+    parent_id?: string;
+    version_no?: number;
+    review_feedback?: VerificationFeedback;
+  };
+  input: string;
+  request: ManagedRequest["request"];
+  agents: AgentConfig[];
+  agent_turns: TurnResult[];
+  stream_events: StreamEvent[];
+  flow_json?: SubworkFlowJson;
+  final_text?: string;
+  diff?: string;
+  file_changes?: string;
+  error?: string;
+}
+
+interface WorkspaceExportPayload {
+  schema_version: 1;
+  exported_at: string;
+  work: {
+    id: string;
+    title: string;
+  };
+  subworks: SubworkExportPayload[];
 }
 
 const cloneRequest = (value: ManagedRequest["request"]): ManagedRequest["request"] =>
@@ -86,6 +127,7 @@ const cloneAgentConfig = (agent: AgentConfig): AgentConfig => ({
   ...agent,
   skills: [...agent.skills],
   depends_on: [...agent.depends_on],
+  research_sources: [...agent.research_sources],
   mcp_servers: [...agent.mcp_servers],
 });
 
@@ -128,6 +170,7 @@ const subWorkLabel = (versionNo: number) =>
 const subWorkStatusLabel = (status: SubWorkView["status"]) => {
   if (status === "completed") return "終了";
   if (status === "running") return "実行中";
+  if (status === "failed") return "エラー";
   return "未実行";
 };
 
@@ -333,6 +376,119 @@ const extractFeedbackFromSource = (value: string) => {
   return value.slice(index + marker.length).trim();
 };
 
+const sanitizeFileNamePart = (value: string) =>
+  (value || "untitled")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, "-")
+    .slice(0, 80) || "untitled";
+
+const downloadTextFile = (fileName: string, content: string, mimeType: string) => {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const markdownBlock = (value?: string, lang = "") => {
+  const text = (value ?? "").trim();
+  if (!text) return "_なし_";
+  return `\`\`\`${lang}\n${text.replace(/```/g, "``\\`")}\n\`\`\``;
+};
+
+const buildSubworkMarkdown = (payload: SubworkExportPayload) => {
+  const lines = [
+    `# ${payload.work.title} / ${payload.subwork.label}`,
+    "",
+    `- exported_at: ${payload.exported_at}`,
+    `- status: ${payload.subwork.status}`,
+    payload.subwork.created_at ? `- created_at: ${payload.subwork.created_at}` : "",
+    payload.subwork.version_no ? `- version_no: ${payload.subwork.version_no}` : "",
+    "",
+    "## 依頼内容",
+    markdownBlock(payload.input),
+    "",
+  ].filter(Boolean);
+
+  if (payload.subwork.review_feedback) {
+    lines.push(
+      "## ユーザーレビュー",
+      `- kind: ${payload.subwork.review_feedback.kind}`,
+      `- created_at: ${payload.subwork.review_feedback.created_at}`,
+      markdownBlock(payload.subwork.review_feedback.comment),
+      "",
+    );
+  }
+
+  lines.push("## エージェント発言");
+  if (payload.agent_turns.length === 0) {
+    lines.push("_発言はありません。_", "");
+  } else {
+    payload.agent_turns.forEach((turn, index) => {
+      lines.push(
+        `### ${index + 1}. ${turn.agent_name} (${turn.org_role} / ${turn.provider})`,
+        turn.error ? `**error:** ${turn.error}` : "",
+        markdownBlock(turn.output || "出力はありません。"),
+        turn.research_results?.length ? "#### research results" : "",
+        turn.research_results?.length
+          ? turn.research_results
+              .map((item) =>
+                [
+                  `- ${item.url}`,
+                  item.title ? `  - title: ${item.title}` : "",
+                  item.snippet ? `  - snippet: ${item.snippet}` : "",
+                  item.error ? `  - error: ${item.error}` : "",
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              )
+              .join("\n")
+          : "",
+        turn.file_changes ? "#### file changes" : "",
+        turn.file_changes ? markdownBlock(turn.file_changes, "diff") : "",
+        "",
+      );
+    });
+  }
+
+  lines.push("## 議論結果", markdownBlock(payload.final_text), "");
+  if (payload.error) {
+    lines.push("## エラー", markdownBlock(payload.error), "");
+  }
+  if (payload.diff || payload.file_changes) {
+    lines.push("## diff / file changes", markdownBlock(payload.file_changes || payload.diff, "diff"), "");
+  }
+
+  lines.push("## stream_events", markdownBlock(JSON.stringify(payload.stream_events, null, 2), "json"));
+  return lines.filter((line) => line !== "").join("\n");
+};
+
+const buildWorkspaceMarkdown = (payload: WorkspaceExportPayload) => [
+  `# ${payload.work.title} / 全サブワーク議論ログ`,
+  "",
+  `- exported_at: ${payload.exported_at}`,
+  `- subworks: ${payload.subworks.length}`,
+  "",
+  ...payload.subworks.flatMap((subwork, index) => [
+    index === 0 ? "" : "\n---\n",
+    buildSubworkMarkdown(subwork),
+  ]),
+].join("\n");
+
+const collaborationStyle = (value: ManagedRequest["request"]) => {
+  const text = `${value.objective}\n${value.global_instruction}`.toLowerCase();
+  if (text.includes("ディベート") || text.includes("debate")) return "debate";
+  if (text.includes("議論") || text.includes("ディスカッション") || text.includes("discussion")) {
+    return "discussion";
+  }
+  return "";
+};
+
 export function Workspace() {
   const request = useApp((state) => state.request);
   const updateRequest = useApp((state) => state.updateRequest);
@@ -372,8 +528,6 @@ export function Workspace() {
 
   const preset = getRequestPreset(presetId);
   const enabledAgents = request.agents.filter((agent) => agent.enabled !== false);
-  const progressSteps = getProgressSteps(run);
-  const liveNotes = getLiveNotes(run);
   const selectedManagedRequest = managedRequests.find((item) => item.id === selectedManagedRequestId);
   const verificationFeedback = selectedManagedRequest?.verification_feedback ?? [];
   const versions = selectedManagedRequest?.versions ?? [];
@@ -389,8 +543,6 @@ export function Workspace() {
   const currentTeamRoleSummary = summarizeRoles(currentTeamEnabledAgents);
   const currentTeamProviderSummary = summarizeProviders(currentTeamEnabledAgents);
   const visibleFinalText = run.finalText ?? selectedManagedRequest?.final_text ?? "";
-  const visibleDiff = run.diff ?? selectedManagedRequest?.diff ?? "";
-  const visibleFileChanges = run.fileChanges ?? selectedManagedRequest?.file_changes ?? "";
   const versionSubWorks: SubWorkView[] = [...versions]
     .sort((a, b) => a.version_no - b.version_no)
     .map((version) => ({
@@ -400,6 +552,7 @@ export function Workspace() {
       createdAt: version.created_at,
       input: version.request.source_text,
       result: version.final_text || version.diff || version.file_changes || "",
+      error: version.error,
       diff: version.diff,
       fileChanges: version.file_changes,
       parentId: version.parent_version_id,
@@ -418,10 +571,16 @@ export function Workspace() {
     ? {
         id: CURRENT_SUBWORK_ID,
         label: subWorkLabel(versionSubWorks.length + 1),
-        status: run.status === "running" ? "running" : "not_started",
+        status:
+          run.status === "running"
+            ? "running"
+            : run.status === "failed"
+              ? "failed"
+              : "not_started",
         createdAt: run.startedAt ? new Date(run.startedAt).toISOString() : undefined,
         input: request.source_text,
         result: currentRunHasResult ? run.finalText ?? "" : "",
+        error: run.error,
         diff: currentRunHasResult ? run.diff : undefined,
         fileChanges: currentRunHasResult ? run.fileChanges : undefined,
         isCurrent: true,
@@ -447,13 +606,76 @@ export function Workspace() {
         ? [fallbackNextSubWork]
         : [];
   const activeRequest = selectedSubWork?.version?.request ?? request;
+  const activeCollaborationStyle = collaborationStyle(activeRequest);
+  const progressTabLabel = activeCollaborationStyle ? "議論ログ" : "エージェント進捗";
+  const progressHeaderLabel = activeCollaborationStyle ? "議論タイムライン" : "リアルタイム出力";
+  const agentCardsLabel = activeCollaborationStyle ? "発言者と反応状況" : "エージェント作業状況";
+  const outputPanelLabel = activeCollaborationStyle
+    ? "議論結果（ユーザー確認前）"
+    : "最終回答";
+  const emptyOutputMessage = activeCollaborationStyle
+    ? "議論が完了すると、ここにユーザー確認前の議論結果が表示されます。"
+    : "実行が完了すると、ここに最終回答が表示されます。";
   const activeResult = selectedSubWork?.isEditable && currentSubWork
     ? currentSubWork.result
     : selectedSubWork?.result ?? "";
+  const activeError = selectedSubWork?.isEditable && currentSubWork
+    ? currentSubWork.error
+    : selectedSubWork?.error;
   const activeDiff = selectedSubWork?.isEditable && currentSubWork ? currentSubWork.diff : selectedSubWork?.diff;
   const activeFileChanges = selectedSubWork?.isEditable && currentSubWork
     ? currentSubWork.fileChanges
     : selectedSubWork?.fileChanges;
+  const activeOutputText = activeResult || (selectedSubWork?.isCurrent ? visibleFinalText : "");
+  const activeRunTurns = selectedSubWork?.isCurrent
+    ? run.turns
+    : selectedSubWork?.version?.agent_turns ?? [];
+  const activeRunEvents = selectedSubWork?.isCurrent
+    ? run.events
+    : selectedSubWork?.version?.stream_events ?? [];
+  const activeRunState: RunState = selectedSubWork?.isCurrent
+    ? run
+    : {
+        status:
+          selectedSubWork?.status === "running"
+            ? "running"
+            : selectedSubWork?.status === "failed"
+              ? "failed"
+              : selectedSubWork?.status === "completed"
+                ? "completed"
+                : "idle",
+        events: activeRunEvents,
+        turns: activeRunTurns,
+        currentRound: 0,
+        error: activeError,
+        finalText: activeResult || undefined,
+        diff: activeDiff,
+        fileChanges: activeFileChanges,
+        startedAt: selectedSubWork?.version?.run_started_at
+          ? Date.parse(selectedSubWork.version.run_started_at)
+          : selectedSubWork?.createdAt
+            ? Date.parse(selectedSubWork.createdAt)
+            : undefined,
+        endedAt: selectedSubWork?.version?.run_ended_at
+          ? Date.parse(selectedSubWork.version.run_ended_at)
+          : undefined,
+      };
+  const progressSteps = getProgressSteps(activeRunState);
+  const liveNotes = getLiveNotes(activeRunState);
+  const displayedProgressSteps = activeCollaborationStyle
+    ? progressSteps.map((step) =>
+        step.id === "finalizing"
+          ? { ...step, label: "議論結果をまとめています" }
+          : step,
+      )
+    : progressSteps;
+  const displayedLiveNotes = activeCollaborationStyle
+    ? liveNotes.map((note) =>
+        note === "AIチームの最終回答が完成しました。"
+          ? "AIチームの議論結果がまとまりました。ユーザー確認前の内容です。"
+          : note,
+      )
+    : liveNotes;
   const activeCanEdit = selectedSubWork?.isEditable ?? true;
   const activeExecutionAgents = activeRequest.agents;
   const activeExecutionEnabledAgents = activeExecutionAgents.filter((agent) => agent.enabled !== false);
@@ -477,6 +699,126 @@ export function Workspace() {
     selectedSubWork?.reviewFeedback?.comment ??
     extractFeedbackFromSource(selectedSubWork?.input ?? "");
   const activeRequestTitle = requestTitle.trim() || selectedManagedRequest?.title || "新規ワーク";
+  const buildSubworkExportPayload = (subWork: SubWorkView): SubworkExportPayload => {
+    const isCurrent = Boolean(subWork.isCurrent);
+    const subRequest = subWork.version?.request ?? request;
+    const subTurns = isCurrent ? run.turns : subWork.version?.agent_turns ?? [];
+    const subEvents = isCurrent ? run.events : subWork.version?.stream_events ?? [];
+    const subFinalText = isCurrent ? activeOutputText : subWork.result;
+    const subDiff = isCurrent ? activeDiff : subWork.diff;
+    const subFileChanges = isCurrent ? activeFileChanges : subWork.fileChanges;
+    const subError = isCurrent ? activeError : subWork.error;
+    const versionNo =
+      subWork.version?.version_no ??
+      Math.max(1, subWorks.findIndex((item) => item.id === subWork.id) + 1);
+    const createdAt = subWork.createdAt ?? new Date().toISOString();
+    const runStartedAt = isCurrent
+      ? run.startedAt
+        ? new Date(run.startedAt).toISOString()
+        : undefined
+      : subWork.version?.run_started_at;
+    const runEndedAt = isCurrent
+      ? run.endedAt
+        ? new Date(run.endedAt).toISOString()
+        : undefined
+      : subWork.version?.run_ended_at;
+    const workId =
+      selectedManagedRequest?.id ??
+      selectedManagedRequestId ??
+      localRequestIdRef.current ??
+      "unsaved-work";
+    const flowJson =
+      subWork.version?.flow_json ??
+      buildSubworkFlowJson({
+        workId,
+        subworkId: subWork.id,
+        parentSubworkId: subWork.parentId,
+        versionNo,
+        title: subWork.label,
+        createdAt,
+        requestSnapshot: cloneRequest(subRequest),
+        runStartedAt,
+        runEndedAt,
+        turns: subTurns,
+        events: subEvents,
+        finalText: subFinalText,
+        diff: subDiff,
+        fileChanges: subFileChanges,
+      });
+
+    return {
+      schema_version: 1,
+      exported_at: new Date().toISOString(),
+      work: {
+        id: workId,
+        title: activeRequestTitle,
+      },
+      subwork: {
+        id: subWork.id,
+        label: subWork.label,
+        status: subWork.status,
+        created_at: subWork.createdAt,
+        parent_id: subWork.parentId,
+        version_no: versionNo,
+        review_feedback: subWork.reviewFeedback,
+      },
+      input: subWork.input,
+      request: cloneRequest(subRequest),
+      agents: subRequest.agents,
+      agent_turns: subTurns,
+      stream_events: subEvents,
+      flow_json: flowJson,
+      final_text: subFinalText,
+      diff: subDiff,
+      file_changes: subFileChanges,
+      error: subError,
+    };
+  };
+  const downloadSubwork = (subWork: SubWorkView | undefined, format: "json" | "md") => {
+    if (!subWork) return;
+    const payload = buildSubworkExportPayload(subWork);
+    const baseName = [
+      sanitizeFileNamePart(activeRequestTitle),
+      sanitizeFileNamePart(subWork.label),
+      format === "json" ? "debate-log" : "debate-log",
+    ].join("-");
+    if (format === "json") {
+      downloadTextFile(
+        `${baseName}.json`,
+        JSON.stringify(payload, null, 2),
+        "application/json",
+      );
+      return;
+    }
+    downloadTextFile(`${baseName}.md`, buildSubworkMarkdown(payload), "text/markdown");
+  };
+  const buildWorkspaceExportPayload = (): WorkspaceExportPayload => ({
+    schema_version: 1,
+    exported_at: new Date().toISOString(),
+    work: {
+      id:
+        selectedManagedRequest?.id ??
+        selectedManagedRequestId ??
+        localRequestIdRef.current ??
+        "unsaved-work",
+      title: activeRequestTitle,
+    },
+    subworks: subWorks.map((subWork) => buildSubworkExportPayload(subWork)),
+  });
+  const downloadAllSubworks = (format: "json" | "md") => {
+    if (subWorks.length === 0) return;
+    const payload = buildWorkspaceExportPayload();
+    const baseName = `${sanitizeFileNamePart(activeRequestTitle)}-all-debate-logs`;
+    if (format === "json") {
+      downloadTextFile(
+        `${baseName}.json`,
+        JSON.stringify(payload, null, 2),
+        "application/json",
+      );
+      return;
+    }
+    downloadTextFile(`${baseName}.md`, buildWorkspaceMarkdown(payload), "text/markdown");
+  };
   const canStart = request.source_text.trim().length > 0 && enabledAgents.length > 0;
   const missingReason = !request.source_text.trim()
     ? "依頼内容を入力してください"
@@ -588,6 +930,10 @@ export function Workspace() {
     const versions = nextVersion && !isDuplicateVersion(baseVersions[0], nextVersion)
       ? [nextVersion, ...baseVersions]
       : baseVersions;
+    const mergedFeedback =
+      pendingReviewFeedback && !feedbackList.some((item) => item.id === pendingReviewFeedback.id)
+        ? [pendingReviewFeedback, ...feedbackList]
+        : feedbackList;
     return {
       id,
       title: requestTitle.trim() || fallbackTitle,
@@ -607,7 +953,7 @@ export function Workspace() {
       file_changes: run.fileChanges ?? existing?.file_changes,
       agent_turns: run.turns.length > 0 ? run.turns : existing?.agent_turns,
       stream_events: run.events.length > 0 ? run.events : existing?.stream_events,
-      verification_feedback: feedbackList,
+      verification_feedback: mergedFeedback,
     };
   };
 
@@ -631,6 +977,7 @@ export function Workspace() {
       final_text: run.finalText,
       diff: run.diff,
       file_changes: run.fileChanges,
+      error: run.error,
       agent_turns: run.turns.length > 0 ? run.turns : undefined,
       stream_events: run.events.length > 0 ? run.events : undefined,
       flow_json: buildSubworkFlowJson({
@@ -824,6 +1171,16 @@ export function Workspace() {
     const parentId =
       selectedSubWork?.version?.id ??
       (versionSubWorks.length > 0 ? versionSubWorks[versionSubWorks.length - 1].id : undefined);
+    const continuationFinalText =
+      [
+        activeResult,
+        selectedSubWork?.version?.final_text,
+        selectedSubWork?.version?.file_changes,
+        selectedSubWork?.version?.diff,
+        selectedManagedRequest?.final_text,
+        selectedManagedRequest?.file_changes,
+        selectedManagedRequest?.diff,
+      ].find((value) => value?.trim()) ?? "";
     const nextRequest = {
       ...cloneRequest(activeRequest),
       agents: request.agents.map(cloneAgentConfig),
@@ -834,7 +1191,7 @@ export function Workspace() {
         "追加フィードバックを反映し、AIチームでもう一度議論して改善案を出す。",
       source_text: buildFeedbackContinuationSource({
         originalSource: activeRequest.source_text,
-        finalText: activeResult,
+        finalText: continuationFinalText,
         feedback: result.feedback,
       }),
     };
@@ -889,12 +1246,13 @@ export function Workspace() {
     if (runKey === lastSavedRunKeyRef.current) return;
     lastSavedRunKeyRef.current = runKey;
     setRequestStatus(run.status === "completed" ? "completed" : "paused");
+    const completed = run.status === "completed";
     void persistManagedRequestAuto({
-      appendRunVersion: true,
-      clearPending: true,
-      resetRunAfter: true,
+      appendRunVersion: completed,
+      clearPending: completed,
+      resetRunAfter: completed,
     });
-  }, [run.status, run.endedAt, run.startedAt, run.finalText, run.diff, run.error]);
+  }, [run.status, run.endedAt, run.startedAt, run.finalText, run.diff, run.fileChanges, run.error]);
 
   return (
     <div className="grid h-full grid-cols-[minmax(320px,380px)_minmax(560px,1fr)_minmax(340px,400px)] gap-4 overflow-hidden p-4">
@@ -1023,7 +1381,7 @@ export function Workspace() {
                 ? "ワーク全体のサブワーク履歴とエージェントログ"
                 : contentMode === "edit"
                   ? `${selectedSubWork?.label ?? "サブワーク"} · 作成・編集`
-                  : `${selectedSubWork?.label ?? "サブワーク"} · ${enabledAgents.length}人のAIチーム · ${formatDuration(run.startedAt, run.endedAt)}`}
+                  : `${selectedSubWork?.label ?? "サブワーク"} · ${activeExecutionEnabledAgents.length}人のAIチーム · ${formatDuration(activeRunState.startedAt, activeRunState.endedAt)}`}
             </p>
           </div>
           {workMode === "subwork" && contentMode === "progress" ? (
@@ -1091,7 +1449,7 @@ export function Workspace() {
             <div className="mb-4 grid grid-cols-2 gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-xs">
               {[
                 ["edit", "作成・編集"],
-                ["progress", "エージェント進捗"],
+                ["progress", progressTabLabel],
               ].map(([mode, label]) => (
                 <button
                   key={mode}
@@ -1190,8 +1548,12 @@ export function Workspace() {
                 <div>
                   <Label>4. 結果</Label>
                   <div className="min-h-24 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-sm leading-relaxed text-[var(--color-fg-muted)]">
-                    {activeResult ? (
-                      <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-sans">
+                    {activeError ? (
+                      <pre className="whitespace-pre-wrap rounded-md border border-red-500/40 bg-red-500/10 p-3 font-sans text-red-200">
+                        {activeError}
+                      </pre>
+                    ) : activeResult ? (
+                      <pre className="whitespace-pre-wrap font-sans">
                         {activeResult}
                       </pre>
                     ) : (
@@ -1203,7 +1565,7 @@ export function Workspace() {
                       <summary className="cursor-pointer text-xs text-[var(--color-fg-muted)]">
                         diff / file changes
                       </summary>
-                      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs text-[var(--color-fg-muted)]">
+                      <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-[var(--color-fg-muted)]">
                         {activeFileChanges || activeDiff}
                       </pre>
                     </details>
@@ -1414,7 +1776,7 @@ export function Workspace() {
                 </div>
               )}
 
-              {activeResult && (
+              {activeResult && !activeError && (
                 <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
                   <div className="space-y-3">
                     <div>
@@ -1515,7 +1877,7 @@ export function Workspace() {
                       onClick={() => void runCurrentWork()}
                     >
                       <Play className="h-4 w-4" />
-                      このワークを実行
+                      このサブワークを実行
                     </Button>
                   )}
                 </div>
@@ -1536,8 +1898,38 @@ export function Workspace() {
 
           {workMode === "subwork" && contentMode === "progress" && (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-[var(--color-fg)]">
+                    {selectedSubWork?.label ?? "サブワーク"} の議論ログ
+                  </div>
+                  <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
+                    エージェント発言、イベント、議論結果を保存用に書き出します。
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadSubwork(selectedSubWork, "json")}
+                    disabled={!selectedSubWork}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    JSON
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadSubwork(selectedSubWork, "md")}
+                    disabled={!selectedSubWork}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Markdown
+                  </Button>
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-                {progressSteps.map((step) => (
+                {displayedProgressSteps.map((step) => (
                   <div
                     key={step.id}
                     className={clsx(
@@ -1559,17 +1951,25 @@ export function Workspace() {
                 ))}
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">エージェント作業状況</h3>
-                <AgentProgressCards agents={enabledAgents} turns={run.turns} events={run.events} />
+                <h3 className="mb-2 text-sm font-semibold">{agentCardsLabel}</h3>
+                <AgentProgressCards
+                  agents={activeExecutionEnabledAgents}
+                  turns={activeRunTurns}
+                  events={activeRunEvents}
+                />
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">リアルタイム出力</h3>
-                <Conversation agents={enabledAgents} turns={run.turns} events={run.events} />
+                <h3 className="mb-2 text-sm font-semibold">{progressHeaderLabel}</h3>
+                <Conversation
+                  agents={activeExecutionEnabledAgents}
+                  turns={activeRunTurns}
+                  events={activeRunEvents}
+                />
               </div>
               <div>
                 <h3 className="mb-2 text-sm font-semibold">ライブメモ</h3>
                 <div className="space-y-2">
-                  {liveNotes.map((note, index) => (
+                  {displayedLiveNotes.map((note, index) => (
                     <div
                       key={`${note}-${index}`}
                       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-sm leading-relaxed text-[var(--color-fg-muted)]"
@@ -1580,14 +1980,14 @@ export function Workspace() {
                 </div>
               </div>
               <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
-                <h3 className="mb-2 text-sm font-semibold">最終回答</h3>
-                {visibleFinalText ? (
+                <h3 className="mb-2 text-sm font-semibold">{outputPanelLabel}</h3>
+                {activeOutputText ? (
                   <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--color-fg)]">
-                    {visibleFinalText}
+                    {activeOutputText}
                   </pre>
                 ) : (
                   <div className="text-sm text-[var(--color-fg-muted)]">
-                    実行が完了すると、ここに最終回答が表示されます。
+                    {emptyOutputMessage}
                   </div>
                 )}
               </div>
@@ -1600,10 +2000,35 @@ export function Workspace() {
 
           {workMode === "history" && (
             <div className="space-y-3">
-              <section className="grid grid-cols-3 gap-2">
-                <Info label="現在のWS" value={activeRequestTitle} />
-                <Info label="サブワーク" value={`${subWorks.length}件`} />
-                <Info label="履歴化済み結果" value={`${versionSubWorks.length}件`} />
+              <section className="grid gap-2 lg:grid-cols-[1fr_auto]">
+                <div className="grid grid-cols-3 gap-2">
+                  <Info label="現在のWS" value={activeRequestTitle} />
+                  <Info label="サブワーク" value={`${subWorks.length}件`} />
+                  <Info label="履歴化済み結果" value={`${versionSubWorks.length}件`} />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
+                  <span className="px-1 text-xs font-semibold text-[var(--color-fg-muted)]">
+                    一括ダウンロード
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadAllSubworks("json")}
+                    disabled={subWorks.length === 0}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    JSON
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadAllSubworks("md")}
+                    disabled={subWorks.length === 0}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Markdown
+                  </Button>
+                </div>
               </section>
               {subWorks.length === 0 ? (
                 <div className="rounded-md border border-dashed border-[var(--color-border)] p-4 text-sm text-[var(--color-fg-subtle)]">
@@ -1638,7 +2063,23 @@ export function Workspace() {
                                 : ""}
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadSubwork(subWork, "json")}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              JSON
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadSubwork(subWork, "md")}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Markdown
+                            </Button>
                             {subWork.version && (
                               <Button
                                 variant="ghost"
@@ -1677,23 +2118,41 @@ export function Workspace() {
                             <summary className="cursor-pointer text-xs font-semibold">
                               flow_json
                             </summary>
-                            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--color-fg-muted)]">
+                            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--color-fg-muted)]">
                               {JSON.stringify(subWork.version.flow_json, null, 2)}
                             </pre>
                           </details>
                         )}
-                        <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                        <div className="mt-3 grid gap-3">
                           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
                             <h3 className="mb-2 text-xs font-semibold text-[var(--color-fg)]">インプット概要</h3>
-                            <pre className="max-h-32 overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                              {truncateForCard(subWork.input || "入力はありません。", 360)}
+                            <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
+                              {subWork.input || "入力はありません。"}
                             </pre>
                           </div>
+                          {subWork.reviewFeedback && (
+                            <div className="rounded-md border border-sky-500/30 bg-sky-500/10 p-3">
+                              <h3 className="mb-2 text-xs font-semibold text-sky-100">ユーザーレビュー</h3>
+                              <div className="mb-2 text-[10px] text-sky-200/80">
+                                {FEEDBACK_LABEL[subWork.reviewFeedback.kind]} ·{" "}
+                                {new Date(subWork.reviewFeedback.created_at).toLocaleString("ja-JP")}
+                              </div>
+                              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-sky-100">
+                                {subWork.reviewFeedback.comment || "レビュー本文はありません。"}
+                              </pre>
+                            </div>
+                          )}
                           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
                             <h3 className="mb-2 text-xs font-semibold text-[var(--color-fg)]">結果概要</h3>
-                            <pre className="max-h-32 overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                              {truncateForCard(subWork.result || "このサブワークに結果はまだありません。", 360)}
-                            </pre>
+                            {subWork.error ? (
+                              <pre className="whitespace-pre-wrap rounded-md border border-red-500/40 bg-red-500/10 p-3 font-sans text-xs leading-relaxed text-red-200">
+                                {subWork.error}
+                              </pre>
+                            ) : (
+                              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
+                                {subWork.result || "このサブワークに結果はまだありません。"}
+                              </pre>
+                            )}
                           </div>
                         </div>
                         {(subWork.diff || subWork.fileChanges) && (
@@ -1701,7 +2160,7 @@ export function Workspace() {
                             <summary className="cursor-pointer text-xs font-semibold">
                               diff / file changes
                             </summary>
-                            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--color-fg-muted)]">
+                            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--color-fg-muted)]">
                               {subWork.fileChanges || subWork.diff}
                             </pre>
                           </details>
@@ -1773,35 +2232,39 @@ export function Workspace() {
                         : "未選択"
                       }
                     />
-                  {visibleFinalText && (
-                    <Info label="最新の実行結果" value={visibleFinalText} />
+                  {activeOutputText && (
+                    <Info label="最新の実行結果" value={activeOutputText} />
                   )}
                   <Info label="依頼内容" value={requestPreview || "未設定"} />
-                  <Info label="AIチーム" value={`${enabledAgents.length}人が有効`} />
-                  <Info label="ターン数" value={`${run.turns.length}件`} />
-                  {visibleDiff && (
+                  <Info label="AIチーム" value={`${activeExecutionEnabledAgents.length}人が有効`} />
+                  <Info label="ターン数" value={`${activeRunTurns.length}件`} />
+                  {activeDiff && (
                     <Info
                       label="変更点"
-                      value={visibleDiff}
+                      value={activeDiff}
                       icon={<FileDiff className="h-3.5 w-3.5" />}
                     />
                   )}
-                  {visibleFileChanges && (
+                  {activeFileChanges && (
                     <Info
                       label="ファイル変更"
-                      value={visibleFileChanges}
+                      value={activeFileChanges}
                       icon={<FileDiff className="h-3.5 w-3.5" />}
                     />
                   )}
-                  {run.error && <Info label="エラー" value={run.error} />}
+                  {activeRunState.error && <Info label="エラー" value={activeRunState.error} />}
                 </div>
               )}
               {inspectorTab === "conversation" && (
-                <Conversation agents={enabledAgents} turns={run.turns} events={run.events} />
+                <Conversation
+                  agents={activeExecutionEnabledAgents}
+                  turns={activeRunTurns}
+                  events={activeRunEvents}
+                />
               )}
               {inspectorTab === "events" && (
                 <pre className="whitespace-pre-wrap rounded-md bg-[var(--color-surface-2)] p-3 font-mono text-xs text-[var(--color-fg-muted)]">
-                  {run.events.length ? JSON.stringify(run.events, null, 2) : "ログはまだありません。"}
+                  {activeRunEvents.length ? JSON.stringify(activeRunEvents, null, 2) : "ログはまだありません。"}
                 </pre>
               )}
               {inspectorTab === "payload" && (
@@ -1895,6 +2358,9 @@ function Conversation({
                     {turn.error}
                   </div>
                 )}
+                {turn.research_results && turn.research_results.length > 0 && (
+                  <ResearchResultsList results={turn.research_results} />
+                )}
                 <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--color-fg-muted)]">
                   {turn.output || "出力はありません。"}
                 </pre>
@@ -1967,20 +2433,23 @@ function HistoryAgentLogs({
                 latestTurn.error ? (
                   <div className="text-red-300">{latestTurn.error}</div>
                 ) : (
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-sans">
-                    {truncateForCard(latestTurn.output || "出力はありません。")}
+                  <pre className="whitespace-pre-wrap font-sans">
+                    {latestTurn.output || "出力はありません。"}
                   </pre>
                 )
               ) : (
                 "このエージェントの出力はありません。"
               )}
             </div>
+            {latestTurn?.research_results && latestTurn.research_results.length > 0 && (
+              <ResearchResultsList results={latestTurn.research_results} />
+            )}
             {agentEvents.length > 0 && (
               <details className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
                 <summary className="cursor-pointer text-[10px] font-semibold text-[var(--color-fg-muted)]">
                   raw events
                 </summary>
-                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[10px] text-[var(--color-fg-subtle)]">
+                <pre className="mt-2 whitespace-pre-wrap font-mono text-[10px] text-[var(--color-fg-subtle)]">
                   {JSON.stringify(agentEvents, null, 2)}
                 </pre>
               </details>
@@ -2078,9 +2547,12 @@ function AgentProgressCards({
                 {latestTurn.error ? (
                   <div className="text-xs text-red-300">{latestTurn.error}</div>
                 ) : (
-                  <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
+                  <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
                     {latestTurn.output || "出力はありません。"}
                   </pre>
+                )}
+                {latestTurn.research_results && latestTurn.research_results.length > 0 && (
+                  <ResearchResultsList results={latestTurn.research_results} compact />
                 )}
               </div>
             )}
@@ -2113,11 +2585,6 @@ function getAgentWorkDescription(
   return "開始待ちです。実行順が来ると、このカードが実行中に変わります。";
 }
 
-function truncateForCard(value: string, maxLength = 420) {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength).trimEnd()}\n...`;
-}
-
 type AgentRunStatus = "waiting" | "running" | "completed" | "error";
 
 function getAgentStatus(
@@ -2138,6 +2605,35 @@ function getAgentStatus(
   if (lastAgentEvent?.type === "turn_started") return "running";
   if (agentTurns.length > 0) return "completed";
   return "waiting";
+}
+
+function ResearchResultsList({
+  results,
+  compact = false,
+}: {
+  results: NonNullable<TurnResult["research_results"]>;
+  compact?: boolean;
+}) {
+  return (
+    <div className={clsx("space-y-2", compact ? "mt-2" : "mb-3 mt-2")}>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-sky-200">
+        research results
+      </div>
+      {results.map((item, index) => (
+        <div
+          key={`${item.url}-${index}`}
+          className="rounded-md border border-sky-500/25 bg-sky-500/10 p-2 text-xs text-sky-100"
+        >
+          <div className="font-semibold">{item.title || item.url}</div>
+          <div className="mt-1 break-all text-[10px] text-sky-200/80">{item.url}</div>
+          {item.snippet && (
+            <div className="mt-2 leading-relaxed text-sky-100/80">{item.snippet}</div>
+          )}
+          {item.error && <div className="mt-2 text-red-300">{item.error}</div>}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function AgentStatusBadge({ status }: { status: AgentRunStatus }) {
@@ -2183,6 +2679,7 @@ function buildFeedbackContinuationSource({
       : "前回の最終回答はまだありません。",
     "",
     "ユーザーから追加フィードバックがありました。",
+    "重要: このユーザーフィードバックを次の議論の最優先変更要求として扱ってください。",
     `種別: ${FEEDBACK_LABEL[feedback.kind]}`,
     feedback.comment.trim(),
     "",

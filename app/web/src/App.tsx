@@ -5,6 +5,7 @@ import { Drawer } from "./components/Drawer";
 import { useApp } from "./state/store";
 import { Dashboard } from "./screens/Dashboard";
 import { Workspace } from "./screens/Workspace";
+import { Coding } from "./screens/Coding";
 import { TeamComposer } from "./screens/TeamComposer";
 import { AgentStudio } from "./screens/AgentStudio";
 import { Execution } from "./screens/Execution";
@@ -30,6 +31,7 @@ export function App() {
         <main className="flex flex-1 overflow-hidden">
           <div className="flex-1 overflow-hidden">
             {screen === "workspace" && <Workspace />}
+            {screen === "coding" && <Coding />}
             {screen === "dashboard" && <Dashboard />}
             {screen === "team" && <TeamComposer />}
             {screen === "agents" && <AgentStudio />}

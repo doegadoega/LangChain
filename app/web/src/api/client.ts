@@ -6,7 +6,10 @@ import type {
   ManagedRequest,
   ProviderKind,
   ProviderModelsResponse,
+  DirectoryPickResponse,
   Project,
+  SourceFileResponse,
+  SourceTreeResponse,
   SkillDocument,
   SkillSource,
   Template,
@@ -57,6 +60,13 @@ export const api = {
   updateRequest: (id: string, r: ManagedRequest) =>
     req<ManagedRequest>(`/api/requests/${id}`, { method: "PUT", body: JSON.stringify(r) }),
   deleteRequest: (id: string) => req<void>(`/api/requests/${id}`, { method: "DELETE" }),
+
+  // source files
+  pickDirectory: () => req<DirectoryPickResponse>("/api/files/pick-directory"),
+  listSourceTree: (path: string) =>
+    req<SourceTreeResponse>(`/api/files/tree?path=${encodeURIComponent(path)}`),
+  readSourceFile: (path: string) =>
+    req<SourceFileResponse>(`/api/files/read?path=${encodeURIComponent(path)}`),
 
   // chats
   listChats: () => req<ChatSession[]>("/api/chats"),

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from app.skills.models import SkillReference
 
 
-MAX_CUSTOM_AGENTS = 5
+MAX_CUSTOM_AGENTS = 20
 MAX_ROUNDS = 5
 
 
@@ -56,6 +56,10 @@ class AgentConfig(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     command_template: str | None = Field(default=None, max_length=2000)
     model: str | None = Field(default=None, max_length=100)
+    allow_web_search: bool = False
+    research_sources: list[str] = Field(default_factory=list)
+    require_citations: bool = True
+    max_search_results: int = Field(default=5, ge=1, le=20)
     mcp_enabled: bool = False
     mcp_config_path: str | None = Field(default=None, max_length=500)
     mcp_servers: list[str] = Field(default_factory=list)
@@ -101,6 +105,24 @@ class AgentConfig(BaseModel):
             raise ValueError("depends_on can contain at most 20 entries")
         return unique
 
+    @field_validator("research_sources")
+    @classmethod
+    def validate_research_sources(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item.strip()]
+        unique: list[str] = []
+        seen: set[str] = set()
+        for source in cleaned:
+            if source in seen:
+                continue
+            seen.add(source)
+            unique.append(source)
+        if len(unique) > 30:
+            raise ValueError("research_sources can contain at most 30 entries")
+        for source in unique:
+            if len(source) > 500:
+                raise ValueError("each research source must be <= 500 chars")
+        return unique
+
     @field_validator("mcp_servers")
     @classmethod
     def validate_mcp_servers(cls, value: list[str]) -> list[str]:
@@ -138,6 +160,14 @@ class AgentConfig(BaseModel):
             "editor": OrgRole.MANAGER.value,
         }
         return legacy_map.get(raw, raw)
+
+
+class ResearchSourceResult(BaseModel):
+    source: str
+    url: str
+    title: str = ""
+    snippet: str = ""
+    error: str | None = None
 
 
 class CodeContext(BaseModel):
@@ -224,6 +254,10 @@ class TurnResult(BaseModel):
     mcp_enabled: bool = False
     mcp_context_used: bool = False
     mcp_context_error: str | None = None
+    research_enabled: bool = False
+    research_context_used: bool = False
+    research_context_error: str | None = None
+    research_results: list[ResearchSourceResult] = Field(default_factory=list)
 
 
 class RoundResult(BaseModel):

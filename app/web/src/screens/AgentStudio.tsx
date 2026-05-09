@@ -478,6 +478,55 @@ function AgentEditor({
 
       <Card>
         <CardHeader>
+          <CardTitle>Research / ネット検索</CardTitle>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={agent.allow_web_search}
+              onChange={(e) => onChange({ allow_web_search: e.target.checked })}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
+            ネット検索を許可
+          </label>
+        </CardHeader>
+        <CardBody
+          className={clsx("grid grid-cols-2 gap-3", !agent.allow_web_search && "opacity-50")}
+        >
+          <div>
+            <Label>max_search_results</Label>
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={agent.max_search_results}
+              onChange={(e) => onChange({ max_search_results: +e.target.value })}
+            />
+          </div>
+          <label className="flex items-end gap-2 pb-2 text-xs">
+            <input
+              type="checkbox"
+              checked={agent.require_citations}
+              onChange={(e) => onChange({ require_citations: e.target.checked })}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
+            回答に参照URLを残す
+          </label>
+          <div className="col-span-2">
+            <ChipsEditor
+              label="必ず確認する技術サイト / source URL"
+              values={agent.research_sources}
+              onChange={(research_sources) => onChange({ research_sources })}
+              placeholder="https://developer.apple.com/documentation/swiftui"
+            />
+          </div>
+          <div className="col-span-2 text-xs leading-relaxed text-[var(--color-fg-subtle)]">
+            OFF のエージェントには検索許可と登録ソースをプロンプトへ渡しません。ON の場合は登録ソースを優先し、回答時に参照URLを残すよう指示します。
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>MCP 連携</CardTitle>
           <label className="flex items-center gap-2 text-xs">
             <input

@@ -47,6 +47,26 @@ def test_create_project(client):
     assert resp.status_code == 201
 
 
+def test_list_source_tree_and_read_file(client, tmp_path):
+    source_dir = tmp_path / "repo"
+    source_dir.mkdir()
+    (source_dir / "Todo.swift").write_text("struct Todo {}\n", encoding="utf-8")
+    (source_dir / "node_modules").mkdir()
+    (source_dir / "node_modules" / "ignored.js").write_text("x", encoding="utf-8")
+
+    tree_resp = client.get("/api/files/tree", params={"path": str(source_dir)})
+
+    assert tree_resp.status_code == 200
+    payload = tree_resp.json()
+    assert payload["path"] == str(source_dir)
+    assert [item["name"] for item in payload["children"]] == ["Todo.swift"]
+
+    read_resp = client.get("/api/files/read", params={"path": str(source_dir / "Todo.swift")})
+
+    assert read_resp.status_code == 200
+    assert read_resp.json()["content"] == "struct Todo {}\n"
+
+
 def test_create_team_template_preserves_agents_and_run_settings(client):
     template = {
         "id": "team-local-llm",

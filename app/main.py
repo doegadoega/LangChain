@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -31,6 +33,20 @@ def get_skill_store() -> SkillStore:
 
 BASE_DIR = Path(__file__).resolve().parent
 JSONDict = dict[str, Any]
+IGNORED_SOURCE_DIRS = {
+    ".git",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "DerivedData",
+    "build",
+    "dist",
+}
+SOURCE_TEXT_MAX_BYTES = 512 * 1024
+SOURCE_TREE_MAX_CHILDREN = 300
 
 
 def get_store() -> FileStore:
@@ -45,6 +61,68 @@ def _validate_record_id(record_id: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", record_id):
         raise HTTPException(status_code=400, detail="Invalid record id")
     return record_id
+
+
+def _resolve_local_path(raw_path: str) -> Path:
+    raw = raw_path.strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="path is required")
+    try:
+        return Path(raw).expanduser().resolve()
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid path: {exc}") from exc
+
+
+def _source_tree_item(path: Path) -> JSONDict:
+    stat = path.stat()
+    return {
+        "name": path.name,
+        "path": str(path),
+        "kind": "directory" if path.is_dir() else "file",
+        "size": stat.st_size,
+        "updated_at": stat.st_mtime,
+    }
+
+
+def _pick_directory_with_osascript() -> str:
+    if shutil.which("osascript") is None:
+        raise RuntimeError("osascript is not available")
+    completed = subprocess.run(
+        [
+            "osascript",
+            "-e",
+            'POSIX path of (choose folder with prompt "作業ディレクトリを選択してください")',
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    if completed.returncode != 0:
+        message = completed.stderr.strip() or completed.stdout.strip() or "osascript failed"
+        if "-128" in message or "User canceled" in message:
+            return ""
+        raise RuntimeError(message)
+    return completed.stdout.strip()
+
+
+def _pick_directory_with_tkinter() -> str:
+    import tkinter
+    from tkinter import filedialog
+
+    root = None
+    try:
+        root = tkinter.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        return filedialog.askdirectory()
+    finally:
+        if root is not None:
+            root.destroy()
+
+
+def _is_probably_binary(data: bytes) -> bool:
+    return b"\x00" in data[:2048]
 
 
 def _truncate_text(text: str, max_chars: int) -> str:
@@ -258,6 +336,91 @@ def provider_models(provider: str):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Unsupported provider") from exc
     return list_provider_models(provider_kind)
+
+
+@app.get("/api/files/tree")
+def file_tree(path: str):
+    root = _resolve_local_path(path)
+    if not root.exists() or not root.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    children: list[JSONDict] = []
+    try:
+        entries = sorted(
+            root.iterdir(),
+            key=lambda item: (not item.is_dir(), item.name.lower()),
+        )
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=f"Cannot read directory: {exc}") from exc
+
+    for entry in entries:
+        if entry.name in IGNORED_SOURCE_DIRS:
+            continue
+        if entry.name.startswith(".") and entry.name not in {".env", ".env.example"}:
+            continue
+        try:
+            children.append(_source_tree_item(entry))
+        except OSError:
+            continue
+        if len(children) >= SOURCE_TREE_MAX_CHILDREN:
+            break
+
+    return {
+        "name": root.name or str(root),
+        "path": str(root),
+        "kind": "directory",
+        "children": children,
+        "truncated": len(children) >= SOURCE_TREE_MAX_CHILDREN,
+    }
+
+
+@app.get("/api/files/pick-directory")
+def file_pick_directory():
+    errors: list[str] = []
+    try:
+        selected = _pick_directory_with_tkinter()
+        return {"path": selected}
+    except Exception as exc:  # pragma: no cover - depends on local Python build / GUI session
+        errors.append(f"tkinter: {exc}")
+
+    try:
+        selected = _pick_directory_with_osascript()
+        return {"path": selected}
+    except Exception as exc:  # pragma: no cover - depends on local GUI session
+        errors.append(f"osascript: {exc}")
+
+    raise HTTPException(
+        status_code=503,
+        detail="Folder picker is unavailable. " + " / ".join(errors),
+    )
+
+
+@app.get("/api/files/read")
+def file_read(path: str):
+    target = _resolve_local_path(path)
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        stat = target.stat()
+        if stat.st_size > SOURCE_TEXT_MAX_BYTES:
+            raise HTTPException(status_code=413, detail="File is too large")
+        data = target.read_bytes()
+    except HTTPException:
+        raise
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=f"Cannot read file: {exc}") from exc
+
+    if _is_probably_binary(data):
+        raise HTTPException(status_code=415, detail="Binary file is not supported")
+
+    return {
+        "name": target.name,
+        "path": str(target),
+        "kind": "file",
+        "size": stat.st_size,
+        "updated_at": stat.st_mtime,
+        "content": data.decode("utf-8", errors="replace"),
+    }
 
 
 # -- Skills --

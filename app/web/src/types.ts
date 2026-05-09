@@ -35,6 +35,10 @@ export interface AgentConfig {
   model?: string | null;
   model_decision?: ModelDecision;
   enabled?: boolean;
+  allow_web_search: boolean;
+  research_sources: string[];
+  require_citations: boolean;
+  max_search_results: number;
   mcp_enabled: boolean;
   mcp_config_path?: string | null;
   mcp_servers: string[];
@@ -77,6 +81,7 @@ export interface WorkspaceVersion {
   final_text?: string;
   diff?: string;
   file_changes?: string;
+  error?: string;
   agent_turns?: TurnResult[];
   stream_events?: StreamEvent[];
   flow_json?: SubworkFlowJson;
@@ -146,6 +151,7 @@ export interface ManagedRequest {
   final_text?: string;
   diff?: string;
   file_changes?: string;
+  error?: string;
   agent_turns?: TurnResult[];
   stream_events?: StreamEvent[];
   run_started_at?: string;
@@ -223,6 +229,18 @@ export interface TurnResult {
   mcp_enabled?: boolean;
   mcp_context_used?: boolean;
   mcp_context_error?: string | null;
+  research_enabled?: boolean;
+  research_context_used?: boolean;
+  research_context_error?: string | null;
+  research_results?: ResearchSourceResult[];
+}
+
+export interface ResearchSourceResult {
+  source: string;
+  url: string;
+  title?: string;
+  snippet?: string;
+  error?: string | null;
 }
 
 export interface RoundResult {
@@ -239,9 +257,30 @@ export interface RefineResponse {
 }
 
 export type StreamEvent = (
-  | { type: "run_started"; plan?: unknown }
-  | { type: "round_started"; round_index: number }
-  | { type: "turn_started"; agent_id: string; agent_name: string; org_role: OrgRole; provider: ProviderKind }
+  | {
+      type: "run_started";
+      plan?: unknown;
+      workflow_mode?: WorkflowMode;
+      orchestration_mode?: OrchestrationMode;
+      execution_plan?: string[][];
+      rounds?: number;
+      agent_count?: number;
+      total_turns?: number;
+      has_working_dir?: boolean;
+    }
+  | { type: "round_started"; round_index: number; execution_plan?: string[][] }
+  | {
+      type: "turn_started";
+      agent_id: string;
+      agent_name: string;
+      org_role: OrgRole;
+      provider: ProviderKind;
+      round_index?: number;
+      batch_index?: number;
+      turn_index?: number;
+      depends_on?: string[];
+      mcp_enabled?: boolean;
+    }
   | {
       type: "turn_completed";
       turn: TurnResult;
@@ -289,6 +328,7 @@ export interface Workflow {
 
 export type ScreenId =
   | "workspace"
+  | "coding"
   | "dashboard"
   | "team"
   | "agents"
@@ -313,6 +353,35 @@ export interface SkillReference {
   source: SkillSource;
   version_requirement: SkillVersionRequirement;
   enabled: boolean;
+}
+
+export interface SourceTreeItem {
+  name: string;
+  path: string;
+  kind: "directory" | "file";
+  size: number;
+  updated_at: number;
+}
+
+export interface SourceTreeResponse {
+  name: string;
+  path: string;
+  kind: "directory";
+  children: SourceTreeItem[];
+  truncated: boolean;
+}
+
+export interface DirectoryPickResponse {
+  path: string;
+}
+
+export interface SourceFileResponse {
+  name: string;
+  path: string;
+  kind: "file";
+  size: number;
+  updated_at: number;
+  content: string;
 }
 
 export interface SkillMetadata {

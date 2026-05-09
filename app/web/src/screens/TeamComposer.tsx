@@ -749,6 +749,63 @@ function TeamAgentRow({
           />
         </div>
       )}
+      <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold text-[var(--color-fg)]">Research / ネット検索</div>
+            <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
+              このエージェントだけに検索許可と必須参照サイトを設定します。
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={agent.allow_web_search}
+              onChange={(event) => onUpdate({ allow_web_search: event.target.checked })}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
+            許可
+          </label>
+        </div>
+        <div className={clsx("grid gap-2 md:grid-cols-2", !agent.allow_web_search && "opacity-50")}>
+          <div>
+            <Label>max_search_results</Label>
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={agent.max_search_results}
+              onChange={(event) => onUpdate({ max_search_results: +event.target.value })}
+            />
+          </div>
+          <label className="flex items-end gap-2 pb-2 text-xs">
+            <input
+              type="checkbox"
+              checked={agent.require_citations}
+              onChange={(event) => onUpdate({ require_citations: event.target.checked })}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
+            参照URLを残す
+          </label>
+          <div className="md:col-span-2">
+            <Label>必ず確認する技術サイト</Label>
+            <Textarea
+              rows={3}
+              value={agent.research_sources.join("\n")}
+              placeholder="https://developer.apple.com/documentation/swiftui"
+              className="font-mono"
+              onChange={(event) =>
+                onUpdate({
+                  research_sources: event.target.value
+                    .split(/\r?\n|,/)
+                    .map((item) => item.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          </div>
+        </div>
+      </div>
       <div className="mt-2">
         <Label>depends_on</Label>
         <Select

@@ -134,6 +134,27 @@ const normalizeAgent = (value: unknown): AgentConfig => {
     model: typeof raw.model === "string" ? raw.model : null,
     model_decision: modelDecision,
     enabled: typeof raw.enabled === "boolean" ? raw.enabled : true,
+    allow_web_search:
+      typeof raw.allow_web_search === "boolean"
+        ? raw.allow_web_search
+        : typeof raw.allowWebSearch === "boolean"
+          ? raw.allowWebSearch
+          : false,
+    research_sources: asStringArray(raw.research_sources).length
+      ? asStringArray(raw.research_sources)
+      : asStringArray(raw.researchSources),
+    require_citations:
+      typeof raw.require_citations === "boolean"
+        ? raw.require_citations
+        : typeof raw.requireCitations === "boolean"
+          ? raw.requireCitations
+          : true,
+    max_search_results:
+      typeof raw.max_search_results === "number"
+        ? raw.max_search_results
+        : typeof raw.maxSearchResults === "number"
+          ? raw.maxSearchResults
+          : 5,
     mcp_enabled:
       typeof raw.mcp_enabled === "boolean"
         ? raw.mcp_enabled
@@ -212,6 +233,7 @@ const cloneAgentConfig = (agent: AgentConfig): AgentConfig => ({
     version_requirement: { ...ref.version_requirement },
   })),
   depends_on: [...agent.depends_on],
+  research_sources: [...agent.research_sources],
   mcp_servers: [...agent.mcp_servers],
 });
 
@@ -246,6 +268,10 @@ const teamAgent = ({
   model,
   model_decision,
   enabled: true,
+  allow_web_search: false,
+  research_sources: [],
+  require_citations: true,
+  max_search_results: 5,
   mcp_enabled: false,
   mcp_servers: [],
   mcp_instruction: "",
@@ -264,6 +290,10 @@ const defaultAgents = (): AgentConfig[] => [
     depends_on: [],
     model_decision: "fixed",
     enabled: true,
+    allow_web_search: false,
+    research_sources: [],
+    require_citations: true,
+    max_search_results: 5,
     mcp_enabled: false,
     mcp_servers: [],
     mcp_instruction: "",
@@ -280,6 +310,10 @@ const defaultAgents = (): AgentConfig[] => [
     depends_on: ["ceo"],
     model_decision: "ceo_decides",
     enabled: true,
+    allow_web_search: false,
+    research_sources: [],
+    require_citations: true,
+    max_search_results: 5,
     mcp_enabled: false,
     mcp_servers: [],
     mcp_instruction: "",
@@ -296,6 +330,10 @@ const defaultAgents = (): AgentConfig[] => [
     depends_on: ["manager"],
     model_decision: "ceo_decides",
     enabled: true,
+    allow_web_search: false,
+    research_sources: [],
+    require_citations: true,
+    max_search_results: 5,
     mcp_enabled: false,
     mcp_servers: [],
     mcp_instruction: "",
@@ -312,6 +350,10 @@ const defaultAgents = (): AgentConfig[] => [
     depends_on: ["manager"],
     model_decision: "ceo_decides",
     enabled: true,
+    allow_web_search: false,
+    research_sources: [],
+    require_citations: true,
+    max_search_results: 5,
     mcp_enabled: false,
     mcp_servers: [],
     mcp_instruction: "",
@@ -328,6 +370,10 @@ const defaultAgents = (): AgentConfig[] => [
     depends_on: [`worker_${i}`],
     model_decision: "ceo_decides",
     enabled: true,
+    allow_web_search: false,
+    research_sources: [],
+    require_citations: true,
+    max_search_results: 5,
     mcp_enabled: false,
     mcp_servers: [],
     mcp_instruction: "",
@@ -921,6 +967,10 @@ export const newAgent = (org_role: AgentConfig["org_role"] = "worker"): AgentCon
   depends_on: [],
   model_decision: "ceo_decides",
   enabled: true,
+  allow_web_search: false,
+  research_sources: [],
+  require_citations: true,
+  max_search_results: 5,
   mcp_enabled: false,
   mcp_servers: [],
   mcp_instruction: "",

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pathlib
 import subprocess as _sp
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import unified_diff
 from typing import Iterator
 
@@ -16,11 +16,13 @@ from app.models import (
     ProviderKind,
     RefineRequest,
     RefineResponse,
+    ResearchSourceResult,
     RoundResult,
     TurnResult,
     WorkflowMode,
 )
 from app.providers import CLITemplateProvider, ProviderError, resolve_provider
+from app.research import fetch_research_sources
 from app.skills import SkillDocument, SkillStore, render_skills
 
 DIRECT_EDIT_PROVIDERS = {
@@ -35,27 +37,42 @@ DIRECT_EDIT_PROVIDERS = {
 class RunContext:
     request: RefineRequest
     draft: str
+    interaction_history: list[dict[str, str | int]] = field(default_factory=list)
 
 
 def _capture_git_diff(working_directory: str) -> str:
-    """Return combined staged + unstaged + untracked diff relative to HEAD."""
+    """Return tracked diff under the selected working directory without mutating git state."""
     try:
-        _sp.run(
-            ["git", "add", "-A"],
-            cwd=working_directory,
-            capture_output=True,
-            timeout=30,
-            check=False,
-        )
         result = _sp.run(
-            ["git", "diff", "--staged", "HEAD"],
+            ["git", "diff", "--no-ext-diff", "HEAD", "--", "."],
             cwd=working_directory,
             capture_output=True,
             text=True,
             timeout=30,
             check=False,
         )
-        return (result.stdout or "").strip()
+        diff = (result.stdout or "").strip()
+        untracked = _sp.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "--", "."],
+            cwd=working_directory,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        untracked_files = [
+            line.strip()
+            for line in (untracked.stdout or "").splitlines()
+            if line.strip()
+        ]
+        if untracked_files:
+            untracked_block = "\n".join(f"- {path}" for path in untracked_files[:100])
+            if len(untracked_files) > 100:
+                untracked_block += f"\n- ... and {len(untracked_files) - 100} more"
+            diff = "\n\n".join(
+                part for part in [diff, f"Untracked files:\n{untracked_block}"] if part
+            )
+        return diff
     except Exception:
         return ""
 
@@ -130,6 +147,53 @@ def _build_mcp_context_block(mcp_context: str, mcp_error: str | None) -> str:
     return "MCP参照コンテキスト: なし"
 
 
+def _build_research_context_block(
+    agent: AgentConfig,
+    research_results: list[ResearchSourceResult] | None = None,
+    research_error: str | None = None,
+) -> str:
+    if not agent.allow_web_search:
+        return ""
+
+    sources = "\n".join(f"- {source}" for source in agent.research_sources) or "- 未登録"
+    fetched = research_results or []
+    if fetched:
+        fetched_block = "\n".join(
+            "\n".join(
+                line
+                for line in [
+                    f"- URL: {item.url}",
+                    f"  title: {item.title}" if item.title else "",
+                    f"  snippet: {_truncate_output(item.snippet, max_chars=900)}"
+                    if item.snippet
+                    else "",
+                    f"  error: {item.error}" if item.error else "",
+                ]
+                if line
+            )
+            for item in fetched
+        )
+    else:
+        fetched_block = "なし"
+    citation_rule = (
+        "参照URLを回答に残す"
+        if agent.require_citations
+        else "参照URLの明記は任意"
+    )
+    error_line = f"- 取得エラー: {research_error}\n" if research_error else ""
+    return (
+        "Research Context:\n"
+        "- ネット検索: 許可\n"
+        f"- 最大検索件数: {agent.max_search_results}\n"
+        f"- 引用方針: {citation_rule}\n"
+        "- 必ず確認する技術サイト/ソース:\n"
+        f"{sources}\n"
+        f"- 取得結果:\n{fetched_block}\n"
+        f"{error_line}"
+        "注意: 検索やサイト確認を行う場合は、登録ソースを優先し、古い情報や未確認情報を断定しないでください。\n"
+    )
+
+
 def _build_code_context_block(context: RunContext) -> str:
     code = context.request.code_context
     target_paths = "\n".join(f"- {path}" for path in code.target_paths) or "- 未指定"
@@ -163,6 +227,25 @@ def _build_dependency_context_block(
             lines.append(f"- {dep}: (未実行または出力なし)")
             continue
         lines.append(f"- {dep}:\n```text\n{_truncate_output(output)}\n```")
+    return "\n".join(lines) + "\n"
+
+
+def _build_interaction_history_block(context: RunContext) -> str:
+    if not context.interaction_history:
+        return "議論履歴: なし\n"
+
+    lines = ["議論履歴:"]
+    for item in context.interaction_history[-16:]:
+        round_index = item.get("round_index", "?")
+        agent_name = item.get("agent_name", "unknown")
+        org_role = item.get("org_role", "unknown")
+        output = str(item.get("output", "")).strip()
+        if not output:
+            continue
+        lines.append(
+            f"- Round {round_index} / {agent_name} ({org_role}):\n"
+            f"```text\n{_truncate_output(output, max_chars=1800)}\n```"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -201,11 +284,18 @@ def _build_task_prompt(
     has_working_dir: bool = False,
     can_edit_files: bool = False,
     installed_skills: list[SkillDocument] | None = None,
+    research_results: list[ResearchSourceResult] | None = None,
+    research_error: str | None = None,
 ) -> str:
     objective = context.request.objective.strip() or "特になし"
     global_instruction = context.request.global_instruction.strip() or "特になし"
     workflow_mode = context.request.workflow_mode
     dep_block = _build_dependency_context_block(agent, round_outputs)
+    research_block = _build_research_context_block(
+        agent,
+        research_results=research_results,
+        research_error=research_error,
+    )
     output_history = (
         "\n\n".join(
             f"[{agent_id}]\n{_truncate_output(text)}"
@@ -231,7 +321,13 @@ def _build_task_prompt(
                 objective=objective,
                 global_instruction=global_instruction,
             ),
+            round_index=round_index,
         )
+    interaction_history = (
+        _build_interaction_history_block(context)
+        if workflow_mode == WorkflowMode.WRITING
+        else "議論履歴: codingモードのため未使用\n"
+    )
 
     return (
         f"{_build_system_directive(agent, installed_skills=installed_skills)}\n"
@@ -242,6 +338,8 @@ def _build_task_prompt(
         f"グローバル指示:\n{global_instruction}\n\n"
         f"{code_block}\n"
         f"{dep_block}\n"
+        f"{research_block}\n"
+        f"{interaction_history}\n"
         f"これまでの依存出力サマリー:\n{output_history}\n\n"
         f"現在の状態:\n<<DRAFT>>\n{context.draft}\n<</DRAFT>>\n\n"
         f"タスク:\n{role_instruction}"
@@ -292,27 +390,40 @@ def _detect_collaboration_style(*, objective: str, global_instruction: str) -> s
     return ""
 
 
-def _build_writing_instruction(*, org_role: OrgRole, collaboration_style: str = "") -> str:
+def _build_writing_instruction(
+    *, org_role: OrgRole, collaboration_style: str = "", round_index: int = 1
+) -> str:
     role_hint = {
         OrgRole.CEO: "意思決定しやすい簡潔さを重視してください。",
         OrgRole.MANAGER: "段取りと依存関係が伝わる構成にしてください。",
         OrgRole.PMO: "抜け漏れと曖昧表現を排除してください。",
         OrgRole.QA: "検証観点が明確になるようにしてください。",
     }.get(org_role, "読み手に伝わる明瞭さを重視してください。")
+    debate_round_hint = (
+        "このラウンドでは、前の発言を踏まえて論点を収束させてください。"
+        if round_index >= 2
+        else "このラウンドでは、目的に照らした主要論点を出してください。"
+    )
     if collaboration_style == "debate":
         return (
             "現在の下書きをディベート対象として扱ってください。\n"
-            "自分のロールの観点から、賛成論点・反対論点・リスク・反論を分けて出してください。\n"
-            "他エージェントの出力がある場合は、それに対する同意点と反論を明示してください。\n"
-            "最後に、意思決定に使える判断材料と暫定結論を短くまとめてください。\n"
+            "縦割りコメントは禁止です。自分の担当範囲だけで完結させず、会話として進めてください。\n"
+            "他エージェントの主張に必ず反応し、同意・反論・補強・未決点を分けてください。\n"
+            "目的に照らして、採用すべき判断材料と捨てるべき論点を明確にしてください。\n"
+            "ユーザー確認前に最終決定・最終確認済みとは書かないでください。出力は暫定結論または議論結果として扱ってください。\n"
+            f"{debate_round_hint}\n"
+            "出力は `主張` `他者への反応` `採用判断` `残るリスク` `次に渡す材料` を含めてください。\n"
             f"{role_hint}"
         )
     if collaboration_style == "discussion":
         return (
             "現在の下書きをチーム議論の対象として扱ってください。\n"
-            "自分のロールの観点から論点、補足、懸念、次の提案を出してください。\n"
-            "他エージェントの出力がある場合は、それを踏まえて合意点・未解決点を整理してください。\n"
-            "最後に、チームとしてのまとめと次の行動を短く提示してください。\n"
+            "縦割りコメントは禁止です。各自の担当範囲を並べるだけではなく、他者の発言に反応してください。\n"
+            "他エージェントの主張に必ず反応し、同意・反論・補強・未決点を分けてください。\n"
+            "目的に照らして、合意できること、まだ決めないこと、次に確認することを整理してください。\n"
+            "ユーザー確認前に最終決定・最終確認済みとは書かないでください。出力は暫定結論または議論結果として扱ってください。\n"
+            f"{debate_round_hint}\n"
+            "出力は `主張` `他者への反応` `合意点` `未決点` `次の行動` を含めてください。\n"
             f"{role_hint}"
         )
     return (
@@ -524,6 +635,17 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     "mcp_enabled": agent.mcp_enabled,
                 }
 
+                research_results: list[ResearchSourceResult] = []
+                research_error = None
+                if agent.allow_web_search and agent.research_sources:
+                    try:
+                        research_results = fetch_research_sources(
+                            agent.research_sources,
+                            max_results=agent.max_search_results,
+                        )
+                    except Exception as exc:
+                        research_error = str(exc)
+
                 prompt = _build_task_prompt(
                     agent=agent,
                     context=context,
@@ -532,6 +654,8 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     has_working_dir=has_working_dir,
                     can_edit_files=can_edit_files,
                     installed_skills=installed_skills,
+                    research_results=research_results,
+                    research_error=research_error,
                 )
                 cwd = working_dir if has_working_dir else None
                 mcp_context = ""
@@ -576,11 +700,25 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                         mcp_enabled=agent.mcp_enabled,
                         mcp_context_used=bool(mcp_context),
                         mcp_context_error=mcp_context_error,
+                        research_enabled=agent.allow_web_search,
+                        research_context_used=bool(research_results),
+                        research_context_error=research_error,
+                        research_results=research_results,
                     )
                     turns.append(turn)
                     round_outputs[agent.id] = output
+                    if request.workflow_mode == WorkflowMode.WRITING and output:
+                        context.interaction_history.append(
+                            {
+                                "round_index": round_index,
+                                "agent_id": agent.id,
+                                "agent_name": agent.name,
+                                "org_role": agent.org_role.value,
+                                "output": output,
+                            }
+                        )
 
-                    if not has_working_dir or not can_edit_files:
+                    if not has_working_dir or not can_edit_files or not file_changes:
                         context.draft = output or context.draft
 
                 except ProviderError as exc:
@@ -594,6 +732,10 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                         mcp_enabled=agent.mcp_enabled,
                         mcp_context_used=bool(mcp_context),
                         mcp_context_error=mcp_context_error,
+                        research_enabled=agent.allow_web_search,
+                        research_context_used=bool(research_results),
+                        research_context_error=research_error,
+                        research_results=research_results,
                     )
                     turns.append(turn)
                     round_outputs[agent.id] = ""

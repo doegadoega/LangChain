@@ -42,6 +42,10 @@ V2 の全体仕様（組織体制、インフラ構成、アプリ構成、構�
   - `mcp_enabled` でON/OFF
   - `mcp_servers[]` / `mcp_instruction` をプロンプトへ反映
   - `mcp_context_command` で外部MCPクライアント実行結果を注入可能
+- Research設定（エージェント単位）
+  - `allow_web_search` でネット検索許可をON/OFF
+  - `research_sources[]` に必ず確認する技術サイトやURLを登録
+  - `require_citations` で回答時の参照URL明記を要求
 
 ## 1. セットアップ
 
@@ -88,7 +92,7 @@ uvicorn app.main:app --reload --port 8000
 
 Web UIの `Workspace` で `SuperPowers Local` を選ぶと、LM Studioのローカルモデルを使う設計前処理チームに切り替わります。
 
-Workspace では、依頼内容を複数のワークスペースとして登録できます。左ペインの `ワークスペース管理` から登録・一覧検索・読み込み編集・削除を行い、選択中ワークスペースの入力内容、実行結果、フィードバックを保存できます。中央ペインはコンテンツ領域で、`作成・編集`、`エージェント進捗`、`履歴` のモードを切り替えます。`作成・編集` では実行チームを Built-in / Custom テンプレートから選択でき、選択したチームのエージェント構成をワークへコピーします。右ペインの `レビュー・ログ` はフィードバック、会話ログ、イベント、JSON確認用です。ワークスペースには `元々の依頼内容`、`前回の依頼内容`、実行結果のローカルバージョン履歴が保存され、過去バージョンの依頼内容を現在の編集状態へ戻せます。
+Workspace では、依頼内容を複数のワークスペースとして登録できます。左ペインの `ワークスペース管理` から登録・一覧検索・読み込み編集・削除を行い、選択中ワークスペースの入力内容、実行結果、フィードバックを保存できます。中央ペインはコンテンツ領域で、`作成・編集`、`エージェント進捗`、`履歴` のモードを切り替えます。`議論したい` / `ディベートしたい` を選んだ場合は、`エージェント進捗` が議論ログとして機能し、各エージェントの発言履歴を次の発言者へ渡して、同意・反論・補強・未決点を収束させます。`作成・編集` では実行チームを Built-in / Custom テンプレートから選択でき、選択したチームのエージェント構成をワークへコピーします。右ペインの `レビュー・ログ` はフィードバック、会話ログ、イベント、JSON確認用です。ワークスペースには `元々の依頼内容`、`前回の依頼内容`、実行結果のローカルバージョン履歴が保存され、過去バージョンの依頼内容を現在の編集状態へ戻せます。
 
 ワークスペースの `作業モード` を `coding` にすると、作業ディレクトリ、対象ファイル、技術スタック、受け入れ条件、テストコマンドを入力できます。これらは AI チームのコーディング相談・修正方針・実装レビュー用プロンプトに渡されます。
 
@@ -122,12 +126,40 @@ python -m app.cli run --config /path/to/request.json --stream
 python -m app.cli sample-config --path /tmp/langchain-request.sample.json
 ```
 
+コーディング用途は、JSONを用意せずに最小指定で実行できます。
+
+```bash
+python -m app.cli code \
+  --workdir /path/to/repo \
+  --request "LoginViewModel.swift のバリデーション不具合を直して" \
+  --target LoginViewModel.swift \
+  --test-command "swift test" \
+  --provider codex_cli \
+  --stream \
+  --output /tmp/coding-result.json
+```
+
+- `codex_cli` / `claude_cli` / `gemini_cli` / `custom_cli`: 作業ディレクトリで直接編集できます。
+- `ollama` / `lm_studio`: 直接編集せず、diff案と実装指示を返します。
+- `custom_cli` を使う場合は `--command-template` を指定してください。
+
 ## 2.4 相談チャットとエージェント設定の確認
 
 Web UI の `相談チャット` では、保存済みエージェントを選んで個別に会話できます。
 送信時は、画面で選択しているエージェント設定が `/api/chats/message` に渡され、バックエンド側で `name`、`org_role`、`persona`、`provider`、`model` を使って回答を生成します。
 
 保存済みエージェントとチャット履歴はローカルJSONとして保存されます。
+
+## 2.5 Coding 画面
+
+Web UI の `Coding` 画面では、VS Code 風の構成でコーディング依頼を管理できます。
+
+- 左: コーディング依頼一覧
+- 中央左: 作業ディレクトリとソースコード一覧
+- 中央右: 依頼内容、対象ファイル、テストコマンド、ソース表示
+- 右: エージェント作業状況、diff / file changes、実行ログ
+
+ソース一覧は `/api/files/tree`、ファイル表示は `/api/files/read` を使います。`node_modules`、`.git`、`.venv` などの重いディレクトリは一覧から除外します。
 
 ```text
 ~/.agent-refinement/agents/<agent_id>.json
@@ -182,11 +214,13 @@ curl -s "http://127.0.0.1:8000/api/providers/lm_studio/models" | jq
 curl -s "http://127.0.0.1:8000/api/providers/ollama/models" | jq
 ```
 
-Teams 画面では、左カラムの保存済みチーム一覧から複数チームを管理できます。保存済みチームは `Built-in` と `Custom` のタブで切り替えられ、組み込みテンプレートと自分で保存したチームを分けて確認できます。チームを選ぶと中央で編成を編集でき、右カラムで更新保存・別名保存・削除できます。保存対象はエージェント一覧、enabled、persona、provider、model、depends_on、workflow_mode、orchestration_mode、rounds です。
+Teams 画面では、左カラムの保存済みチーム一覧から複数チームを管理できます。保存済みチームは `Built-in` と `Custom` のタブで切り替えられ、組み込みテンプレートと自分で保存したチームを分けて確認できます。チームを選ぶと中央で編成を編集でき、右カラムで更新保存・別名保存・削除できます。保存対象はエージェント一覧、enabled、persona、provider、model、depends_on、Research設定、workflow_mode、orchestration_mode、rounds です。
 
 削除できない組み込みチームテンプレートとして、標準フルチーム、軽量ローカルコーディング、Codex実装チーム、設計レビュー、SuperPowers風ワークフローを用意しています。組み込みテンプレートを編集した場合、保存時にはユーザーチームとして複製されます。
 
 各エージェントの `persona` は、実行時プロンプトの「人格・振る舞い指示」としてローカルLLM/CLIに渡されます。チーム内で人格や回答方針を変えたい場合は、Teams または Agent Studio で persona を編集してください。
+
+各エージェントの Research 設定では、ネット検索の許可、必ず確認する技術サイト、最大検索件数、参照URLを回答に残すかを指定できます。`allow_web_search=false` のエージェントには Research Context を渡しません。`allow_web_search=true` かつ `research_sources` がある場合は、登録URLを実行時に取得し、タイトル・抜粋・取得エラーを Research Context としてプロンプト、エージェントログ、サブワークのダウンロードMarkdownに残します。
 
 `custom_cli` を選んだエージェントは、画面上で `command_template` を必ず設定してください。
 

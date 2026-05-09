@@ -27,7 +27,7 @@ DEFAULT_COMMANDS = {
 CODING_COMMANDS = {
     ProviderKind.CODEX_CLI: os.getenv(
         "CODEX_CLI_CODING_CMD",
-        "codex exec -c model_reasoning_effort=high --full-auto {prompt}",
+        "codex exec -c model_reasoning_effort=high --skip-git-repo-check --sandbox workspace-write {prompt}",
     ),
     ProviderKind.CLAUDE_CLI: os.getenv(
         "CLAUDE_CLI_CODING_CMD",
@@ -108,34 +108,67 @@ class CLITemplateProvider:
     command_template: str
     timeout_sec: int = 300
 
+    def _normalize_args(self, args: list[str]) -> list[str]:
+        executable = os.path.basename(args[0]) if args else ""
+        if executable != "codex" or "--full-auto" not in args:
+            return args
+
+        normalized = [arg for arg in args if arg != "--full-auto"]
+        if "--sandbox" not in normalized:
+            prompt_markers = {"{prompt}", "{query}"}
+            insert_at = next(
+                (index for index, arg in enumerate(normalized) if arg in prompt_markers),
+                len(normalized),
+            )
+            normalized[insert_at:insert_at] = ["--sandbox", "workspace-write"]
+        return normalized
+
+    def _stdin_prompt_arg(self, args: list[str]) -> str | None:
+        executable = os.path.basename(args[0]) if args else ""
+        if executable == "codex":
+            return "-"
+        if executable == "gemini":
+            return ""
+        return None
+
     def _build_args(
         self,
         prompt: str,
         model: str | None,
         mcp_config_path: str | None,
         mcp_servers: list[str] | None,
-    ) -> list[str]:
-        args = shlex.split(self.command_template)
+    ) -> tuple[list[str], bool]:
+        args = self._normalize_args(shlex.split(self.command_template))
         servers = mcp_servers or []
         replacements = {
-            "{prompt}": prompt,
-            "{query}": prompt,
             "{model}": model or "",
             "{mcp_config_path}": mcp_config_path or "",
             "{mcp_servers_csv}": ",".join(servers),
             "{mcp_servers_json}": json.dumps(servers, ensure_ascii=False),
         }
         built: list[str] = []
+        stdin_prompt = False
         for token in args:
+            if token in {"{prompt}", "{query}"}:
+                stdin_prompt = True
+                stdin_arg = self._stdin_prompt_arg(args)
+                if stdin_arg is not None:
+                    built.append(stdin_arg)
+                continue
+
             replaced = token
             for key, value in replacements.items():
                 replaced = replaced.replace(key, value)
+            replaced = replaced.replace("{prompt}", prompt).replace("{query}", prompt)
             built.append(replaced)
 
         if all("{prompt}" not in token and "{query}" not in token for token in args):
-            built.append(prompt)
+            if len(prompt) > 16_000:
+                stdin_prompt = True
+            else:
+                built.append(prompt)
 
-        return [arg for arg in built if arg]
+        return [arg for arg in built if arg or arg == ""], stdin_prompt
 
     def generate(
         self,
@@ -146,7 +179,7 @@ class CLITemplateProvider:
         mcp_config_path: str | None = None,
         mcp_servers: list[str] | None = None,
     ) -> str:
-        args = self._build_args(
+        args, stdin_prompt = self._build_args(
             prompt=prompt,
             model=model,
             mcp_config_path=mcp_config_path,
@@ -160,10 +193,15 @@ class CLITemplateProvider:
                 timeout=self.timeout_sec,
                 check=False,
                 cwd=cwd or None,
+                input=prompt if stdin_prompt else None,
             )
         except FileNotFoundError as exc:
             raise ProviderError(
                 f"command not found: {args[0]} (check CLI install and PATH)"
+            ) from exc
+        except OSError as exc:
+            raise ProviderError(
+                f"could not start CLI command: {exc}"
             ) from exc
         except subprocess.TimeoutExpired as exc:
             raise ProviderError(

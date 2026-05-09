@@ -5,6 +5,7 @@ import {
   Bot,
   Play,
   PanelTop,
+  Code2,
   ShieldCheck,
   ScrollText,
   Settings as SettingsIcon,
@@ -17,14 +18,15 @@ import type { ScreenId } from "../types";
 
 const items: { id: ScreenId; label: string; icon: React.ComponentType<{ className?: string }>; order: string }[] = [
   { id: "workspace", label: "Workspace", icon: PanelTop, order: "1" },
-  { id: "dashboard", label: "Runs", icon: LayoutDashboard, order: "2" },
-  { id: "team", label: "Teams", icon: Users, order: "3" },
-  { id: "agents", label: "Agent Studio", icon: Bot, order: "4" },
-  { id: "skills", label: "スキル管理", icon: Library, order: "5" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, order: "6" },
-  { id: "execution", label: "Advanced Run", icon: Play, order: "7" },
-  { id: "logs", label: "Logs", icon: ScrollText, order: "8" },
-  { id: "qa", label: "QA Gate", icon: ShieldCheck, order: "9" },
+  { id: "coding", label: "Coding", icon: Code2, order: "2" },
+  { id: "dashboard", label: "Runs", icon: LayoutDashboard, order: "3" },
+  { id: "team", label: "Teams", icon: Users, order: "4" },
+  { id: "agents", label: "Agent Studio", icon: Bot, order: "5" },
+  { id: "skills", label: "スキル管理", icon: Library, order: "6" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, order: "7" },
+  { id: "execution", label: "Advanced Run", icon: Play, order: "8" },
+  { id: "logs", label: "Logs", icon: ScrollText, order: "9" },
+  { id: "qa", label: "QA Gate", icon: ShieldCheck, order: "10" },
   { id: "chat", label: "相談チャット", icon: MessageSquareMore, order: "0" },
 ];
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from app.models import RefineRequest
+from app.models import AgentConfig, CodeContext, OrchestrationMode, ProviderKind, RefineRequest, WorkflowMode
 from app.orchestrator import iter_refinement_events, run_refinement
 
 
@@ -35,6 +35,72 @@ def _cmd_run(args: argparse.Namespace) -> int:
         request = _read_request(config_path)
     except (json.JSONDecodeError, ValidationError) as exc:
         print(f"[ERROR] invalid config: {exc}", file=sys.stderr)
+        return 2
+
+    if args.stream:
+        final_result: dict | None = None
+        for event in iter_refinement_events(request):
+            print(json.dumps(event, ensure_ascii=False))
+            if event.get("type") == "run_completed":
+                payload = event.get("result")
+                if isinstance(payload, dict):
+                    final_result = payload
+        if args.output and final_result is not None:
+            _write_json(Path(args.output).expanduser(), final_result)
+        return 0
+
+    result = run_refinement(request).model_dump(mode="json")
+    if args.output:
+        _write_json(Path(args.output).expanduser(), result)
+
+    if args.pretty:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps(result, ensure_ascii=False))
+    return 0
+
+
+def _cmd_code(args: argparse.Namespace) -> int:
+    targets = args.target or []
+    agent = AgentConfig(
+        id=args.agent_id,
+        name=args.agent_name,
+        org_role="worker",
+        provider=ProviderKind(args.provider),
+        persona=(
+            "コーディング担当。対象範囲を絞り、必要最小限の変更、確認方法、"
+            "リスクを明確にする。"
+        ),
+        skills=["coding", "minimal-diff"],
+        depends_on=[],
+        command_template=args.command_template,
+        model=args.model,
+        mcp_enabled=False,
+        mcp_servers=[],
+        mcp_instruction="",
+        mcp_timeout_sec=60,
+        is_custom=True,
+    )
+    try:
+        request = RefineRequest(
+            workflow_mode=WorkflowMode.CODING,
+            orchestration_mode=OrchestrationMode.SEQUENTIAL,
+            source_text=args.request,
+            objective=args.objective,
+            global_instruction=args.instruction,
+            code_context=CodeContext(
+                repository="",
+                working_directory=str(Path(args.workdir).expanduser()),
+                target_paths=targets,
+                tech_stack=args.tech_stack,
+                acceptance_criteria=args.acceptance_criteria,
+                test_command=args.test_command,
+            ),
+            rounds=args.rounds,
+            agents=[agent],
+        )
+    except (ValueError, ValidationError) as exc:
+        print(f"[ERROR] invalid coding request: {exc}", file=sys.stderr)
         return 2
 
     if args.stream:
@@ -167,6 +233,79 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write final result JSON to file",
     )
     run_parser.set_defaults(func=_cmd_run)
+
+    code_parser = subparsers.add_parser(
+        "code", help="Run a minimal coding workflow from CLI flags"
+    )
+    code_parser.add_argument(
+        "--workdir",
+        required=True,
+        help="Repository or working directory for the coding run",
+    )
+    code_parser.add_argument(
+        "--request",
+        required=True,
+        help="Coding request text",
+    )
+    code_parser.add_argument(
+        "--target",
+        action="append",
+        help="Target file or path. Repeat for multiple paths.",
+    )
+    code_parser.add_argument(
+        "--test-command",
+        default="",
+        help="Command the coding agent should use for verification",
+    )
+    code_parser.add_argument(
+        "--tech-stack",
+        default="",
+        help="Short tech stack note",
+    )
+    code_parser.add_argument(
+        "--acceptance-criteria",
+        default="",
+        help="Completion criteria for the coding run",
+    )
+    code_parser.add_argument(
+        "--objective",
+        default="コードの問題を調査して、必要最小限の修正案または変更を出す。",
+        help="Objective passed to the coding workflow",
+    )
+    code_parser.add_argument(
+        "--instruction",
+        default="対象範囲外のリファクタは避け、変更理由と確認方法を簡潔に示す。",
+        help="Global instruction passed to the coding workflow",
+    )
+    code_parser.add_argument(
+        "--provider",
+        default="codex_cli",
+        choices=[provider.value for provider in ProviderKind],
+        help="Provider used by the coding agent",
+    )
+    code_parser.add_argument("--model", help="Optional provider model")
+    code_parser.add_argument(
+        "--command-template",
+        help="Custom CLI command template. Required when provider is custom_cli.",
+    )
+    code_parser.add_argument("--agent-id", default="cli_coder")
+    code_parser.add_argument("--agent-name", default="CLI Coder")
+    code_parser.add_argument("--rounds", type=int, default=1)
+    code_parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Print streaming events as JSONL",
+    )
+    code_parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print final JSON response",
+    )
+    code_parser.add_argument(
+        "--output",
+        help="Write final result JSON to file",
+    )
+    code_parser.set_defaults(func=_cmd_code)
 
     sample_parser = subparsers.add_parser(
         "sample-config", help="Create a sample request JSON"
