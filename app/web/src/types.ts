@@ -13,8 +13,10 @@ export type ProviderKind =
   | "gemini_cli"
   | "claude_cli"
   | "codex_cli"
+  | "android_cli"
   | "openai_api"
   | "anthropic_api"
+  | "deepseek_api"
   | "ollama"
   | "lm_studio"
   | "custom_cli";
@@ -57,6 +59,42 @@ export interface CodeContext {
   test_command: string;
 }
 
+export interface GitStatusResponse {
+  repo_root: string;
+  current_branch: string;
+  base_commit: string;
+  dirty: boolean;
+  changed_files: string[];
+  untracked_files: string[];
+}
+
+export interface CodingWorktreeState {
+  request_id: string;
+  repo_root: string;
+  source_working_directory: string;
+  worktree_path: string;
+  base_branch: string;
+  base_commit: string;
+  ai_branch: string;
+  user_dirty: boolean;
+  user_patch_applied: boolean;
+  user_changed_files: string[];
+  user_untracked_files: string[];
+  status: "prepared" | "running" | "completed" | "conflict" | "merged" | "discarded";
+}
+
+export type KnowledgeKind = "markdown" | "text" | "image" | "figma" | "mcp" | "link" | "note";
+
+export interface KnowledgeResource {
+  id: string;
+  title: string;
+  kind: KnowledgeKind;
+  content: string;
+  source: string;
+  content_type: string;
+  tags: string[];
+}
+
 export interface RefineRequest {
   workflow_mode: WorkflowMode;
   orchestration_mode: OrchestrationMode;
@@ -64,6 +102,7 @@ export interface RefineRequest {
   objective: string;
   global_instruction: string;
   code_context: CodeContext;
+  knowledge_context: KnowledgeResource[];
   rounds: number;
   agents: AgentConfig[];
 }
@@ -85,6 +124,7 @@ export interface WorkspaceVersion {
   agent_turns?: TurnResult[];
   stream_events?: StreamEvent[];
   flow_json?: SubworkFlowJson;
+  version_control?: CodingWorktreeState;
   run_started_at?: string;
   run_ended_at?: string;
 }
@@ -154,6 +194,7 @@ export interface ManagedRequest {
   error?: string;
   agent_turns?: TurnResult[];
   stream_events?: StreamEvent[];
+  version_control?: CodingWorktreeState;
   run_started_at?: string;
   run_ended_at?: string;
   verification_feedback?: VerificationFeedback[];
@@ -167,9 +208,12 @@ export interface VerificationFeedback {
 }
 
 export interface ChatAttachment {
-  kind: "request" | "logs" | "error" | "context";
+  kind: "request" | "logs" | "error" | "context" | "image";
   title: string;
   content: string;
+  content_type?: string;
+  description?: string;
+  size?: number;
 }
 
 export interface ChatSource {
@@ -333,6 +377,7 @@ export type ScreenId =
   | "team"
   | "agents"
   | "skills"
+  | "knowledge"
   | "execution"
   | "qa"
   | "logs"
@@ -406,4 +451,14 @@ export interface CandidateBatch {
   id: string;
   directory: string;
   skills: SkillDocument[];
+}
+
+export interface ExternalSkillImportError {
+  url: string;
+  message: string;
+}
+
+export interface ExternalSkillImportResult {
+  documents: SkillDocument[];
+  errors: ExternalSkillImportError[];
 }

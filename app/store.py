@@ -14,6 +14,14 @@ class FileStore:
         self._base = base_dir or Path.home() / ".agent-refinement"
 
     @property
+    def base_dir(self) -> Path:
+        return self._base
+
+    @property
+    def worktrees_dir(self) -> Path:
+        return self._base / "worktrees"
+
+    @property
     def _agents_dir(self) -> Path:
         return self._base / "agents"
 
@@ -36,6 +44,10 @@ class FileStore:
     @property
     def _workflows_dir(self) -> Path:
         return self._base / "workflows"
+
+    @property
+    def _knowledge_dir(self) -> Path:
+        return self._base / "knowledge"
 
     def save_agent(self, data: dict[str, Any]) -> None:
         self._save(self._agents_dir, data["id"], data)
@@ -99,6 +111,18 @@ class FileStore:
 
     def delete_workflow(self, workflow_id: str) -> None:
         self._delete(self._workflows_dir, workflow_id)
+
+    def save_knowledge(self, data: dict[str, Any]) -> None:
+        self._save(self._knowledge_dir, data["id"], data)
+
+    def load_knowledge(self) -> list[dict[str, Any]]:
+        return self._load_all(self._knowledge_dir)
+
+    def load_knowledge_item(self, knowledge_id: str) -> dict[str, Any] | None:
+        return self._load_one(self._knowledge_dir, knowledge_id)
+
+    def delete_knowledge(self, knowledge_id: str) -> None:
+        self._delete(self._knowledge_dir, knowledge_id)
 
     def _save(self, directory: Path, record_id: str, data: dict[str, Any]) -> None:
         directory.mkdir(parents=True, exist_ok=True)

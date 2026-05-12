@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
   ChevronRight,
@@ -6,6 +6,7 @@ import {
   FileCode2,
   Folder,
   FolderOpen,
+  Image as ImageIcon,
   ListChecks,
   Loader2,
   MessageSquareMore,
@@ -13,9 +14,11 @@ import {
   RefreshCcw,
   Send,
   Square,
+  X,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
+import { KnowledgePicker } from "../components/KnowledgePicker";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { api } from "../api/client";
 import { PROVIDER_LABEL, ROLE_LABEL, formatDuration } from "../lib/format";
@@ -24,6 +27,7 @@ import type {
   AgentConfig,
   ChatAttachment,
   ChatSession,
+  CodingWorktreeState,
   ManagedRequest,
   ManagedRequestStatus,
   RefineRequest,
@@ -97,6 +101,7 @@ const createCodingRequest = (base?: Partial<RefineRequest>): RefineRequest => ({
     acceptance_criteria: base?.code_context?.acceptance_criteria ?? "",
     test_command: base?.code_context?.test_command ?? "",
   },
+  knowledge_context: base?.knowledge_context ?? [],
   agents: base?.agents?.length ? base.agents : [defaultCodingAgent()],
 });
 
@@ -122,10 +127,12 @@ export function Coding() {
   const [sourceError, setSourceError] = useState("");
   const [resultTab, setResultTab] = useState<ResultTab>("agents");
   const [saveMessage, setSaveMessage] = useState("");
+  const [versionMessage, setVersionMessage] = useState("");
   const [selectedTeamTemplateId, setSelectedTeamTemplateId] = useState("");
   const [featureRequest, setFeatureRequest] = useState("");
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [chatMessage, setChatMessage] = useState("");
+  const [chatImageAttachments, setChatImageAttachments] = useState<ChatAttachment[]>([]);
   const [chatStatus, setChatStatus] = useState("");
   const [chatSending, setChatSending] = useState(false);
   const [layout, setLayout] = useState({
@@ -149,6 +156,7 @@ export function Coding() {
   const displayedDiff = run.fileChanges || run.diff || selectedRecord?.file_changes || selectedRecord?.diff || "";
   const displayedFinal = run.finalText || selectedRecord?.final_text || "";
   const displayedError = run.error || selectedRecord?.error || "";
+  const displayedVersionControl = selectedRecord?.version_control;
   const completedTurnCount = displayedEvents.filter((event) => event.type === "turn_completed").length;
   const runStartedEvent = displayedEvents.find((event) => event.type === "run_started");
   const totalTurnCount = runStartedEvent?.total_turns ?? Math.max(1, enabledAgentsCount(draft.agents) * (draft.rounds || 1));
@@ -306,10 +314,12 @@ export function Coding() {
     requestValue: RefineRequest,
     status: ManagedRequestStatus,
     currentRun = useApp.getState().run,
+    recordId = activeId,
+    versionControl?: CodingWorktreeState,
   ): ManagedRequest => {
-    const existing = activeId ? managedRequests.find((item) => item.id === activeId) : undefined;
+    const existing = recordId ? managedRequests.find((item) => item.id === recordId) : undefined;
     const now = nowIso();
-    const id = existing?.id ?? activeId ?? makeId();
+    const id = existing?.id ?? recordId ?? makeId();
     const recordTitle =
       title.trim() ||
       requestValue.source_text.trim().split("\n")[0]?.slice(0, 60) ||
@@ -322,6 +332,7 @@ export function Coding() {
             createdAt: now,
             requestValue,
             currentRun,
+            versionControl,
           })
         : undefined;
     const versions =
@@ -346,6 +357,7 @@ export function Coding() {
       file_changes: currentRun.fileChanges ?? existing?.file_changes,
       agent_turns: currentRun.turns.length > 0 ? currentRun.turns : existing?.agent_turns,
       stream_events: currentRun.events.length > 0 ? currentRun.events : existing?.stream_events,
+      version_control: versionControl ?? existing?.version_control,
       run_started_at: currentRun.startedAt ? new Date(currentRun.startedAt).toISOString() : existing?.run_started_at,
       run_ended_at: currentRun.endedAt ? new Date(currentRun.endedAt).toISOString() : existing?.run_ended_at,
       error: currentRun.error ?? existing?.error,
@@ -360,57 +372,121 @@ export function Coding() {
     setSaveMessage("コーディング依頼を保存しました。");
   };
 
+  const prepareRequestForRun = async (
+    requestValue: RefineRequest,
+    recordId: string,
+  ): Promise<{ requestValue: RefineRequest; versionControl?: CodingWorktreeState }> => {
+    const baseWorkingDirectory =
+      selectedRecord?.version_control?.source_working_directory ||
+      requestValue.code_context.repository ||
+      requestValue.code_context.working_directory;
+    if (!baseWorkingDirectory.trim()) {
+      return { requestValue };
+    }
+    const versionControl = await api.prepareCodingWorktree({
+      request_id: `${recordId}-${Date.now().toString(36)}`,
+      working_directory: baseWorkingDirectory,
+    });
+    const preparedRequest = createCodingRequest({
+      ...requestValue,
+      code_context: {
+        ...requestValue.code_context,
+        repository: versionControl.source_working_directory,
+        working_directory: versionControl.worktree_path,
+      },
+    });
+    setDraft(preparedRequest);
+    const tree = await api.listSourceTree(versionControl.worktree_path);
+    setTreeByPath((current) => ({ ...current, [tree.path]: tree.children }));
+    setOpenDirs((current) => new Set([...current, tree.path]));
+    setVersionMessage(
+      versionControl.user_dirty
+        ? versionControl.user_patch_applied
+          ? "ユーザ変更を検出し、AI用worktreeへ反映しました。"
+          : "ユーザ変更を検出しました。未追跡ファイルはAI用worktreeへ自動反映されません。"
+        : "AI用worktreeを準備しました。",
+    );
+    return { requestValue: preparedRequest, versionControl };
+  };
+
   const runCoding = async () => {
-    const requestValue = createCodingRequest(draft);
-    updateRequest(requestValue);
-    const running = await saveManagedRequest(buildRecord(requestValue, "running"));
-    setActiveId(running.id);
-    setTitle(running.title);
-    setResultTab("agents");
-    await startRun();
-    const latestRun = useApp.getState().run;
-    const finalStatus: ManagedRequestStatus =
-      latestRun.status === "completed" ? "completed" : latestRun.status === "failed" ? "paused" : "running";
-    await saveManagedRequest(buildRecord(requestValue, finalStatus, latestRun));
-    setSaveMessage(latestRun.status === "completed" ? "実行が完了しました。" : "実行結果を保存しました。");
+    try {
+      const recordId = activeId ?? makeId();
+      setActiveId(recordId);
+      const prepared = await prepareRequestForRun(createCodingRequest(draft), recordId);
+      const requestValue = prepared.requestValue;
+      updateRequest(requestValue);
+      const running = await saveManagedRequest(
+        buildRecord(requestValue, "running", useApp.getState().run, recordId, prepared.versionControl),
+      );
+      setActiveId(running.id);
+      setTitle(running.title);
+      setResultTab("agents");
+      await startRun();
+      const latestRun = useApp.getState().run;
+      const finalStatus: ManagedRequestStatus =
+        latestRun.status === "completed" ? "completed" : latestRun.status === "failed" ? "paused" : "running";
+      await saveManagedRequest(
+        buildRecord(requestValue, finalStatus, latestRun, recordId, prepared.versionControl),
+      );
+      setSaveMessage(latestRun.status === "completed" ? "実行が完了しました。" : "実行結果を保存しました。");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSaveMessage(message);
+      setVersionMessage("AI用worktreeの準備に失敗しました。");
+    }
   };
 
   const runFeatureAddition = async () => {
-    const addition = featureRequest.trim();
-    if (!addition) {
-      setSaveMessage("追加したい機能を書いてください。");
-      return;
+    try {
+      const addition = featureRequest.trim();
+      if (!addition) {
+        setSaveMessage("追加したい機能を書いてください。");
+        return;
+      }
+      const previousSummary = selectedRecord?.final_text || selectedRecord?.request.source_text || draft.source_text;
+      const recordId = activeId ?? makeId();
+      setActiveId(recordId);
+      const requestBeforeWorktree = createCodingRequest({
+        ...draft,
+        source_text: [
+          "既存の実装を前提に、次の機能追加を行ってください。",
+          "",
+          "## 追加したい機能",
+          addition,
+          "",
+          "## 元の依頼",
+          truncateText(selectedRecord?.original_request?.source_text || draft.source_text, 1600),
+          "",
+          "## 直近の結果メモ",
+          truncateText(previousSummary, 1600),
+        ].join("\n"),
+        objective: "既存コードに対して、指定された追加機能を必要最小限の差分で実装する。",
+      });
+      const prepared = await prepareRequestForRun(requestBeforeWorktree, recordId);
+      const requestValue = prepared.requestValue;
+      setDraft(requestValue);
+      updateRequest(requestValue);
+      const running = await saveManagedRequest(
+        buildRecord(requestValue, "running", useApp.getState().run, recordId, prepared.versionControl),
+      );
+      setActiveId(running.id);
+      setTitle(running.title);
+      setResultTab("agents");
+      await startRun();
+      const latestRun = useApp.getState().run;
+      const finalStatus: ManagedRequestStatus =
+        latestRun.status === "completed" ? "completed" : latestRun.status === "failed" ? "paused" : "running";
+      await saveManagedRequest(
+        buildRecord(requestValue, finalStatus, latestRun, recordId, prepared.versionControl),
+      );
+      setFeatureRequest("");
+      setSaveMessage(latestRun.status === "completed" ? "追加機能の実行が完了しました。" : "追加機能の実行結果を保存しました。");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSaveMessage(message);
+      setVersionMessage("追加機能用worktreeの準備に失敗しました。");
     }
-    const previousSummary = selectedRecord?.final_text || selectedRecord?.request.source_text || draft.source_text;
-    const requestValue = createCodingRequest({
-      ...draft,
-      source_text: [
-        "既存の実装を前提に、次の機能追加を行ってください。",
-        "",
-        "## 追加したい機能",
-        addition,
-        "",
-        "## 元の依頼",
-        truncateText(selectedRecord?.original_request?.source_text || draft.source_text, 1600),
-        "",
-        "## 直近の結果メモ",
-        truncateText(previousSummary, 1600),
-      ].join("\n"),
-      objective: "既存コードに対して、指定された追加機能を必要最小限の差分で実装する。",
-    });
-    setDraft(requestValue);
-    updateRequest(requestValue);
-    const running = await saveManagedRequest(buildRecord(requestValue, "running"));
-    setActiveId(running.id);
-    setTitle(running.title);
-    setResultTab("agents");
-    await startRun();
-    const latestRun = useApp.getState().run;
-    const finalStatus: ManagedRequestStatus =
-      latestRun.status === "completed" ? "completed" : latestRun.status === "failed" ? "paused" : "running";
-    await saveManagedRequest(buildRecord(requestValue, finalStatus, latestRun));
-    setFeatureRequest("");
-    setSaveMessage(latestRun.status === "completed" ? "追加機能の実行が完了しました。" : "追加機能の実行結果を保存しました。");
   };
 
   const removeActive = async () => {
@@ -438,10 +514,11 @@ export function Coding() {
           error: displayedError,
           sourcePath,
           sourceText,
-        }),
+        }).concat(chatImageAttachments),
       });
       setChatSessions((items) => [session, ...items.filter((item) => item.id !== session.id)]);
       setChatMessage("");
+      setChatImageAttachments([]);
       setChatStatus("CEOから回答がありました。");
       setResultTab("chat");
     } catch (error) {
@@ -571,6 +648,9 @@ export function Coding() {
               <div className="mt-2 rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300">
                 {sourceError}
               </div>
+            )}
+            {(displayedVersionControl || versionMessage) && (
+              <VersionControlSummary state={displayedVersionControl} message={versionMessage} />
             )}
           </div>
           <div className="flex-1 overflow-y-auto p-2">
@@ -712,6 +792,12 @@ export function Coding() {
                   <RefreshCcw className="h-4 w-4" />
                 </Button>
               </div>
+              <div className="mt-3">
+                <KnowledgePicker
+                  selected={draft.knowledge_context ?? []}
+                  onChange={(knowledge_context) => updateDraft({ knowledge_context })}
+                />
+              </div>
               <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div>
@@ -844,7 +930,10 @@ export function Coding() {
               message={chatMessage}
               status={chatStatus}
               sending={chatSending}
+              imageAttachments={chatImageAttachments}
               onMessageChange={setChatMessage}
+              onImageAttachmentsChange={setChatImageAttachments}
+              onStatusChange={setChatStatus}
               onSend={() => void sendCEOChat()}
             />
           )}
@@ -916,6 +1005,37 @@ function SourceTree({
           onOpenFile={onOpenFile}
         />
       ))}
+    </div>
+  );
+}
+
+function VersionControlSummary({
+  state,
+  message,
+}: {
+  state?: CodingWorktreeState;
+  message: string;
+}) {
+  return (
+    <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-[11px] text-[var(--color-fg-muted)]">
+      <div className="mb-1 font-semibold text-[var(--color-fg)]">Git / worktree</div>
+      {message && <div className="mb-1 text-sky-200">{message}</div>}
+      {state ? (
+        <div className="space-y-1">
+          <div className="truncate">元repo: {state.source_working_directory}</div>
+          <div className="truncate">AI作業: {state.worktree_path}</div>
+          <div className="truncate">branch: {state.ai_branch}</div>
+          <div className="truncate">base: {state.base_branch} / {state.base_commit.slice(0, 10)}</div>
+          {state.user_dirty && (
+            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-1 text-amber-200">
+              ユーザ変更 {state.user_changed_files.length}件
+              {state.user_untracked_files.length ? ` / 未追跡 ${state.user_untracked_files.length}件` : ""}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>実行時に元repoからAI専用worktreeを作成します。</div>
+      )}
     </div>
   );
 }
@@ -1129,7 +1249,10 @@ function CodingCEOChat({
   message,
   status,
   sending,
+  imageAttachments,
   onMessageChange,
+  onImageAttachmentsChange,
+  onStatusChange,
   onSend,
 }: {
   agent?: AgentConfig;
@@ -1137,7 +1260,10 @@ function CodingCEOChat({
   message: string;
   status: string;
   sending: boolean;
+  imageAttachments: ChatAttachment[];
   onMessageChange: (value: string) => void;
+  onImageAttachmentsChange: Dispatch<SetStateAction<ChatAttachment[]>>;
+  onStatusChange: (value: string) => void;
   onSend: () => void;
 }) {
   if (!agent) {
@@ -1188,6 +1314,19 @@ function CodingCEOChat({
             <pre className="max-h-72 overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg)]">
               {item.content}
             </pre>
+            {item.attachments && item.attachments.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1 border-t border-[var(--color-border)] pt-2">
+                {item.attachments.map((attachment, index) => (
+                  <span
+                    key={`${item.id}-${attachment.title}-${index}`}
+                    className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] text-[var(--color-fg-muted)]"
+                  >
+                    <ImageIcon className="h-3 w-3" />
+                    {attachment.title}
+                  </span>
+                ))}
+              </div>
+            )}
             {item.error && (
               <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
                 {item.error}
@@ -1204,10 +1343,69 @@ function CodingCEOChat({
           value={message}
           placeholder="CEOに相談したいことを書いてください。例: この追加機能はどう切るべき？ / 先に直すべき問題は？"
           onChange={(event) => onMessageChange(event.target.value)}
+          onPaste={(event) => {
+            const files = Array.from(event.clipboardData.files).filter((file) =>
+              file.type.startsWith("image/"),
+            );
+            if (files.length) {
+              event.preventDefault();
+              void addChatImageFiles(files, onImageAttachmentsChange, onStatusChange);
+            }
+          }}
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key === "Enter") onSend();
           }}
         />
+        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-fg)]">
+              <ImageIcon className="h-4 w-4" />
+              画像を添付
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  const files = Array.from(event.target.files ?? []);
+                  event.target.value = "";
+                  void addChatImageFiles(files, onImageAttachmentsChange, onStatusChange);
+                }}
+              />
+            </label>
+            <div className="text-[11px] text-[var(--color-fg-subtle)]">貼り付けでも追加できます。</div>
+          </div>
+          {imageAttachments.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {imageAttachments.map((attachment, index) => (
+                <div
+                  key={`${attachment.title}-${index}`}
+                  className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs"
+                >
+                  {attachment.content.startsWith("data:image/") ? (
+                    <img
+                      src={attachment.content}
+                      alt={attachment.title}
+                      className="h-8 w-8 rounded border border-[var(--color-border)] object-cover"
+                    />
+                  ) : (
+                    <ImageIcon className="h-4 w-4 text-[var(--color-fg-muted)]" />
+                  )}
+                  <span className="max-w-36 truncate">{attachment.title}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onImageAttachmentsChange((items) => items.filter((_, i) => i !== index))
+                    }
+                    className="rounded p-0.5 text-[var(--color-fg-muted)] hover:bg-red-500/20 hover:text-red-300"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 text-xs text-[var(--color-fg-muted)]">{status}</div>
           <Button disabled={!message.trim() || sending} onClick={onSend}>
@@ -1337,16 +1535,53 @@ function buildCodingChatAttachments({
   return attachments.slice(0, 6);
 }
 
+async function addChatImageFiles(
+  files: File[],
+  setAttachments: Dispatch<SetStateAction<ChatAttachment[]>>,
+  setStatus: (status: string) => void,
+) {
+  const imageFiles = files.filter((file) => file.type.startsWith("image/")).slice(0, 4);
+  if (!imageFiles.length) return;
+  const tooLarge = imageFiles.find((file) => file.size > 2 * 1024 * 1024);
+  if (tooLarge) {
+    setStatus(`${tooLarge.name} は 2MB を超えるため添付できません。`);
+    return;
+  }
+  const attachments = await Promise.all(
+    imageFiles.map(
+      (file) =>
+        new Promise<ChatAttachment>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () =>
+            resolve({
+              kind: "image",
+              title: file.name || "pasted-image",
+              content: String(reader.result ?? ""),
+              content_type: file.type || "image/png",
+              description: "ユーザーがCEOチャットへ添付した画像です。",
+              size: file.size,
+            });
+          reader.onerror = () => reject(reader.error ?? new Error("画像を読み込めませんでした。"));
+          reader.readAsDataURL(file);
+        }),
+    ),
+  );
+  setAttachments((items) => [...items, ...attachments].slice(0, 6));
+  setStatus(`${attachments.length} 件の画像を添付しました。`);
+}
+
 const buildCodingVersion = ({
   versionNo,
   createdAt,
   requestValue,
   currentRun,
+  versionControl,
 }: {
   versionNo: number;
   createdAt: string;
   requestValue: RefineRequest;
   currentRun: CodingRunSnapshot;
+  versionControl?: CodingWorktreeState;
 }): WorkspaceVersion => {
   const title = `実行 ${versionNo} · ${new Date(createdAt).toLocaleString("ja-JP")}`;
   return {
@@ -1361,6 +1596,7 @@ const buildCodingVersion = ({
     error: currentRun.error,
     agent_turns: currentRun.turns.length > 0 ? currentRun.turns : undefined,
     stream_events: currentRun.events.length > 0 ? currentRun.events : undefined,
+    version_control: versionControl,
     run_started_at: currentRun.startedAt ? new Date(currentRun.startedAt).toISOString() : undefined,
     run_ended_at: currentRun.endedAt ? new Date(currentRun.endedAt).toISOString() : undefined,
   };

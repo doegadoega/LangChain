@@ -437,11 +437,13 @@ function AgentEditor({
               rows={3}
             />
           </div>
-          {agent.provider === "custom_cli" && (
+          {(agent.provider === "custom_cli" || agent.provider === "android_cli") && (
             <div className="col-span-2">
-              <Label>command_template (custom_cli 必須)</Label>
+              <Label>
+                command_template {agent.provider === "custom_cli" ? "(custom_cli 必須)" : "(Android CLI の上書き)"}
+              </Label>
               <Input
-                placeholder="my-cli --prompt {prompt}"
+                placeholder={agent.provider === "android_cli" ? "android-cli {prompt}" : "my-cli --prompt {prompt}"}
                 value={agent.command_template ?? ""}
                 onChange={(e) => onChange({ command_template: e.target.value })}
               />

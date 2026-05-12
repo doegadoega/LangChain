@@ -6,6 +6,7 @@ import app.providers as providers
 from app.models import ProviderKind
 from app.providers import (
     CLITemplateProvider,
+    DeepSeekAPIProvider,
     LMStudioProvider,
     OllamaProvider,
     resolve_provider,
@@ -28,6 +29,77 @@ def test_resolve_provider_supports_lm_studio():
     )
 
     assert isinstance(provider, LMStudioProvider)
+
+
+def test_resolve_provider_supports_deepseek_api():
+    provider = resolve_provider(
+        provider_kind=ProviderKind.DEEPSEEK_API,
+        command_template=None,
+    )
+
+    assert isinstance(provider, DeepSeekAPIProvider)
+
+
+def test_resolve_provider_supports_android_cli(monkeypatch):
+    monkeypatch.setenv("ANDROID_CLI_CMD", "android-cli run {prompt}")
+    provider = resolve_provider(
+        provider_kind=ProviderKind.ANDROID_CLI,
+        command_template=None,
+    )
+
+    assert isinstance(provider, CLITemplateProvider)
+    assert provider.command_template == "android-cli run {prompt}"
+
+
+def test_resolve_provider_supports_android_cli_coding_command(monkeypatch):
+    monkeypatch.setenv("ANDROID_CLI_CMD", "android-cli ask {prompt}")
+    monkeypatch.setenv("ANDROID_CLI_CODING_CMD", "android-cli code --write {prompt}")
+    provider = resolve_provider(
+        provider_kind=ProviderKind.ANDROID_CLI,
+        command_template=None,
+        coding_mode=True,
+    )
+
+    assert isinstance(provider, CLITemplateProvider)
+    assert provider.command_template == "android-cli code --write {prompt}"
+
+
+def test_deepseek_provider_posts_openai_compatible_payload(monkeypatch):
+    calls: list[tuple[str, dict[str, object], int, dict[str, str] | None]] = []
+
+    def fake_post_json(
+        url: str,
+        payload: dict[str, object],
+        *,
+        timeout_sec: int,
+        headers: dict[str, str] | None = None,
+    ):
+        calls.append((url, payload, timeout_sec, headers))
+        return {"choices": [{"message": {"content": " deepseek answer "}}]}
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setattr(providers, "_post_json", fake_post_json)
+
+    result = DeepSeekAPIProvider(base_url="https://deepseek.local").generate(
+        prompt="hello",
+        model="deepseek-v4-flash",
+    )
+
+    assert result == "deepseek answer"
+    assert calls == [
+        (
+            "https://deepseek.local/chat/completions",
+            {
+                "model": "deepseek-v4-flash",
+                "messages": [{"role": "user", "content": "hello"}],
+                "temperature": 0.2,
+                "stream": False,
+                "thinking": {"type": "disabled"},
+            },
+            300,
+            {"Authorization": "Bearer test-key"},
+        )
+    ]
 
 
 def test_ollama_provider_posts_chat_payload(monkeypatch):
@@ -155,4 +227,3 @@ def test_gemini_cli_provider_sends_prompt_via_stdin_with_empty_prompt_arg(monkey
     assert result == "done"
     assert calls[0]["args"] == ["gemini", "-p", ""]
     assert calls[0]["input"] == prompt
-

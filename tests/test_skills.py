@@ -136,6 +136,38 @@ def test_import_local_directory_creates_candidates(tmp_path):
     assert store.load_installed_skills() == []
 
 
+def test_discover_directory_skills_lists_without_importing(tmp_path):
+    store = SkillStore(base_directory=tmp_path / "store")
+    installed = tmp_path / "codex" / "skills" / "swift"
+    installed.mkdir(parents=True)
+    (installed / "SKILL.md").write_text(
+        "---\nid: swift-style\nname: Swift Style\nversion: 1.0.0\n---\nbody\n",
+        encoding="utf-8",
+    )
+
+    documents = store.discover_directory_skills(tmp_path / "codex" / "skills")
+
+    assert [doc.metadata.id for doc in documents] == ["swift-style"]
+    assert store.load_candidates() == []
+    assert store.load_installed_skills() == []
+
+
+def test_discover_directory_skills_derives_id_for_codex_style_skill(tmp_path):
+    store = SkillStore(base_directory=tmp_path / "store")
+    installed = tmp_path / "codex" / "skills" / "swift-agents"
+    installed.mkdir(parents=True)
+    (installed / "SKILL.md").write_text(
+        "---\nname: Swift Agents\ndescription: Swift guidance\n---\nbody\n",
+        encoding="utf-8",
+    )
+
+    documents = store.discover_directory_skills(tmp_path / "codex" / "skills")
+
+    assert documents[0].metadata.id == "swift-agents"
+    assert documents[0].metadata.name == "Swift Agents"
+    assert documents[0].metadata.version == "0.0.0"
+
+
 def test_approve_candidate_moves_to_library(tmp_path):
     store = SkillStore(base_directory=tmp_path)
     external = tmp_path / "external" / "api-design"
@@ -303,6 +335,24 @@ def test_api_install_list_and_delete(api_client):
     assert client.get("/api/skills").json() == []
 
 
+def test_api_list_local_installed_skills(api_client, tmp_path):
+    client, _store = api_client
+    installed = tmp_path / "codex" / "skills" / "swift"
+    installed.mkdir(parents=True)
+    (installed / "SKILL.md").write_text(
+        "---\nid: swift-style\nname: Swift Style\nversion: 1.0.0\n---\nbody\n",
+        encoding="utf-8",
+    )
+
+    resp = client.get(
+        "/api/skills/installed-local",
+        params={"path": str(tmp_path / "codex" / "skills")},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()[0]["metadata"]["id"] == "swift-style"
+
+
 def test_api_candidate_flow(api_client, tmp_path):
     client, _store = api_client
     external = tmp_path / "external" / "api-design"
@@ -357,3 +407,43 @@ def test_api_import_external_url_as_candidate(api_client, monkeypatch):
 
     batches = client.get("/api/skills/candidates").json()
     assert batches and batches[0]["skills"][0]["metadata"]["id"] == "external-skill"
+
+
+def test_api_import_external_urls_as_candidates_with_partial_errors(api_client, monkeypatch):
+    client, _store = api_client
+
+    def fake_fetch(url: str) -> str:
+        if url == "https://example.com/one/SKILL.md":
+            return "---\nid: skill-one\nname: Skill One\nversion: 1.0.0\n---\none\n"
+        if url == "https://example.com/two/SKILL.md":
+            return "---\nid: skill-two\nname: Skill Two\nversion: 1.0.0\n---\ntwo\n"
+        raise ValueError("not a skill")
+
+    monkeypatch.setattr("app.main._fetch_external_skill_markdown", fake_fetch)
+    resp = client.post(
+        "/api/skills/candidates/import-urls",
+        json={
+            "urls": [
+                "https://example.com/one/SKILL.md",
+                "https://example.com/missing/SKILL.md",
+                "https://example.com/two/SKILL.md",
+            ]
+        },
+    )
+    assert resp.status_code == 201
+    payload = resp.json()
+    assert [doc["metadata"]["id"] for doc in payload["documents"]] == [
+        "skill-one",
+        "skill-two",
+    ]
+    assert payload["errors"] == [
+        {"url": "https://example.com/missing/SKILL.md", "message": "not a skill"}
+    ]
+
+    batches = client.get("/api/skills/candidates").json()
+    candidate_ids = {
+        skill["metadata"]["id"]
+        for batch in batches
+        for skill in batch["skills"]
+    }
+    assert {"skill-one", "skill-two"}.issubset(candidate_ids)

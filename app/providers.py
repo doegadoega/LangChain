@@ -22,6 +22,7 @@ DEFAULT_COMMANDS = {
         "CODEX_CLI_CMD",
         "codex exec -c model_reasoning_effort=high --skip-git-repo-check --sandbox read-only {prompt}",
     ),
+    ProviderKind.ANDROID_CLI: os.getenv("ANDROID_CLI_CMD", "android-cli {prompt}"),
 }
 
 CODING_COMMANDS = {
@@ -36,6 +37,9 @@ CODING_COMMANDS = {
     ProviderKind.GEMINI_CLI: os.getenv(
         "GEMINI_CLI_CODING_CMD", "gemini -p {prompt}"
     ),
+    ProviderKind.ANDROID_CLI: os.getenv(
+        "ANDROID_CLI_CODING_CMD", "android-cli {prompt}"
+    ),
 }
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/api")
@@ -47,6 +51,8 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2-chat-latest")
 ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
 ANTHROPIC_VERSION = os.getenv("ANTHROPIC_VERSION", "2023-06-01")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 class ProviderError(RuntimeError):
     pass
@@ -78,6 +84,11 @@ ANTHROPIC_API_MODELS = [
     _model_item("claude-3-5-haiku-20241022", "Claude Haiku 3.5"),
 ]
 
+DEEPSEEK_API_MODELS = [
+    _model_item("deepseek-v4-flash", "DeepSeek V4 Flash"),
+    _model_item("deepseek-v4-pro", "DeepSeek V4 Pro"),
+]
+
 
 def _dedupe_models(models: list[dict[str, str]]) -> list[dict[str, str]]:
     seen: set[str] = set()
@@ -89,6 +100,19 @@ def _dedupe_models(models: list[dict[str, str]]) -> list[dict[str, str]]:
         seen.add(model_id)
         unique.append({"id": model_id, "name": model.get("name") or model_id})
     return unique
+
+
+def _default_cli_command(provider_kind: ProviderKind, *, coding_mode: bool) -> str | None:
+    if provider_kind == ProviderKind.ANDROID_CLI:
+        if coding_mode:
+            return os.getenv(
+                "ANDROID_CLI_CODING_CMD",
+                os.getenv("ANDROID_CLI_CMD", "android-cli {prompt}"),
+            )
+        return os.getenv("ANDROID_CLI_CMD", "android-cli {prompt}")
+    if coding_mode:
+        return CODING_COMMANDS.get(provider_kind, DEFAULT_COMMANDS.get(provider_kind))
+    return DEFAULT_COMMANDS.get(provider_kind)
 
 
 class TextProvider(Protocol):
@@ -349,6 +373,13 @@ def list_provider_models(provider_kind: ProviderKind) -> dict[str, object]:
             "error": None,
         }
 
+    if provider_kind == ProviderKind.DEEPSEEK_API:
+        return {
+            "provider": provider_kind.value,
+            "models": DEEPSEEK_API_MODELS,
+            "error": None,
+        }
+
     if provider_kind == ProviderKind.LM_STUDIO:
         try:
             return {
@@ -384,6 +415,7 @@ def list_provider_models(provider_kind: ProviderKind) -> dict[str, object]:
         ProviderKind.CODEX_CLI: os.getenv("CODEX_MODEL", ""),
         ProviderKind.CLAUDE_CLI: os.getenv("CLAUDE_MODEL", ""),
         ProviderKind.GEMINI_CLI: os.getenv("GEMINI_MODEL", ""),
+        ProviderKind.ANDROID_CLI: os.getenv("ANDROID_CLI_MODEL", ""),
         ProviderKind.CUSTOM_CLI: os.getenv("CUSTOM_CLI_MODEL", ""),
     }.get(provider_kind, "")
     models = [_model_item(configured)] if configured else []
@@ -509,6 +541,48 @@ class OpenAIAPIProvider:
 
 
 @dataclass
+class DeepSeekAPIProvider:
+    base_url: str = DEEPSEEK_BASE_URL
+    default_model: str = DEEPSEEK_MODEL
+    timeout_sec: int = 300
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        model: str | None = None,
+        cwd: str | None = None,
+        mcp_config_path: str | None = None,
+        mcp_servers: list[str] | None = None,
+    ) -> str:
+        api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+        if not api_key:
+            raise ProviderError("deepseek_api requires DEEPSEEK_API_KEY")
+        data = _post_json(
+            _join_url(self.base_url, "chat/completions"),
+            {
+                "model": model or self.default_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2,
+                "stream": False,
+                "thinking": {"type": "disabled"},
+            },
+            timeout_sec=self.timeout_sec,
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise ProviderError("DeepSeek response did not include choices")
+        first = choices[0]
+        if not isinstance(first, dict):
+            raise ProviderError("DeepSeek response choice was not an object")
+        message = first.get("message")
+        if isinstance(message, dict) and isinstance(message.get("content"), str):
+            return message["content"].strip()
+        raise ProviderError("DeepSeek response did not include message.content")
+
+
+@dataclass
 class AnthropicAPIProvider:
     base_url: str = ANTHROPIC_BASE_URL
     default_model: str = ANTHROPIC_MODEL
@@ -570,17 +644,17 @@ def resolve_provider(
     if provider_kind == ProviderKind.ANTHROPIC_API:
         return AnthropicAPIProvider()
 
+    if provider_kind == ProviderKind.DEEPSEEK_API:
+        return DeepSeekAPIProvider()
+
     if provider_kind == ProviderKind.CUSTOM_CLI:
         if not command_template:
             raise ProviderError("custom_cli requires command_template")
         return CLITemplateProvider(command_template=command_template)
 
-    if coding_mode:
-        template = command_template or CODING_COMMANDS.get(
-            provider_kind, DEFAULT_COMMANDS.get(provider_kind)
-        )
-    else:
-        template = command_template or DEFAULT_COMMANDS.get(provider_kind)
+    template = command_template or _default_cli_command(
+        provider_kind, coding_mode=coding_mode
+    )
 
     if not template:
         raise ProviderError(f"unsupported provider: {provider_kind}")

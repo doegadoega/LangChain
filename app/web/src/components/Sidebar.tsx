@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   Library,
+  Database,
   Users,
   Bot,
   Play,
@@ -23,10 +24,11 @@ const items: { id: ScreenId; label: string; icon: React.ComponentType<{ classNam
   { id: "team", label: "Teams", icon: Users, order: "4" },
   { id: "agents", label: "Agent Studio", icon: Bot, order: "5" },
   { id: "skills", label: "スキル管理", icon: Library, order: "6" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, order: "7" },
-  { id: "execution", label: "Advanced Run", icon: Play, order: "8" },
-  { id: "logs", label: "Logs", icon: ScrollText, order: "9" },
-  { id: "qa", label: "QA Gate", icon: ShieldCheck, order: "10" },
+  { id: "knowledge", label: "Knowledge", icon: Database, order: "7" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, order: "8" },
+  { id: "execution", label: "Advanced Run", icon: Play, order: "9" },
+  { id: "logs", label: "Logs", icon: ScrollText, order: "10" },
+  { id: "qa", label: "QA Gate", icon: ShieldCheck, order: "11" },
   { id: "chat", label: "相談チャット", icon: MessageSquareMore, order: "0" },
 ];
 

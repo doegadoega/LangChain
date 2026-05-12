@@ -15,6 +15,7 @@ import {
 import clsx from "clsx";
 import { Button } from "../components/ui/Button";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
+import { KnowledgePicker } from "../components/KnowledgePicker";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { formatDuration, PROVIDER_LABEL, ROLE_LABEL } from "../lib/format";
 import { useApp } from "../state/store";
@@ -893,6 +894,7 @@ export function Workspace() {
         acceptance_criteria: "",
         test_command: "",
       },
+      knowledge_context: [],
     });
     resetRun();
     setWorkMode("subwork");
@@ -1543,6 +1545,12 @@ export function Workspace() {
                   />
                 </div>
               </div>
+
+              <KnowledgePicker
+                selected={activeRequest.knowledge_context ?? []}
+                disabled={!activeCanEdit}
+                onChange={(knowledge_context) => activeCanEdit && updateRequest({ knowledge_context })}
+              />
 
               <div className="grid gap-3">
                 <div>

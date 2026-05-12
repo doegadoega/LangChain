@@ -1,9 +1,10 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
   Bot,
   FileText,
   Globe2,
+  Image as ImageIcon,
   Link,
   Loader2,
   MessageSquareMore,
@@ -31,6 +32,7 @@ export function AgentChat() {
   const [attachRequest, setAttachRequest] = useState(false);
   const [attachLogs, setAttachLogs] = useState(false);
   const [attachError, setAttachError] = useState(false);
+  const [imageAttachments, setImageAttachments] = useState<ChatAttachment[]>([]);
   const [status, setStatus] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -67,10 +69,11 @@ export function AgentChat() {
         agent: selectedAgent,
         question,
         web_search_enabled: useWebSearch,
-        attachments,
+        attachments: [...attachments, ...imageAttachments],
       });
       setSessions((items) => [session, ...items.filter((item) => item.id !== session.id)]);
       setMessage("");
+      setImageAttachments([]);
       setStatus("保存しました。");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -229,7 +232,11 @@ export function AgentChat() {
                         key={`${item.id}-${attachment.kind}-${attachment.title}`}
                         className="flex items-center gap-1.5 text-xs text-[var(--color-fg-muted)]"
                       >
-                        <FileText className="h-3.5 w-3.5" />
+                        {attachment.kind === "image" ? (
+                          <ImageIcon className="h-3.5 w-3.5" />
+                        ) : (
+                          <FileText className="h-3.5 w-3.5" />
+                        )}
                         {attachment.title}
                       </div>
                     ))}
@@ -270,12 +277,73 @@ export function AgentChat() {
               className="font-sans"
               placeholder="聞きたいことを書いてください。例: このエラーは何？ / この設計で大丈夫？ / 初心者向けに説明して"
               onChange={(event) => setMessage(event.target.value)}
+              onPaste={(event) => {
+                const files = Array.from(event.clipboardData.files).filter((file) =>
+                  file.type.startsWith("image/"),
+                );
+                if (files.length) {
+                  event.preventDefault();
+                  void addImageFiles(files, setImageAttachments, setStatus);
+                }
+              }}
               onKeyDown={(event) => {
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                   void sendMessage();
                 }
               }}
             />
+            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-fg)]">
+                  <ImageIcon className="h-4 w-4" />
+                  画像を添付
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => {
+                      const files = Array.from(event.target.files ?? []);
+                      event.target.value = "";
+                      void addImageFiles(files, setImageAttachments, setStatus);
+                    }}
+                  />
+                </label>
+                <div className="text-[11px] text-[var(--color-fg-subtle)]">
+                  スクショは貼り付けでも追加できます。
+                </div>
+              </div>
+              {imageAttachments.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {imageAttachments.map((attachment, index) => (
+                    <div
+                      key={`${attachment.title}-${index}`}
+                      className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs"
+                    >
+                      {attachment.content.startsWith("data:image/") ? (
+                        <img
+                          src={attachment.content}
+                          alt={attachment.title}
+                          className="h-8 w-8 rounded border border-[var(--color-border)] object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="h-4 w-4 text-[var(--color-fg-muted)]" />
+                      )}
+                      <span className="max-w-40 truncate">{attachment.title}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setImageAttachments((items) => items.filter((_, i) => i !== index))
+                        }
+                        className="rounded p-0.5 text-[var(--color-fg-muted)] hover:bg-red-500/20 hover:text-red-300"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs text-[var(--color-fg-muted)]">{status}</div>
               <Button
@@ -381,4 +449,39 @@ function buildAttachments({
     });
   }
   return attachments;
+}
+
+async function addImageFiles(
+  files: File[],
+  setAttachments: Dispatch<SetStateAction<ChatAttachment[]>>,
+  setStatus: (status: string) => void,
+) {
+  const imageFiles = files.filter((file) => file.type.startsWith("image/")).slice(0, 4);
+  if (!imageFiles.length) return;
+  const tooLarge = imageFiles.find((file) => file.size > 2 * 1024 * 1024);
+  if (tooLarge) {
+    setStatus(`${tooLarge.name} は 2MB を超えるため添付できません。`);
+    return;
+  }
+  const attachments = await Promise.all(
+    imageFiles.map(
+      (file) =>
+        new Promise<ChatAttachment>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () =>
+            resolve({
+              kind: "image",
+              title: file.name || "pasted-image",
+              content: String(reader.result ?? ""),
+              content_type: file.type || "image/png",
+              description: "ユーザーがチャットへ添付した画像です。",
+              size: file.size,
+            });
+          reader.onerror = () => reject(reader.error ?? new Error("画像を読み込めませんでした。"));
+          reader.readAsDataURL(file);
+        }),
+    ),
+  );
+  setAttachments((items) => [...items, ...attachments].slice(0, 6));
+  setStatus(`${attachments.length} 件の画像を添付しました。`);
 }

@@ -14,6 +14,7 @@ import { Logs } from "./screens/Logs";
 import { Settings } from "./screens/Settings";
 import { AgentChat } from "./screens/AgentChat";
 import { Skills } from "./screens/Skills";
+import { Knowledge } from "./screens/Knowledge";
 
 export function App() {
   const screen = useApp((s) => s.screen);
@@ -36,6 +37,7 @@ export function App() {
             {screen === "team" && <TeamComposer />}
             {screen === "agents" && <AgentStudio />}
             {screen === "skills" && <Skills />}
+            {screen === "knowledge" && <Knowledge />}
             {screen === "execution" && <Execution />}
             {screen === "qa" && <QAGate />}
             {screen === "logs" && <Logs />}

@@ -1,4 +1,5 @@
 import pytest
+import subprocess
 from fastapi.testclient import TestClient
 from app.main import app, get_store
 from app.store import FileStore
@@ -45,6 +46,72 @@ def test_create_project(client):
     project = {"id": "proj-1", "name": "Test", "working_directory": "/tmp", "status": "active"}
     resp = client.post("/api/projects", json=project)
     assert resp.status_code == 201
+
+
+def _git(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", repo, *args],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            "GIT_AUTHOR_NAME": "Test User",
+            "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "Test User",
+            "GIT_COMMITTER_EMAIL": "test@example.com",
+        },
+    )
+
+
+def test_git_status_reports_user_changes(client, tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(str(repo), "init")
+    (repo / "Todo.swift").write_text("struct Todo {}\n", encoding="utf-8")
+    _git(str(repo), "add", "Todo.swift")
+    _git(str(repo), "commit", "-m", "initial")
+    (repo / "Todo.swift").write_text("struct Todo { let title: String }\n", encoding="utf-8")
+
+    resp = client.get("/api/git/status", params={"path": str(repo)})
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["repo_root"] == str(repo)
+    assert payload["dirty"] is True
+    assert payload["changed_files"] == ["Todo.swift"]
+    assert payload["untracked_files"] == []
+    assert payload["base_commit"]
+
+
+def test_prepare_coding_worktree_applies_user_dirty_patch(client, tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(str(repo), "init")
+    (repo / "Todo.swift").write_text("struct Todo {}\n", encoding="utf-8")
+    _git(str(repo), "add", "Todo.swift")
+    _git(str(repo), "commit", "-m", "initial")
+    (repo / "Todo.swift").write_text("struct Todo { let title: String }\n", encoding="utf-8")
+
+    resp = client.post(
+        "/api/git/worktrees/prepare",
+        json={"request_id": "coding-1", "working_directory": str(repo)},
+    )
+
+    assert resp.status_code == 201
+    payload = resp.json()
+    assert payload["repo_root"] == str(repo)
+    assert payload["ai_branch"] == "ai/coding-1"
+    assert payload["user_dirty"] is True
+    assert payload["user_patch_applied"] is True
+    assert payload["user_changed_files"] == ["Todo.swift"]
+    worktree_path = payload["worktree_path"]
+    assert (tmp_path / "worktrees" / "coding-1").exists()
+    assert "let title" in (tmp_path / "worktrees" / "coding-1" / "Todo.swift").read_text(
+        encoding="utf-8"
+    )
+    assert "let title" in (repo / "Todo.swift").read_text(encoding="utf-8")
+    branch = _git(worktree_path, "branch", "--show-current").stdout.strip()
+    assert branch == "ai/coding-1"
 
 
 def test_list_source_tree_and_read_file(client, tmp_path):
@@ -144,3 +211,101 @@ def test_list_chatgpt_and_claude_api_provider_models(client):
         model["id"] == "claude-sonnet-4-5-20250929"
         for model in anthropic_resp.json()["models"]
     )
+
+
+def test_list_deepseek_api_provider_models(client):
+    resp = client.get("/api/providers/deepseek_api/models")
+
+    assert resp.status_code == 200
+    assert any(model["id"] == "deepseek-v4-flash" for model in resp.json()["models"])
+
+
+def test_chat_message_preserves_image_attachment_without_prompting_raw_data(client, monkeypatch):
+    captured: dict[str, object] = {}
+
+    class FakeProvider:
+        def generate(self, **kwargs):
+            captured.update(kwargs)
+            return "画像を受け取りました。"
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda **kwargs: FakeProvider())
+
+    agent = {
+        "id": "ceo",
+        "name": "CEO",
+        "org_role": "ceo",
+        "provider": "openai_api",
+        "persona": "",
+        "skills": [],
+        "depends_on": [],
+        "allow_web_search": False,
+        "research_sources": [],
+        "require_citations": True,
+        "max_search_results": 5,
+        "mcp_enabled": False,
+        "mcp_servers": [],
+        "mcp_instruction": "",
+        "mcp_timeout_sec": 60,
+        "is_custom": True,
+    }
+    image_data = "data:image/png;base64," + ("a" * 200)
+
+    resp = client.post(
+        "/api/chats/message",
+        json={
+            "session_id": "chat_ceo",
+            "agent": agent,
+            "question": "この画像を見て",
+            "web_search_enabled": False,
+            "attachments": [
+                {
+                    "kind": "image",
+                    "title": "screenshot.png",
+                    "content": image_data,
+                    "content_type": "image/png",
+                }
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    user_message = resp.json()["messages"][0]
+    assert user_message["attachments"][0]["kind"] == "image"
+    assert user_message["attachments"][0]["content"] == image_data
+    assert image_data not in captured["prompt"]
+    assert "画像添付" in captured["prompt"]
+
+
+def test_create_and_list_knowledge_resources(client):
+    resource = {
+        "id": "swift-guidelines",
+        "title": "Swift Guidelines",
+        "kind": "markdown",
+        "content": "# Swift\nUse SwiftUI.",
+        "source": "local-md",
+        "tags": ["swift", "ios"],
+    }
+
+    create_resp = client.post("/api/knowledge", json=resource)
+    list_resp = client.get("/api/knowledge")
+
+    assert create_resp.status_code == 201
+    assert list_resp.status_code == 200
+    assert list_resp.json()[0]["id"] == "swift-guidelines"
+    assert list_resp.json()[0]["kind"] == "markdown"
+
+
+def test_import_local_markdown_as_knowledge(client, tmp_path):
+    doc = tmp_path / "guideline.md"
+    doc.write_text("# Internal Guide\nKeep changes small.", encoding="utf-8")
+
+    resp = client.post(
+        "/api/knowledge/import-local",
+        json={"path": str(doc), "tags": ["guide"]},
+    )
+
+    assert resp.status_code == 201
+    payload = resp.json()
+    assert payload["title"] == "guideline.md"
+    assert payload["kind"] == "markdown"
+    assert "Keep changes small." in payload["content"]

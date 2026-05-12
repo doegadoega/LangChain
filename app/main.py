@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -20,7 +22,7 @@ from app.evaluation import (
     create_evaluation,
     get_agent_evaluations_across_projects,
 )
-from app.models import AgentConfig, ProviderKind, RefineRequest, RefineResponse
+from app.models import AgentConfig, KnowledgeContextItem, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
 from app.providers import ProviderError, list_provider_models, resolve_provider
 from app.skills import SkillSource, SkillStore, SkillStoreError
@@ -46,7 +48,10 @@ IGNORED_SOURCE_DIRS = {
     "dist",
 }
 SOURCE_TEXT_MAX_BYTES = 512 * 1024
+KNOWLEDGE_TEXT_MAX_BYTES = 1024 * 1024
+KNOWLEDGE_IMAGE_MAX_BYTES = 2 * 1024 * 1024
 SOURCE_TREE_MAX_CHILDREN = 300
+WORKTREE_BRANCH_PREFIX = "ai"
 
 
 def get_store() -> FileStore:
@@ -137,6 +142,141 @@ def _safe_text(value: Any, *, max_chars: int) -> str:
     return _truncate_text(value.strip(), max_chars)
 
 
+def _safe_branch_segment(value: str) -> str:
+    segment = re.sub(r"[^A-Za-z0-9._-]", "-", value.strip()).strip(".-/")
+    return segment[:64] or "coding"
+
+
+def _run_git(
+    repo: Path,
+    args: list[str],
+    *,
+    input_bytes: bytes | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[bytes]:
+    completed = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        input=input_bytes,
+        capture_output=True,
+        check=False,
+    )
+    if check and completed.returncode != 0:
+        message = completed.stderr.decode("utf-8", errors="replace").strip()
+        message = message or completed.stdout.decode("utf-8", errors="replace").strip()
+        raise HTTPException(status_code=400, detail=message or "git command failed")
+    return completed
+
+
+def _git_text(repo: Path, args: list[str], *, check: bool = True) -> str:
+    completed = _run_git(repo, args, check=check)
+    return completed.stdout.decode("utf-8", errors="replace").strip()
+
+
+def _resolve_git_repo(path: Path) -> Path:
+    if shutil.which("git") is None:
+        raise HTTPException(status_code=503, detail="git is not available")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="path not found")
+    target = path if path.is_dir() else path.parent
+    try:
+        repo_root = _git_text(target, ["rev-parse", "--show-toplevel"])
+    except HTTPException as exc:
+        raise HTTPException(status_code=400, detail="path is not inside a git repository") from exc
+    return Path(repo_root).resolve()
+
+
+def _parse_git_porcelain(output: str) -> tuple[list[str], list[str]]:
+    changed: list[str] = []
+    untracked: list[str] = []
+    for raw_line in output.splitlines():
+        line = raw_line.rstrip()
+        if not line:
+            continue
+        status = line[:2]
+        path = line[2:].lstrip()
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        if status == "??":
+            untracked.append(path)
+        else:
+            changed.append(path)
+    return changed, untracked
+
+
+def _git_status_payload(path: Path) -> JSONDict:
+    repo_root = _resolve_git_repo(path)
+    porcelain = _git_text(repo_root, ["status", "--porcelain=v1"])
+    changed_files, untracked_files = _parse_git_porcelain(porcelain)
+    branch = _git_text(repo_root, ["branch", "--show-current"], check=False)
+    base_commit = _git_text(repo_root, ["rev-parse", "HEAD"])
+    return {
+        "repo_root": str(repo_root),
+        "current_branch": branch or "HEAD",
+        "base_commit": base_commit,
+        "dirty": bool(changed_files or untracked_files),
+        "changed_files": changed_files,
+        "untracked_files": untracked_files,
+    }
+
+
+def _prepare_coding_worktree(
+    *,
+    request_id: str,
+    working_directory: str,
+    store: FileStore,
+) -> JSONDict:
+    safe_request_id = _validate_record_id(request_id)
+    repo_root = _resolve_git_repo(_resolve_local_path(working_directory))
+    status = _git_status_payload(repo_root)
+    branch_segment = _safe_branch_segment(safe_request_id)
+    ai_branch = f"{WORKTREE_BRANCH_PREFIX}/{branch_segment}"
+    worktree_path = (store.worktrees_dir / branch_segment).resolve()
+    store.worktrees_dir.mkdir(parents=True, exist_ok=True)
+
+    if not worktree_path.exists():
+        branch_exists = (
+            _run_git(repo_root, ["rev-parse", "--verify", ai_branch], check=False).returncode == 0
+        )
+        args = ["worktree", "add"]
+        if not branch_exists:
+            args.extend(["-b", ai_branch])
+        args.extend([str(worktree_path), status["base_commit"] if not branch_exists else ai_branch])
+        _run_git(repo_root, args)
+
+    user_patch_applied = False
+    if status["changed_files"]:
+        diff = _run_git(repo_root, ["diff", "--binary", "HEAD"]).stdout
+        if diff.strip():
+            apply_result = _run_git(
+                worktree_path,
+                ["apply", "--3way", "--whitespace=nowarn"],
+                input_bytes=diff,
+                check=False,
+            )
+            if apply_result.returncode != 0:
+                message = apply_result.stderr.decode("utf-8", errors="replace").strip()
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Failed to apply user changes to AI worktree: {message}",
+                )
+            user_patch_applied = True
+
+    return {
+        "request_id": safe_request_id,
+        "repo_root": status["repo_root"],
+        "source_working_directory": str(repo_root),
+        "worktree_path": str(worktree_path),
+        "base_branch": status["current_branch"],
+        "base_commit": status["base_commit"],
+        "ai_branch": ai_branch,
+        "user_dirty": status["dirty"],
+        "user_patch_applied": user_patch_applied,
+        "user_changed_files": status["changed_files"],
+        "user_untracked_files": status["untracked_files"],
+        "status": "prepared",
+    }
+
+
 def _chat_session_id(agent_id: str) -> str:
     safe_agent_id = re.sub(r"[^A-Za-z0-9_-]", "_", agent_id)[:48] or "agent"
     return f"chat_{safe_agent_id}"
@@ -195,6 +335,33 @@ def _normalize_external_skill_url(url: str) -> str:
     return raw
 
 
+def _external_skill_urls_from_payload(payload: JSONDict) -> list[str]:
+    raw_urls = payload.get("urls")
+    if raw_urls is None:
+        raw_url = payload.get("url")
+        if isinstance(raw_url, str):
+            raw_urls = raw_url.splitlines()
+    if not isinstance(raw_urls, list):
+        raise HTTPException(status_code=400, detail="urls required")
+
+    urls: list[str] = []
+    seen: set[str] = set()
+    for value in raw_urls:
+        if not isinstance(value, str):
+            continue
+        for part in re.split(r"[\r\n,]+", value):
+            url = part.strip()
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            urls.append(url)
+    if not urls:
+        raise HTTPException(status_code=400, detail="urls required")
+    if len(urls) > 20:
+        raise HTTPException(status_code=400, detail="too many urls")
+    return urls
+
+
 def _fetch_external_skill_markdown(url: str) -> str:
     normalized = _normalize_external_skill_url(url)
     request = urllib.request.Request(
@@ -212,6 +379,75 @@ def _fetch_external_skill_markdown(url: str) -> str:
     return text
 
 
+def _knowledge_id_from_path(path: Path) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_-]", "-", path.stem.lower()).strip("-") or "knowledge"
+    return f"{stem}-{abs(hash(str(path))) % 100000:05d}"
+
+
+def _knowledge_kind_for_path(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix in {".md", ".markdown"}:
+        return "markdown"
+    if suffix in {".txt", ".text"}:
+        return "text"
+    if suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+        return "image"
+    if suffix in {".fig"}:
+        return "figma"
+    if suffix in {".json"} and "mcp" in path.name.lower():
+        return "mcp"
+    return "note"
+
+
+def _normalize_knowledge_payload(payload: JSONDict) -> JSONDict:
+    try:
+        item = KnowledgeContextItem.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return item.model_dump(mode="json")
+
+
+def _read_local_knowledge_file(path: Path, *, tags: list[str] | None = None) -> JSONDict:
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Knowledge file not found")
+    kind = _knowledge_kind_for_path(path)
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=f"Cannot read knowledge file: {exc}") from exc
+
+    if kind == "image":
+        if len(data) > KNOWLEDGE_IMAGE_MAX_BYTES:
+            raise HTTPException(status_code=413, detail="Image knowledge file is too large")
+        content_type = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+        }.get(path.suffix.lower(), "image/*")
+        content = f"data:{content_type};base64,{base64.b64encode(data).decode('ascii')}"
+    else:
+        if len(data) > KNOWLEDGE_TEXT_MAX_BYTES:
+            raise HTTPException(status_code=413, detail="Knowledge file is too large")
+        if _is_probably_binary(data) and kind != "figma":
+            raise HTTPException(status_code=415, detail="Binary knowledge file is not supported")
+        content_type = "application/octet-stream" if kind == "figma" else "text/plain"
+        content = "" if kind == "figma" else data.decode("utf-8", errors="replace")
+
+    return _normalize_knowledge_payload(
+        {
+            "id": _knowledge_id_from_path(path),
+            "title": path.name,
+            "kind": kind,
+            "content": content,
+            "source": str(path),
+            "content_type": content_type,
+            "tags": tags or [],
+        }
+    )
+
+
 def _build_chat_prompt(
     *,
     agent: AgentConfig,
@@ -221,9 +457,22 @@ def _build_chat_prompt(
     search_error: str | None,
     history: list[JSONDict],
 ) -> str:
+    def attachment_prompt_text(item: JSONDict) -> str:
+        kind = item.get("kind", "context")
+        title = item.get("title", "添付")
+        if kind == "image":
+            content_type = item.get("content_type") or "image/*"
+            size = item.get("size")
+            size_text = f", {size} bytes" if isinstance(size, int) else ""
+            note = item.get("description") or "画像データは履歴に保存済みです。現時点のプロバイダー呼び出しには画像本文を直接送らず、ユーザー説明と周辺コンテキストを元に回答してください。"
+            return f"[image] 画像添付: {title} ({content_type}{size_text})\n{note}"
+        return (
+            f"[{kind}] {title}\n"
+            f"{_truncate_text(str(item.get('content', '')), 4000)}"
+        )
+
     attachment_block = "\n\n".join(
-        f"[{item.get('kind', 'context')}] {item.get('title', '添付')}\n"
-        f"{_truncate_text(str(item.get('content', '')), 4000)}"
+        attachment_prompt_text(item)
         for item in attachments
     ) or "なし"
     source_block = "\n".join(
@@ -423,10 +672,47 @@ def file_read(path: str):
     }
 
 
+# -- Git / Coding worktrees --
+@app.get("/api/git/status")
+def get_git_status(path: str):
+    return _git_status_payload(_resolve_local_path(path))
+
+
+@app.post("/api/git/worktrees/prepare", status_code=201)
+def prepare_coding_worktree(payload: JSONDict, store: FileStore = Depends(get_store)):
+    raw_request_id = payload.get("request_id")
+    raw_working_directory = payload.get("working_directory")
+    if not isinstance(raw_request_id, str) or not raw_request_id.strip():
+        raise HTTPException(status_code=400, detail="request_id required")
+    if not isinstance(raw_working_directory, str) or not raw_working_directory.strip():
+        raise HTTPException(status_code=400, detail="working_directory required")
+    return _prepare_coding_worktree(
+        request_id=raw_request_id,
+        working_directory=raw_working_directory,
+        store=store,
+    )
+
+
 # -- Skills --
 @app.get("/api/skills")
 def list_skills(store: SkillStore = Depends(get_skill_store)):
     return [doc.model_dump(mode="json") for doc in store.load_installed_skills()]
+
+
+@app.get("/api/skills/installed-local")
+def list_local_installed_skills(
+    path: str | None = None,
+    store: SkillStore = Depends(get_skill_store),
+):
+    if path and path.strip():
+        source_path = _resolve_local_path(path)
+    else:
+        codex_home = Path(os.getenv("CODEX_HOME", str(Path.home() / ".codex")))
+        source_path = codex_home.expanduser() / "skills"
+    return [
+        doc.model_dump(mode="json")
+        for doc in store.discover_directory_skills(source_path)
+    ]
 
 
 @app.post("/api/skills/install", status_code=201)
@@ -498,6 +784,31 @@ def import_external_skill(
     except (OSError, ValueError, SkillStoreError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return document.model_dump(mode="json")
+
+
+@app.post("/api/skills/candidates/import-urls", status_code=201)
+def import_external_skills(
+    payload: JSONDict, store: SkillStore = Depends(get_skill_store)
+):
+    urls = _external_skill_urls_from_payload(payload)
+    documents: list[JSONDict] = []
+    errors: list[JSONDict] = []
+    for url in urls:
+        try:
+            markdown = _fetch_external_skill_markdown(url)
+            document = store.import_markdown_as_candidate(
+                markdown,
+                batch_prefix="url",
+                source_directory=_normalize_external_skill_url(url),
+            )
+            documents.append(document.model_dump(mode="json"))
+        except (OSError, ValueError, SkillStoreError) as exc:
+            errors.append({"url": url, "message": str(exc)})
+
+    if not documents:
+        detail = errors[0]["message"] if len(errors) == 1 else "No skills imported"
+        raise HTTPException(status_code=400, detail=detail)
+    return {"documents": documents, "errors": errors}
 
 
 @app.post("/api/skills/candidates/{batch_id}/{skill_id}/approve", status_code=201)
@@ -611,6 +922,47 @@ def delete_request(request_id: str, store: FileStore = Depends(get_store)):
     store.delete_request(_validate_record_id(request_id))
 
 
+# -- Knowledge CRUD --
+@app.get("/api/knowledge")
+def list_knowledge(store: FileStore = Depends(get_store)):
+    return store.load_knowledge()
+
+
+@app.post("/api/knowledge", status_code=201)
+def create_knowledge(resource: JSONDict, store: FileStore = Depends(get_store)):
+    normalized = _normalize_knowledge_payload(resource)
+    _validate_record_id(normalized["id"])
+    store.save_knowledge(normalized)
+    return normalized
+
+
+@app.put("/api/knowledge/{knowledge_id}")
+def update_knowledge(
+    knowledge_id: str, resource: JSONDict, store: FileStore = Depends(get_store)
+):
+    safe_id = _validate_record_id(knowledge_id)
+    normalized = _normalize_knowledge_payload({**resource, "id": safe_id})
+    store.save_knowledge(normalized)
+    return normalized
+
+
+@app.delete("/api/knowledge/{knowledge_id}", status_code=204)
+def delete_knowledge(knowledge_id: str, store: FileStore = Depends(get_store)):
+    store.delete_knowledge(_validate_record_id(knowledge_id))
+
+
+@app.post("/api/knowledge/import-local", status_code=201)
+def import_local_knowledge(payload: JSONDict, store: FileStore = Depends(get_store)):
+    raw_path = payload.get("path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise HTTPException(status_code=400, detail="path required")
+    raw_tags = payload.get("tags")
+    tags = [tag for tag in raw_tags if isinstance(tag, str)] if isinstance(raw_tags, list) else []
+    resource = _read_local_knowledge_file(_resolve_local_path(raw_path), tags=tags)
+    store.save_knowledge(resource)
+    return resource
+
+
 # -- Chat CRUD --
 @app.get("/api/chats")
 def list_chats(store: FileStore = Depends(get_store)):
@@ -655,16 +1007,25 @@ def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
     for item in payload.get("attachments") or []:
         if not isinstance(item, dict):
             continue
-        content = _safe_text(item.get("content"), max_chars=12000)
+        kind = _safe_text(item.get("kind"), max_chars=40) or "context"
+        max_chars = 2_000_000 if kind == "image" else 12000
+        content = _safe_text(item.get("content"), max_chars=max_chars)
         if not content:
             continue
-        attachments.append(
-            {
-                "kind": _safe_text(item.get("kind"), max_chars=40) or "context",
-                "title": _safe_text(item.get("title"), max_chars=120) or "添付",
-                "content": content,
-            }
-        )
+        attachment = {
+            "kind": kind,
+            "title": _safe_text(item.get("title"), max_chars=120) or "添付",
+            "content": content,
+        }
+        if kind == "image":
+            attachment["content_type"] = (
+                _safe_text(item.get("content_type"), max_chars=80) or "image/*"
+            )
+            attachment["description"] = _safe_text(
+                item.get("description"), max_chars=1000
+            )
+            attachment["size"] = len(content.encode("utf-8"))
+        attachments.append(attachment)
         if len(attachments) >= 6:
             break
 

@@ -15,8 +15,10 @@ export const ROLE_LABEL: Record<OrgRole, string> = {
 export const PROVIDER_LABEL: Record<ProviderKind, string> = {
   codex_cli: "Codex CLI",
   claude_cli: "Claude CLI",
+  android_cli: "Android CLI",
   openai_api: "ChatGPT / OpenAI API",
   anthropic_api: "Claude API",
+  deepseek_api: "DeepSeek API",
   gemini_cli: "Gemini CLI",
   ollama: "Ollama",
   lm_studio: "LM Studio",

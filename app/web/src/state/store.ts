@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   AgentConfig,
   ManagedRequest,
+  KnowledgeResource,
   ModelDecision,
   OrgRole,
   ProviderKind,
@@ -36,8 +37,10 @@ const PROVIDERS: ProviderKind[] = [
   "gemini_cli",
   "claude_cli",
   "codex_cli",
+  "android_cli",
   "openai_api",
   "anthropic_api",
+  "deepseek_api",
   "ollama",
   "lm_studio",
   "custom_cli",
@@ -55,6 +58,24 @@ const isModelDecision = (value: unknown): value is ModelDecision =>
 
 const asStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+const KNOWLEDGE_KINDS = ["markdown", "text", "image", "figma", "mcp", "link", "note"] as const;
+
+const isKnowledgeKind = (value: unknown): value is KnowledgeResource["kind"] =>
+  typeof value === "string" && (KNOWLEDGE_KINDS as readonly string[]).includes(value);
+
+const normalizeKnowledgeResource = (value: unknown): KnowledgeResource => {
+  const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  return {
+    id: typeof raw.id === "string" && raw.id.trim() ? raw.id : `knowledge_${uid()}`,
+    title: typeof raw.title === "string" && raw.title.trim() ? raw.title : "Untitled knowledge",
+    kind: isKnowledgeKind(raw.kind) ? raw.kind : "markdown",
+    content: typeof raw.content === "string" ? raw.content : "",
+    source: typeof raw.source === "string" ? raw.source : "",
+    content_type: typeof raw.content_type === "string" ? raw.content_type : "",
+    tags: asStringArray(raw.tags),
+  };
+};
 
 const isSkillSource = (value: unknown): value is SkillReference["source"] =>
   value === "bundled" || value === "user" || value === "imported" || value === "discovered";
@@ -490,6 +511,40 @@ const defaultTeamTemplates = (): Template[] => [
     ],
   },
   {
+    id: "builtin_deepseek_test_review",
+    name: "DeepSeek限定テストレビュー",
+    description: "DeepSeek API を一般的なテスト観点・非機密レビューだけに使う構成。",
+    category: "Built-in",
+    is_builtin: true,
+    locked: true,
+    workflow_mode: "coding",
+    orchestration_mode: "dependency_graph",
+    rounds: 1,
+    agents: [
+      teamAgent({
+        id: "deepseek_test_reviewer",
+        name: "DeepSeek Test Reviewer",
+        org_role: "qa",
+        provider: "deepseek_api",
+        model: "deepseek-v4-flash",
+        persona:
+          "外部API担当。社内規約、秘密情報、個人情報、未公開仕様は扱わない。一般的なテスト観点、非機密の実装方針、単純な相談だけに回答する。",
+        skills: ["test-review", "non-confidential"],
+      }),
+      teamAgent({
+        id: "local_safety_gate",
+        name: "Local Safety Gate",
+        org_role: "manager",
+        provider: "lm_studio",
+        model: "qwen2.5-coder-3b-instruct",
+        persona:
+          "DeepSeekの回答をローカル側で確認し、機密情報や過剰な実装判断が混ざっていないかを確認する。",
+        skills: ["safety-review", "scope-control"],
+        depends_on: ["deepseek_test_reviewer"],
+      }),
+    ],
+  },
+  {
     id: "builtin_design_review",
     name: "設計レビュー",
     description: "UI、システム、PMO、QA 観点で仕様やリファクタ方針を確認する構成。",
@@ -634,6 +689,10 @@ interface AppState {
   projects: Project[];
   templates: Template[];
   workflows: Workflow[];
+  knowledge: KnowledgeResource[];
+  loadKnowledge: () => Promise<void>;
+  saveKnowledge: (resource: KnowledgeResource) => Promise<KnowledgeResource>;
+  deleteKnowledge: (id: string) => Promise<void>;
 
   selectedProjectId?: string;
   selectProject: (id?: string) => void;
@@ -692,6 +751,7 @@ const initialRequest: RefineRequest = {
     acceptance_criteria: "",
     test_command: "",
   },
+  knowledge_context: [],
   agents: defaultAgents(),
 };
 
@@ -706,6 +766,32 @@ export const useApp = create<AppState>((set, get) => ({
   projects: [],
   templates: defaultTeamTemplates(),
   workflows: [],
+  knowledge: [],
+  loadKnowledge: async () => {
+    try {
+      const list = await api.listKnowledge();
+      set({ knowledge: list.map(normalizeKnowledgeResource) });
+    } catch {
+      set({ knowledge: [] });
+    }
+  },
+  saveKnowledge: async (resource) => {
+    const normalized = normalizeKnowledgeResource(resource);
+    const exists = get().knowledge.some((item) => item.id === normalized.id);
+    const saved = normalizeKnowledgeResource(
+      exists
+        ? await api.updateKnowledge(normalized.id, normalized)
+        : await api.createKnowledge(normalized),
+    );
+    set((state) => ({
+      knowledge: [saved, ...state.knowledge.filter((item) => item.id !== saved.id)],
+    }));
+    return saved;
+  },
+  deleteKnowledge: async (id) => {
+    await api.deleteKnowledge(id);
+    set((state) => ({ knowledge: state.knowledge.filter((item) => item.id !== id) }));
+  },
   selectedProjectId: undefined,
   selectProject: (id) => set({ selectedProjectId: id }),
 
@@ -935,18 +1021,20 @@ export const useApp = create<AppState>((set, get) => ({
 
   loadAll: async () => {
     try {
-      const [agents, projects, templates, workflows, managedRequests] = await Promise.all([
+      const [agents, projects, templates, workflows, managedRequests, knowledge] = await Promise.all([
         api.listAgents().catch(() => []),
         api.listProjects().catch(() => []),
         api.listTemplates().catch(() => []),
         api.listWorkflows().catch(() => []),
         api.listRequests().catch(() => [] as ManagedRequest[]),
+        api.listKnowledge().catch(() => [] as KnowledgeResource[]),
       ]);
       set({
         agents: agents.map(normalizeAgent),
         projects,
         templates: mergeTemplatesWithBuiltIns(templates),
         workflows,
+        knowledge: knowledge.map(normalizeKnowledgeResource),
         managedRequests: managedRequests
           .slice()
           .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),

@@ -38,8 +38,10 @@ class ProviderKind(str, Enum):
     GEMINI_CLI = "gemini_cli"
     CLAUDE_CLI = "claude_cli"
     CODEX_CLI = "codex_cli"
+    ANDROID_CLI = "android_cli"
     OPENAI_API = "openai_api"
     ANTHROPIC_API = "anthropic_api"
+    DEEPSEEK_API = "deepseek_api"
     OLLAMA = "ollama"
     LM_STUDIO = "lm_studio"
     CUSTOM_CLI = "custom_cli"
@@ -190,6 +192,38 @@ class CodeContext(BaseModel):
         return cleaned
 
 
+class KnowledgeContextItem(BaseModel):
+    id: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=160)
+    kind: str = Field(default="markdown", max_length=40)
+    content: str = Field(default="", max_length=2_000_000)
+    source: str = Field(default="", max_length=500)
+    content_type: str = Field(default="", max_length=120)
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("kind")
+    @classmethod
+    def validate_kind(cls, value: str) -> str:
+        cleaned = value.strip().lower() or "markdown"
+        allowed = {"markdown", "text", "image", "figma", "mcp", "link", "note"}
+        if cleaned not in allowed:
+            raise ValueError(f"knowledge kind must be one of: {', '.join(sorted(allowed))}")
+        return cleaned
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item.strip()]
+        unique: list[str] = []
+        seen: set[str] = set()
+        for tag in cleaned:
+            if tag in seen:
+                continue
+            seen.add(tag)
+            unique.append(tag[:40])
+        return unique[:20]
+
+
 class RefineRequest(BaseModel):
     workflow_mode: WorkflowMode = WorkflowMode.WRITING
     orchestration_mode: OrchestrationMode = OrchestrationMode.SEQUENTIAL
@@ -197,6 +231,7 @@ class RefineRequest(BaseModel):
     objective: str = Field(default="", max_length=3000)
     global_instruction: str = Field(default="", max_length=3000)
     code_context: CodeContext = Field(default_factory=CodeContext)
+    knowledge_context: list[KnowledgeContextItem] = Field(default_factory=list, max_length=12)
     rounds: int = Field(default=1, ge=1, le=MAX_ROUNDS)
     agents: list[AgentConfig] = Field(min_length=1, max_length=20)
 

@@ -739,12 +739,14 @@ function TeamAgentRow({
           onChange={(event) => onUpdate({ persona: event.target.value })}
         />
       </div>
-      {agent.provider === "custom_cli" && (
+      {(agent.provider === "custom_cli" || agent.provider === "android_cli") && (
         <div className="mt-2">
-          <Label>command_template</Label>
+          <Label>
+            command_template {agent.provider === "android_cli" ? "(Android CLI の上書き)" : ""}
+          </Label>
           <Input
             value={agent.command_template ?? ""}
-            placeholder="my-cli --prompt {prompt}"
+            placeholder={agent.provider === "android_cli" ? "android-cli {prompt}" : "my-cli --prompt {prompt}"}
             onChange={(event) => onUpdate({ command_template: event.target.value })}
           />
         </div>

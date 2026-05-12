@@ -7,7 +7,7 @@ import { Input, Label, Textarea } from "../components/ui/Field";
 import { api } from "../api/client";
 import type { CandidateBatch, SkillDocument } from "../types";
 
-type Tab = "library" | "candidates";
+type Tab = "library" | "local" | "candidates";
 
 const SAMPLE_MARKDOWN = `---
 id: my-skill
@@ -30,12 +30,62 @@ OpenAI 固有の指示。
 worker 固有の指示。
 `;
 
+function splitExternalUrls(value: string): string[] {
+  const seen = new Set<string>();
+  return value
+    .split(/[\n\r,]+/)
+    .map((url) => url.trim())
+    .filter((url) => {
+      if (!url || seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+}
+
+function groupSkills(docs: SkillDocument[]) {
+  const groups = new Map<string, SkillDocument[]>();
+  for (const doc of docs) {
+    const arr = groups.get(doc.metadata.id) ?? [];
+    arr.push(doc);
+    groups.set(doc.metadata.id, arr);
+  }
+  return Array.from(groups.entries()).map(([id, docs]) => ({
+    id,
+    latest: docs.slice().sort((a, b) => b.metadata.version.localeCompare(a.metadata.version))[0],
+    versions: docs.slice().sort((a, b) => b.metadata.version.localeCompare(a.metadata.version)),
+  }));
+}
+
+function frontMatterArray(values: string[]): string {
+  return `[${values.map((value) => JSON.stringify(value)).join(", ")}]`;
+}
+
+function managedSkillMarkdown(skill: SkillDocument): string {
+  const metadata = skill.metadata;
+  const frontMatter = [
+    "---",
+    `id: ${metadata.id}`,
+    `name: ${JSON.stringify(metadata.name)}`,
+    `version: ${metadata.version || "0.0.0"}`,
+    metadata.description ? `description: ${JSON.stringify(metadata.description)}` : "",
+    metadata.providers.length ? `providers: ${frontMatterArray(metadata.providers)}` : "",
+    metadata.roles.length ? `roles: ${frontMatterArray(metadata.roles)}` : "",
+    metadata.tags.length ? `tags: ${frontMatterArray(metadata.tags)}` : "",
+    "---",
+    "",
+  ].filter(Boolean);
+  return `${frontMatter.join("\n")}${skill.body || skill.markdown}`;
+}
+
 export function Skills() {
   const [tab, setTab] = useState<Tab>("library");
   const [installed, setInstalled] = useState<SkillDocument[]>([]);
+  const [localInstalled, setLocalInstalled] = useState<SkillDocument[]>([]);
   const [candidates, setCandidates] = useState<CandidateBatch[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null);
   const [importPath, setImportPath] = useState("");
+  const [localPath, setLocalPath] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
   const [installMarkdown, setInstallMarkdown] = useState("");
   const [showInstaller, setShowInstaller] = useState(false);
@@ -45,11 +95,13 @@ export function Skills() {
   const refresh = async () => {
     setError("");
     try {
-      const [docs, batches] = await Promise.all([
+      const [docs, discovered, batches] = await Promise.all([
         api.listSkills(),
+        api.listLocalInstalledSkills(localPath),
         api.listSkillCandidates(),
       ]);
       setInstalled(docs);
+      setLocalInstalled(discovered);
       setCandidates(batches);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -60,23 +112,16 @@ export function Skills() {
     void refresh();
   }, []);
 
-  const groupedInstalled = useMemo(() => {
-    const groups = new Map<string, SkillDocument[]>();
-    for (const doc of installed) {
-      const arr = groups.get(doc.metadata.id) ?? [];
-      arr.push(doc);
-      groups.set(doc.metadata.id, arr);
-    }
-    return Array.from(groups.entries()).map(([id, docs]) => ({
-      id,
-      latest: docs.slice().sort((a, b) => b.metadata.version.localeCompare(a.metadata.version))[0],
-      versions: docs.slice().sort((a, b) => b.metadata.version.localeCompare(a.metadata.version)),
-    }));
-  }, [installed]);
+  const groupedInstalled = useMemo(() => groupSkills(installed), [installed]);
+  const groupedLocalInstalled = useMemo(() => groupSkills(localInstalled), [localInstalled]);
 
   const selectedSkill = useMemo(
     () => groupedInstalled.find((entry) => entry.id === selectedId)?.latest,
     [groupedInstalled, selectedId],
+  );
+  const selectedLocalSkill = useMemo(
+    () => groupedLocalInstalled.find((entry) => entry.id === selectedLocalId)?.latest,
+    [groupedLocalInstalled, selectedLocalId],
   );
 
   const handleInstall = async () => {
@@ -115,15 +160,52 @@ export function Skills() {
 
   const handleImportExternal = async () => {
     setError("");
-    if (!externalUrl.trim()) {
+    const urls = splitExternalUrls(externalUrl);
+    if (urls.length === 0) {
       setError("外部 SKILL.md の URL を入力してください。");
       return;
     }
+    if (urls.length > 20) {
+      setError("一度に取り込める URL は 20 件までです。");
+      return;
+    }
     try {
-      const doc = await api.importExternalSkill(externalUrl.trim());
-      setStatus(`${doc.metadata.name} を外部URLから候補へ取り込みました。承認すると登録済みに追加されます。`);
+      const result = await api.importExternalSkills(urls);
+      const names = result.documents.map((doc) => doc.metadata.name).join(", ");
+      const errorSummary =
+        result.errors.length > 0
+          ? ` / 失敗 ${result.errors.length} 件: ${result.errors.map((item) => item.url).join(", ")}`
+          : "";
+      setStatus(`${result.documents.length} 件を外部URLから候補へ取り込みました: ${names}${errorSummary}`);
       setExternalUrl("");
       setTab("candidates");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleRefreshLocalInstalled = async () => {
+    setError("");
+    try {
+      const docs = await api.listLocalInstalledSkills(localPath);
+      setLocalInstalled(docs);
+      setStatus(`${docs.length} 件のローカルインストール済み Skill を読み込みました。`);
+      if (selectedLocalId && !docs.some((doc) => doc.metadata.id === selectedLocalId)) {
+        setSelectedLocalId(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleInstallLocalSkill = async (skill: SkillDocument) => {
+    setError("");
+    try {
+      const installedSkill = await api.installSkill(managedSkillMarkdown(skill), "imported");
+      setStatus(`${installedSkill.metadata.name} を Web アプリ内の登録済み Skill に追加しました。`);
+      setSelectedId(installedSkill.metadata.id);
+      setTab("library");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -191,6 +273,12 @@ export function Skills() {
           <div className="flex gap-1">
             <TabButton label={`登録済み (${groupedInstalled.length})`} active={tab === "library"} onClick={() => setTab("library")} icon={<Library className="h-3.5 w-3.5" />} />
             <TabButton
+              label={`ローカル (${groupedLocalInstalled.length})`}
+              active={tab === "local"}
+              onClick={() => setTab("local")}
+              icon={<Library className="h-3.5 w-3.5" />}
+            />
+            <TabButton
               label={`候補 (${candidates.reduce((sum, b) => sum + b.skills.length, 0)})`}
               active={tab === "candidates"}
               onClick={() => setTab("candidates")}
@@ -198,22 +286,36 @@ export function Skills() {
             />
           </div>
           {tab === "library" && (
-            <Button size="sm" variant="primary" className="w-full" onClick={() => setShowInstaller((value) => !value)}>
-              <Upload className="h-3.5 w-3.5" /> SKILL.md を直接登録
-            </Button>
+            <div className="space-y-2">
+              <Button size="sm" variant="primary" className="w-full" onClick={() => setShowInstaller((value) => !value)}>
+                <Upload className="h-3.5 w-3.5" /> SKILL.md を直接登録
+              </Button>
+              <div className="space-y-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
+                <Label className="text-[10px]">外部 URL から候補へ取り込み</Label>
+                <Textarea
+                  placeholder={"https://github.com/org/repo/blob/main/path/SKILL.md\nhttps://raw.githubusercontent.com/org/repo/main/other/SKILL.md"}
+                  value={externalUrl}
+                  onChange={(event) => setExternalUrl(event.target.value)}
+                  className="min-h-20 text-xs"
+                />
+                <Button size="sm" variant="outline" className="w-full" onClick={() => void handleImportExternal()}>
+                  <Upload className="h-3.5 w-3.5" /> URLを一括取り込み
+                </Button>
+              </div>
+            </div>
           )}
           {tab === "candidates" && (
             <div className="space-y-2">
               <div className="space-y-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
                 <Label className="text-[10px]">外部 URL から取り込み</Label>
-                <Input
-                  placeholder="https://github.com/org/repo/blob/main/path/SKILL.md"
+                <Textarea
+                  placeholder={"https://github.com/org/repo/blob/main/path/SKILL.md\nhttps://raw.githubusercontent.com/org/repo/main/other/SKILL.md"}
                   value={externalUrl}
                   onChange={(event) => setExternalUrl(event.target.value)}
-                  className="text-xs"
+                  className="min-h-20 text-xs"
                 />
                 <Button size="sm" variant="primary" className="w-full" onClick={() => void handleImportExternal()}>
-                  <Upload className="h-3.5 w-3.5" /> URLから候補へ取り込み
+                  <Upload className="h-3.5 w-3.5" /> URLを一括取り込み
                 </Button>
               </div>
               <div className="space-y-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
@@ -228,6 +330,20 @@ export function Skills() {
                   <FolderInput className="h-3.5 w-3.5" /> 取り込み
                 </Button>
               </div>
+            </div>
+          )}
+          {tab === "local" && (
+            <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
+              <Label className="text-[10px]">ローカル Skill ディレクトリ</Label>
+              <Input
+                placeholder="空なら ~/.codex/skills"
+                value={localPath}
+                onChange={(event) => setLocalPath(event.target.value)}
+                className="text-xs"
+              />
+              <Button size="sm" variant="primary" className="w-full" onClick={() => void handleRefreshLocalInstalled()}>
+                <Library className="h-3.5 w-3.5" /> インストール済みを再読込
+              </Button>
             </div>
           )}
         </div>
@@ -267,6 +383,33 @@ export function Skills() {
                         {r}
                       </span>
                     ))}
+                  </div>
+                </button>
+              );
+            })}
+          {tab === "local" && groupedLocalInstalled.length === 0 && (
+            <EmptyState message="ローカルにインストール済みの Skill が見つかりません。既定では ~/.codex/skills を読みます。" />
+          )}
+          {tab === "local" &&
+            groupedLocalInstalled.map((entry) => {
+              const skill = entry.latest;
+              return (
+                <button
+                  key={entry.id}
+                  onClick={() => setSelectedLocalId(entry.id)}
+                  className={clsx(
+                    "block w-full rounded-md border bg-[var(--color-surface-2)] p-2.5 text-left transition-colors",
+                    selectedLocalId === entry.id
+                      ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
+                      : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="truncate text-sm font-semibold">{skill.metadata.name}</div>
+                    <span className="shrink-0 text-[10px] tabular-nums text-[var(--color-fg-subtle)]">v{skill.metadata.version}</span>
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-[var(--color-fg-muted)]">
+                    {skill.root_directory || skill.metadata.description || "(説明なし)"}
                   </div>
                 </button>
               );
@@ -349,9 +492,20 @@ export function Skills() {
             onDeleteSkill={() => void handleDeleteSkill(selectedSkill.metadata.id)}
             onDeleteVersion={(version) => void handleDeleteVersion(selectedSkill.metadata.id, version)}
           />
+        ) : selectedLocalSkill && tab === "local" ? (
+          <SkillDetail
+            skill={selectedLocalSkill}
+            versions={groupedLocalInstalled.find((entry) => entry.id === selectedLocalSkill.metadata.id)?.versions ?? []}
+            readOnly
+            onInstallLocal={() => void handleInstallLocalSkill(selectedLocalSkill)}
+          />
         ) : (
           <div className="rounded-md border border-dashed border-[var(--color-border)] p-6 text-center text-xs text-[var(--color-fg-subtle)]">
-            {tab === "library" ? "Skill を選択して詳細を表示" : "候補を承認すると登録済みに移動します。"}
+            {tab === "library"
+              ? "Skill を選択して詳細を表示"
+              : tab === "local"
+                ? "ローカル Skill を選択して詳細を表示"
+                : "候補を承認すると登録済みに移動します。"}
           </div>
         )}
       </div>
@@ -400,11 +554,15 @@ function SkillDetail({
   versions,
   onDeleteSkill,
   onDeleteVersion,
+  onInstallLocal,
+  readOnly = false,
 }: {
   skill: SkillDocument;
   versions: SkillDocument[];
-  onDeleteSkill: () => void;
-  onDeleteVersion: (version: string) => void;
+  onDeleteSkill?: () => void;
+  onDeleteVersion?: (version: string) => void;
+  onInstallLocal?: () => void;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-3">
@@ -416,9 +574,22 @@ function SkillDetail({
               id: {skill.metadata.id} · source: {skill.source}
             </div>
           </div>
-          <Button variant="danger" size="sm" onClick={onDeleteSkill}>
-            <Trash2 className="h-3.5 w-3.5" /> Skill を削除
-          </Button>
+          {readOnly ? (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-muted)]">
+                read only
+              </span>
+              {onInstallLocal && (
+                <Button variant="primary" size="sm" onClick={onInstallLocal}>
+                  <Upload className="h-3.5 w-3.5" /> Webアプリに登録
+                </Button>
+              )}
+            </div>
+          ) : (
+            <Button variant="danger" size="sm" onClick={onDeleteSkill ?? (() => undefined)}>
+              <Trash2 className="h-3.5 w-3.5" /> Skill を削除
+            </Button>
+          )}
         </CardHeader>
         <CardBody className="space-y-2 text-xs">
           {skill.metadata.description && <div>{skill.metadata.description}</div>}
@@ -450,9 +621,11 @@ function SkillDetail({
           {versions.map((v) => (
             <div key={v.metadata.version} className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1">
               <span className="tabular-nums">v{v.metadata.version}</span>
-              <Button size="sm" variant="ghost" onClick={() => onDeleteVersion(v.metadata.version)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              {!readOnly && onDeleteVersion && (
+                <Button size="sm" variant="ghost" onClick={() => onDeleteVersion(v.metadata.version)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           ))}
         </CardBody>

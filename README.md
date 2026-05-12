@@ -161,6 +161,26 @@ Web UI の `Coding` 画面では、VS Code 風の構成でコーディング依�
 
 ソース一覧は `/api/files/tree`、ファイル表示は `/api/files/read` を使います。`node_modules`、`.git`、`.venv` などの重いディレクトリは一覧から除外します。
 
+Coding 実行時は、ユーザが指定したローカル Git repository を原本として扱い、AI 用の `git worktree` を `~/.agent-refinement/worktrees/<request-id>` 配下に作成します。AI エージェントはこの worktree だけを作業ディレクトリとして使うため、ユーザの元ディレクトリを直接編集しません。
+
+- 元repoの `HEAD`、branch、ユーザ変更ファイルを実行前に記録
+- ユーザの未コミット変更がある場合は、追跡済みファイルの差分を AI 用 worktree に反映
+- 未追跡ファイルは自動反映せず、画面上で件数を警告
+- AI 作業は `ai/<request-id>` ブランチとして分離
+- 依頼履歴には `version_control` として元repo、worktree、base commit、AI branch を保存
+
+ユーザが元repoを編集した後に追加機能を依頼した場合、アプリは元repo側を新しい前提として再度 worktree を作成します。前回の AI worktree は履歴として残し、次回作業は「ユーザが最後に触った状態」を優先します。
+
+関連API:
+
+```bash
+curl -s "http://127.0.0.1:8000/api/git/status?path=/path/to/repo" | jq
+
+curl -s -X POST "http://127.0.0.1:8000/api/git/worktrees/prepare" \
+  -H "Content-Type: application/json" \
+  -d '{"request_id":"coding-001","working_directory":"/path/to/repo"}' | jq
+```
+
 ```text
 ~/.agent-refinement/agents/<agent_id>.json
 ~/.agent-refinement/chats/chat_<agent_id>.json

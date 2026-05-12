@@ -134,18 +134,21 @@ Codex が `ManagedRequest.original_request` / `previous_request` / `versions[]` 
 - Priority: high
 - Owner: unassigned
 
-現状の `workflow_mode=coding` は Web UI 側ではプロンプト切替のみ。実コード生成・パッチ適用が UI から完結しない。
+`workflow_mode=coding` は Web UI から依頼管理、ソース閲覧、実行ログ確認、AI 用 `git worktree` 準備まで対応済み。実コード生成は CLI provider が worktree 内で実行する。
 
 やること:
 
-- Workspace から作業ディレクトリ（working_directory）を指定して実行
-- Code Context（target_paths / tech_stack / acceptance_criteria / test_command）を Workspace 中央ペインで編集できる
-- 実行後に file_changes を diff ビューアで表示
+- [x] Coding 画面から作業ディレクトリ（working_directory）を指定して実行
+- [x] Code Context（target_paths / tech_stack / acceptance_criteria / test_command）を Coding 画面で編集できる
+- [x] 実行前に元 Git repo から AI 用 worktree を作成
+- [x] ユーザの追跡済み未コミット変更を AI 用 worktree へ反映
+- [x] 実行後に file_changes を diff ビューアで表示
 - diff の適用 / 破棄 / コミット作成（git）の操作 UI
 
 検討事項:
 
-- パッチ適用は CLI provider（codex / claude / gemini）経由か、別途 patch エンドポイントを持つか
+- AI worktree の diff を元repoへ採用する UI（apply / cherry-pick / merge / discard）
+- 未追跡ファイルを AI worktree へ含める確認 UI
 - リスク：作業ディレクトリ外への書き込みが起きないようバックエンドで sandbox を強制
 
 ## Advanced Run

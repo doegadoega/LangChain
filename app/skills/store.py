@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from app.skills.models import CandidateBatch, SkillDocument, SkillSource
-from app.skills.parser import build_skill_document
+from app.skills.models import CandidateBatch, SkillDocument, SkillMetadata, SkillSource
+from app.skills.parser import SkillParseError, build_skill_document, parse_skill_markdown
 
 
 class SkillStoreError(Exception):
@@ -187,6 +187,52 @@ class SkillStore:
                     root_directory=str(target_dir),
                 )
             )
+        results.sort(key=lambda doc: doc.metadata.name.casefold())
+        return results
+
+    def discover_directory_skills(
+        self, source_directory: Path | str
+    ) -> list[SkillDocument]:
+        source_path = Path(source_directory).expanduser()
+        if not source_path.exists() or not source_path.is_dir():
+            return []
+        skill_files = [path for path in source_path.rglob("SKILL.md") if path.is_file()]
+        results: list[SkillDocument] = []
+        for skill_file in skill_files:
+            try:
+                markdown = skill_file.read_text(encoding="utf-8")
+                results.append(
+                    build_skill_document(
+                        markdown=markdown,
+                        source=SkillSource.IMPORTED,
+                        root_directory=str(skill_file.parent),
+                    )
+                )
+            except OSError:
+                continue
+            except SkillParseError:
+                parsed = parse_skill_markdown(markdown)
+                derived_id = skill_file.parent.name.strip() or "skill"
+                name = (parsed.front_matter.get("name") or derived_id).strip() or derived_id
+                version = (parsed.front_matter.get("version") or "0.0.0").strip() or "0.0.0"
+                description = (parsed.front_matter.get("description") or "").strip()
+                results.append(
+                    SkillDocument(
+                        metadata=SkillMetadata(
+                            id=derived_id,
+                            name=name,
+                            version=version,
+                            description=description,
+                            providers=parsed.array_value("providers"),
+                            roles=parsed.array_value("roles"),
+                            tags=parsed.array_value("tags"),
+                        ),
+                        source=SkillSource.IMPORTED,
+                        markdown=markdown,
+                        body=parsed.body,
+                        root_directory=str(skill_file.parent),
+                    )
+                )
         results.sort(key=lambda doc: doc.metadata.name.casefold())
         return results
 

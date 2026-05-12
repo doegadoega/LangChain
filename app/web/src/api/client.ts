@@ -3,12 +3,16 @@ import type {
   CandidateBatch,
   ChatMessageRequest,
   ChatSession,
+  CodingWorktreeState,
   ManagedRequest,
+  KnowledgeResource,
+  ExternalSkillImportResult,
   ProviderKind,
   ProviderModelsResponse,
   DirectoryPickResponse,
   Project,
   SourceFileResponse,
+  GitStatusResponse,
   SourceTreeResponse,
   SkillDocument,
   SkillSource,
@@ -61,12 +65,34 @@ export const api = {
     req<ManagedRequest>(`/api/requests/${id}`, { method: "PUT", body: JSON.stringify(r) }),
   deleteRequest: (id: string) => req<void>(`/api/requests/${id}`, { method: "DELETE" }),
 
+  // knowledge
+  listKnowledge: () => req<KnowledgeResource[]>("/api/knowledge"),
+  createKnowledge: (r: KnowledgeResource) =>
+    req<KnowledgeResource>("/api/knowledge", { method: "POST", body: JSON.stringify(r) }),
+  updateKnowledge: (id: string, r: KnowledgeResource) =>
+    req<KnowledgeResource>(`/api/knowledge/${id}`, { method: "PUT", body: JSON.stringify(r) }),
+  deleteKnowledge: (id: string) => req<void>(`/api/knowledge/${id}`, { method: "DELETE" }),
+  importLocalKnowledge: (path: string, tags: string[] = []) =>
+    req<KnowledgeResource>("/api/knowledge/import-local", {
+      method: "POST",
+      body: JSON.stringify({ path, tags }),
+    }),
+
   // source files
   pickDirectory: () => req<DirectoryPickResponse>("/api/files/pick-directory"),
   listSourceTree: (path: string) =>
     req<SourceTreeResponse>(`/api/files/tree?path=${encodeURIComponent(path)}`),
   readSourceFile: (path: string) =>
     req<SourceFileResponse>(`/api/files/read?path=${encodeURIComponent(path)}`),
+
+  // git / coding worktrees
+  getGitStatus: (path: string) =>
+    req<GitStatusResponse>(`/api/git/status?path=${encodeURIComponent(path)}`),
+  prepareCodingWorktree: (payload: { request_id: string; working_directory: string }) =>
+    req<CodingWorktreeState>("/api/git/worktrees/prepare", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // chats
   listChats: () => req<ChatSession[]>("/api/chats"),
@@ -89,6 +115,12 @@ export const api = {
 
   // skills
   listSkills: () => req<SkillDocument[]>("/api/skills"),
+  listLocalInstalledSkills: (path?: string) =>
+    req<SkillDocument[]>(
+      path?.trim()
+        ? `/api/skills/installed-local?path=${encodeURIComponent(path.trim())}`
+        : "/api/skills/installed-local",
+    ),
   installSkill: (markdown: string, source: SkillSource = "user") =>
     req<SkillDocument>("/api/skills/install", {
       method: "POST",
@@ -107,6 +139,11 @@ export const api = {
     req<SkillDocument>("/api/skills/candidates/import-url", {
       method: "POST",
       body: JSON.stringify({ url }),
+    }),
+  importExternalSkills: (urls: string[]) =>
+    req<ExternalSkillImportResult>("/api/skills/candidates/import-urls", {
+      method: "POST",
+      body: JSON.stringify({ urls }),
     }),
   approveSkillCandidate: (batchId: string, skillId: string) =>
     req<SkillDocument>(`/api/skills/candidates/${batchId}/${skillId}/approve`, { method: "POST" }),

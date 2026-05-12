@@ -1,6 +1,7 @@
 from app.models import (
     AgentConfig,
     CodeContext,
+    KnowledgeContextItem,
     OrchestrationMode,
     ProviderKind,
     RefineRequest,
@@ -377,3 +378,51 @@ def test_discussion_carries_previous_round_outputs_into_next_round(monkeypatch):
     assert "議論履歴" in prompts[2]
     assert "agent-output-1" in prompts[2]
     assert "agent-output-2" in prompts[2]
+
+
+def test_knowledge_context_is_embedded_without_raw_image_data(monkeypatch):
+    prompts: list[str] = []
+
+    def fake_resolve_provider(**kwargs):
+        return DummyProvider("knowledge output", prompts)
+
+    monkeypatch.setattr(orchestrator, "resolve_provider", fake_resolve_provider)
+
+    image_data = "data:image/png;base64," + ("a" * 100)
+    request = RefineRequest(
+        workflow_mode=WorkflowMode.WRITING,
+        source_text="SwiftUIの設計を相談したい",
+        knowledge_context=[
+            KnowledgeContextItem(
+                id="swift-md",
+                title="Swift Guidelines",
+                kind="markdown",
+                content="# Swift\nUse small views.",
+                source="docs/swift.md",
+                tags=["swift"],
+            ),
+            KnowledgeContextItem(
+                id="screen",
+                title="screen.png",
+                kind="image",
+                content=image_data,
+                content_type="image/png",
+            ),
+        ],
+        agents=[
+            AgentConfig(
+                id="reviewer",
+                name="Reviewer",
+                org_role="qa",
+                provider=ProviderKind.LM_STUDIO,
+            )
+        ],
+    )
+
+    orchestrator.run_refinement(request)
+
+    assert "Knowledge Context" in prompts[0]
+    assert "Swift Guidelines" in prompts[0]
+    assert "Use small views." in prompts[0]
+    assert "screen.png" in prompts[0]
+    assert image_data not in prompts[0]

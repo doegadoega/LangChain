@@ -29,7 +29,12 @@ DIRECT_EDIT_PROVIDERS = {
     ProviderKind.GEMINI_CLI,
     ProviderKind.CLAUDE_CLI,
     ProviderKind.CODEX_CLI,
+    ProviderKind.ANDROID_CLI,
     ProviderKind.CUSTOM_CLI,
+}
+
+LIMITED_EXTERNAL_API_PROVIDERS = {
+    ProviderKind.DEEPSEEK_API,
 }
 
 
@@ -208,6 +213,32 @@ def _build_code_context_block(context: RunContext) -> str:
     )
 
 
+def _build_knowledge_context_block(context: RunContext) -> str:
+    if not context.request.knowledge_context:
+        return "Knowledge Context: なし\n"
+
+    lines = ["Knowledge Context:"]
+    for item in context.request.knowledge_context[:12]:
+        source = f" source={item.source}" if item.source else ""
+        tags = f" tags={', '.join(item.tags)}" if item.tags else ""
+        lines.append(f"- [{item.kind}] {item.title}{source}{tags}")
+        if item.kind == "image":
+            content_type = item.content_type or "image/*"
+            lines.append(
+                f"  画像添付: {content_type}. 画像データは履歴に保存済み。"
+                "このプロンプトにはbase64本文を含めません。"
+            )
+        elif item.kind == "figma":
+            lines.append(
+                "  Figma/FIG資料: 外部連携またはファイル参照用。必要なら source を確認してください。"
+            )
+        elif item.kind == "mcp":
+            lines.append("  MCP資料:\n```text\n" + _truncate_output(item.content, max_chars=4000) + "\n```")
+        else:
+            lines.append("```text\n" + _truncate_output(item.content, max_chars=4000) + "\n```")
+    return "\n".join(lines) + "\n"
+
+
 def _truncate_output(text: str, max_chars: int = 2800) -> str:
     if len(text) <= max_chars:
         return text
@@ -290,7 +321,17 @@ def _build_task_prompt(
     objective = context.request.objective.strip() or "特になし"
     global_instruction = context.request.global_instruction.strip() or "特になし"
     workflow_mode = context.request.workflow_mode
+    provider_limit_block = ""
+    if agent.provider in LIMITED_EXTERNAL_API_PROVIDERS:
+        provider_limit_block = (
+            "外部API制限:\n"
+            "- このエージェントは DeepSeek などの外部APIです。\n"
+            "- 社内規約、秘密情報、個人情報、未公開仕様を扱う判断をしないでください。\n"
+            "- 役割は単純なチャット、一般的な実装方針、テスト観点、非機密コードレビューに限定します。\n"
+            "- ファイル編集や秘密情報を含む実装判断は Codex/Claude/local などの許可済みエージェントへ委ねてください。\n\n"
+        )
     dep_block = _build_dependency_context_block(agent, round_outputs)
+    knowledge_block = _build_knowledge_context_block(context)
     research_block = _build_research_context_block(
         agent,
         research_results=research_results,
@@ -336,7 +377,9 @@ def _build_task_prompt(
         f"ラウンド: {round_index}\n"
         f"目的:\n{objective}\n\n"
         f"グローバル指示:\n{global_instruction}\n\n"
+        f"{provider_limit_block}"
         f"{code_block}\n"
+        f"{knowledge_block}\n"
         f"{dep_block}\n"
         f"{research_block}\n"
         f"{interaction_history}\n"

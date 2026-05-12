@@ -255,16 +255,24 @@ sequenceDiagram
 ### 10.2 coding mode 通信フロー
 ```mermaid
 sequenceDiagram
+  participant UI
   participant Orchestrator
-  participant GitRepo as Working Directory (Git)
+  participant GitRepo as User Git Repo
+  participant Worktree as AI Worktree
   participant Provider as CLI Provider
 
-  Orchestrator->>GitRepo: git add -A / git diff --staged HEAD
-  Orchestrator->>Provider: prompt with current diff/context
+  UI->>GitRepo: GET /api/git/status
+  UI->>GitRepo: POST /api/git/worktrees/prepare
+  GitRepo->>Worktree: git worktree add ai/<request-id>
+  GitRepo->>Worktree: apply tracked user diff if dirty
+  UI->>Orchestrator: POST /api/refine/stream with worktree path
+  Orchestrator->>Provider: prompt with worktree/context
   Provider-->>Orchestrator: patch/summary
-  Orchestrator->>GitRepo: capture updated diff
+  Orchestrator->>Worktree: capture updated diff
   Orchestrator-->>Orchestrator: emit file_changes in turn result
 ```
+
+Coding mode は元のローカル Git repository を原本として扱い、AI エージェントには専用 `git worktree` を渡す。ユーザが元repoを変更した後の追加依頼は、元repoの最新状態を新しい base として別 worktree を作る。これにより、ユーザ変更と AI 変更を branch / commit / diff 単位で分離して監査できる。
 
 ## 11. API I/O 方針
 - 入力は `RefineRequest` を基準とする。
@@ -281,6 +289,7 @@ sequenceDiagram
 - 再現性: 実行時の最終 `provider/model` と差分を保存
 - 可観測性: ストリーミングイベントで進行可視化
 - 安全性: working_directory 外の破壊操作は禁止
+- 変更分離: coding mode では元repoを直接編集せず、AI 用 worktree に変更を閉じ込める
 - 可用性: Providerエラー時も run を落とさず、ターン単位でエラー返却
 
 ## 13. 受け入れ条件
