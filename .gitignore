@@ -9,3 +9,4 @@ node_modules/
 **/.swiftpm/xcode/
 *.xcuserstate
 *.tsbuildinfo
+Workspace/
