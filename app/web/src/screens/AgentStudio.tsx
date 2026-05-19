@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Empty } from "../components/ui/Empty";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { ModelPicker } from "../components/ModelPicker";
 import { builtinAgents, newAgent, useApp } from "../state/store";
@@ -26,6 +27,8 @@ export function AgentStudio() {
 
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<OrgRole | "all">("all");
+  const [filterProvider, setFilterProvider] = useState<ProviderKind | "all">("all");
+  const [filterType, setFilterType] = useState<"all" | "draft" | "saved" | "builtin">("all");
   const [sortKey, setSortKey] = useState<SortKey>("type");
   const [draft, setDraft] = useState<AgentConfig | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(savedAgents[0]?.id ?? null);
@@ -59,6 +62,15 @@ export function AgentStudio() {
   const filtered = useMemo(() => {
     const filteredList = listAgents.filter((a) => {
       if (filterRole !== "all" && a.org_role !== filterRole) return false;
+      if (filterProvider !== "all" && a.provider !== filterProvider) return false;
+      if (filterType !== "all") {
+        const isAgentBuiltin = isBuiltin(a.id);
+        const isAgentDraft = !!draft && a.id === draft.id;
+        const isAgentSaved = savedIds.has(a.id);
+        if (filterType === "builtin" && !isAgentBuiltin) return false;
+        if (filterType === "draft" && !isAgentDraft) return false;
+        if (filterType === "saved" && !isAgentSaved) return false;
+      }
       if (!query) return true;
       const q = query.toLowerCase();
       return (
@@ -95,7 +107,12 @@ export function AgentStudio() {
       }
     });
     return sorted;
-  }, [listAgents, query, filterRole, sortKey, isBuiltin]);
+  }, [listAgents, query, filterRole, filterProvider, filterType, sortKey, isBuiltin, draft, savedIds]);
+
+  const availableProviders = useMemo(
+    () => Array.from(new Set(listAgents.map((a) => a.provider))) as ProviderKind[],
+    [listAgents],
+  );
 
   const sourceForId = (id: string | null): AgentConfig | undefined => {
     if (!id) return undefined;
@@ -205,6 +222,31 @@ export function AgentStudio() {
               <RoleChip key={r} role={r} current={filterRole} setRole={setFilterRole} />
             ))}
           </div>
+          <div className="flex flex-wrap gap-1">
+            <TypeChip value="all" label="種別: 全て" current={filterType} setValue={setFilterType} />
+            <TypeChip value="draft" label="ドラフト" current={filterType} setValue={setFilterType} />
+            <TypeChip value="saved" label="保存済み" current={filterType} setValue={setFilterType} />
+            <TypeChip value="builtin" label="Built-in" current={filterType} setValue={setFilterType} />
+          </div>
+          {availableProviders.length > 1 && (
+            <div className="flex flex-wrap gap-1">
+              <ProviderChip
+                value="all"
+                label="provider: 全て"
+                current={filterProvider}
+                setValue={setFilterProvider}
+              />
+              {availableProviders.map((p) => (
+                <ProviderChip
+                  key={p}
+                  value={p}
+                  label={PROVIDER_LABEL[p] ?? p}
+                  current={filterProvider}
+                  setValue={setFilterProvider}
+                />
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Label className="mb-0 shrink-0">並び替え</Label>
             <Select
@@ -258,9 +300,11 @@ export function AgentStudio() {
             </button>
           ))}
           {filtered.length === 0 && (
-            <div className="p-4 text-center text-xs text-[var(--color-fg-subtle)]">
-              該当なし
-            </div>
+            <Empty
+              dense
+              title="該当するエージェントがありません"
+              description="検索ワードかフィルタを変更してください。"
+            />
           )}
         </div>
       </div>
@@ -300,15 +344,50 @@ function RoleChip({
 }) {
   const active = role === current;
   const label = role === "all" ? "All" : ROLE_LABEL[role];
+  return <Chip active={active} onClick={() => setRole(role)} label={label} />;
+}
+
+function TypeChip({
+  value,
+  label,
+  current,
+  setValue,
+}: {
+  value: "all" | "draft" | "saved" | "builtin";
+  label: string;
+  current: "all" | "draft" | "saved" | "builtin";
+  setValue: (v: "all" | "draft" | "saved" | "builtin") => void;
+}) {
+  return <Chip active={value === current} onClick={() => setValue(value)} label={label} />;
+}
+
+function ProviderChip({
+  value,
+  label,
+  current,
+  setValue,
+}: {
+  value: ProviderKind | "all";
+  label: string;
+  current: ProviderKind | "all";
+  setValue: (v: ProviderKind | "all") => void;
+}) {
+  return <Chip active={value === current} onClick={() => setValue(value)} label={label} />;
+}
+
+function Chip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button
-      onClick={() => setRole(role)}
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
       className={clsx(
-        "rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider transition-colors",
+        "rounded-full border px-2.5 py-0.5 font-medium uppercase tracking-wider transition-colors",
         active
           ? "border-[var(--color-accent)]/60 bg-[var(--color-accent)]/15 text-[var(--color-fg)]"
           : "border-[var(--color-border)] text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)]",
       )}
+      style={{ fontSize: "var(--text-xs)" }}
     >
       {label}
     </button>

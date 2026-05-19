@@ -18,7 +18,13 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
+import { ResizeHandle } from "../components/ui/ResizeHandle";
 import { KnowledgePicker } from "../components/KnowledgePicker";
+import { ProviderHealthBar } from "../components/ProviderHealthBar";
+import { useToast } from "../components/ui/Toast";
+import { Empty } from "../components/ui/Empty";
+import { Alert } from "../components/ui/Alert";
+import { Skeleton } from "../components/ui/Skeleton";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { api } from "../api/client";
 import { PROVIDER_LABEL, ROLE_LABEL, formatDuration } from "../lib/format";
@@ -49,7 +55,7 @@ type CodingRunSnapshot = {
   startedAt?: number;
   endedAt?: number;
 };
-type ResizeTarget = "requestList" | "sourceTree" | "statusPanel" | "formPane";
+type ResizeTarget = "requestList" | "statusPanel" | "formPane";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -116,8 +122,10 @@ export function Coding() {
   const startRun = useApp((state) => state.startRun);
   const stopRun = useApp((state) => state.stopRun);
   const resetRun = useApp((state) => state.resetRun);
+  const { notify } = useToast();
 
   const [activeId, setActiveId] = useState<string | undefined>();
+  const [leftTab, setLeftTab] = useState<"requests" | "tree">("requests");
   const [draft, setDraft] = useState<RefineRequest>(() => createCodingRequest());
   const [title, setTitle] = useState("");
   const [treeByPath, setTreeByPath] = useState<Record<string, SourceTreeItem[]>>({});
@@ -136,8 +144,7 @@ export function Coding() {
   const [chatStatus, setChatStatus] = useState("");
   const [chatSending, setChatSending] = useState(false);
   const [layout, setLayout] = useState({
-    requestList: 300,
-    sourceTree: 280,
+    requestList: 340,
     statusPanel: 420,
     formPane: 420,
   });
@@ -370,6 +377,7 @@ export function Coding() {
     setActiveId(saved.id);
     setTitle(saved.title);
     setSaveMessage("コーディング依頼を保存しました。");
+    notify({ kind: "success", title: "コーディング依頼を保存しました" });
   };
 
   const prepareRequestForRun = async (
@@ -430,6 +438,10 @@ export function Coding() {
         buildRecord(requestValue, finalStatus, latestRun, recordId, prepared.versionControl),
       );
       setSaveMessage(latestRun.status === "completed" ? "実行が完了しました。" : "実行結果を保存しました。");
+      notify({
+        kind: latestRun.status === "completed" ? "success" : "info",
+        title: latestRun.status === "completed" ? "実行が完了しました" : "実行結果を保存しました",
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setSaveMessage(message);
@@ -520,12 +532,28 @@ export function Coding() {
       setChatMessage("");
       setChatImageAttachments([]);
       setChatStatus("CEOから回答がありました。");
+      notify({ kind: "success", title: "CEO から回答がありました" });
       setResultTab("chat");
     } catch (error) {
-      setChatStatus(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      setChatStatus(message);
+      notify({ kind: "error", title: "CEO チャットでエラー", description: message });
     } finally {
       setChatSending(false);
     }
+  };
+
+  const adjustResize = (target: ResizeTarget, delta: number) => {
+    setLayout((current) => ({
+      requestList:
+        target === "requestList" ? clamp(current.requestList + delta, 260, 520) : current.requestList,
+      statusPanel:
+        target === "statusPanel" ? clamp(current.statusPanel - delta, 320, 760) : current.statusPanel,
+      formPane:
+        target === "formPane"
+          ? clamp(current.formPane + delta, 300, Math.max(360, window.innerHeight - 220))
+          : current.formPane,
+    }));
   };
 
   const beginResize = (target: ResizeTarget, event: React.PointerEvent<HTMLDivElement>) => {
@@ -539,12 +567,8 @@ export function Coding() {
       setLayout({
         requestList:
           target === "requestList"
-            ? clamp(initial.requestList + dx, 220, 520)
+            ? clamp(initial.requestList + dx, 260, 520)
             : initial.requestList,
-        sourceTree:
-          target === "sourceTree"
-            ? clamp(initial.sourceTree + dx, 220, 520)
-            : initial.sourceTree,
         statusPanel:
           target === "statusPanel"
             ? clamp(initial.statusPanel - dx, 320, 760)
@@ -578,100 +602,145 @@ export function Coding() {
         <div className="border-b border-[var(--color-border)] p-3">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold">Coding</div>
-              <div className="text-xs text-[var(--color-fg-muted)]">実装依頼とソースを管理します。</div>
+              <div className="font-semibold" style={{ fontSize: "var(--text-sm)" }}>Coding</div>
+              <div className="text-[var(--color-fg-muted)]" style={{ fontSize: "var(--text-xs)" }}>
+                実装依頼とソースを管理します。
+              </div>
             </div>
             <Button size="sm" variant="outline" onClick={newRequest}>
               新規
             </Button>
           </div>
-          <Button size="sm" variant="danger" className="w-full" disabled={!activeId} onClick={() => void removeActive()}>
-            削除
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {codingRequests.length === 0 && (
-            <div className="rounded-md border border-dashed border-[var(--color-border)] p-4 text-xs text-[var(--color-fg-subtle)]">
-              コーディング依頼はまだありません。
-            </div>
-          )}
-          <div className="space-y-1">
-            {codingRequests.map((item) => (
-              <button
-                key={item.id}
-                className={clsx(
-                  "w-full rounded-md border p-2 text-left transition-colors",
-                  activeId === item.id
-                    ? "border-[var(--color-accent)] bg-[var(--color-surface-3)]"
-                    : "border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)]",
-                )}
-                onClick={() => selectRecord(item)}
-              >
-                <div className="truncate text-sm font-semibold">{item.title}</div>
-                <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--color-fg-subtle)]">
-                  <span>{STATUS_LABEL[item.status]}</span>
-                  <span>{new Date(item.updated_at).toLocaleString("ja-JP")}</span>
-                </div>
-                <div className="mt-1 truncate text-[11px] text-[var(--color-fg-muted)]">
-                  {item.request.code_context.working_directory || "working_directory 未設定"}
-                </div>
-              </button>
-            ))}
+          <div role="tablist" className="inline-flex w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-0.5">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={leftTab === "requests"}
+              onClick={() => setLeftTab("requests")}
+              className={clsx(
+                "flex-1 rounded px-2 py-1 transition-colors",
+                leftTab === "requests"
+                  ? "bg-[var(--color-surface-3)] text-[var(--color-fg)]"
+                  : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]",
+              )}
+              style={{ fontSize: "var(--text-sm)" }}
+            >
+              依頼一覧
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={leftTab === "tree"}
+              onClick={() => setLeftTab("tree")}
+              className={clsx(
+                "flex-1 rounded px-2 py-1 transition-colors",
+                leftTab === "tree"
+                  ? "bg-[var(--color-surface-3)] text-[var(--color-fg)]"
+                  : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]",
+              )}
+              style={{ fontSize: "var(--text-sm)" }}
+            >
+              ソース
+            </button>
           </div>
         </div>
+
+        {leftTab === "requests" ? (
+          <>
+            <div className="border-b border-[var(--color-border)] p-3">
+              <Button size="sm" variant="danger" className="w-full" disabled={!activeId} onClick={() => void removeActive()}>
+                選択中の依頼を削除
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {codingRequests.length === 0 ? (
+                <Empty dense title="コーディング依頼はまだありません" description="右上の「新規」から作成してください。" />
+              ) : (
+                <div className="space-y-1">
+                  {codingRequests.map((item) => (
+                    <button
+                      key={item.id}
+                      className={clsx(
+                        "w-full rounded-md border p-2 text-left transition-colors",
+                        activeId === item.id
+                          ? "border-[var(--color-accent)] bg-[var(--color-surface-3)]"
+                          : "border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)]",
+                      )}
+                      onClick={() => selectRecord(item)}
+                    >
+                      <div className="truncate font-semibold" style={{ fontSize: "var(--text-sm)" }}>{item.title}</div>
+                      <div
+                        className="mt-1 flex items-center justify-between text-[var(--color-fg-subtle)]"
+                        style={{ fontSize: "var(--text-xs)" }}
+                      >
+                        <span>{STATUS_LABEL[item.status]}</span>
+                        <span>{new Date(item.updated_at).toLocaleString("ja-JP")}</span>
+                      </div>
+                      <div
+                        className="mt-1 truncate text-[var(--color-fg-muted)]"
+                        style={{ fontSize: "var(--text-xs)" }}
+                      >
+                        {item.request.code_context.working_directory || "working_directory 未設定"}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="border-b border-[var(--color-border)] p-3">
+              <Label>作業ディレクトリ</Label>
+              <div className="space-y-2">
+                <Input
+                  value={draft.code_context.working_directory}
+                  placeholder="/path/to/repo"
+                  onChange={(event) => updateCodeContext({ working_directory: event.target.value })}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button size="sm" variant="outline" onClick={() => void pickDirectory()}>
+                    フォルダを選択
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => void loadTree()}>
+                    読込
+                  </Button>
+                </div>
+              </div>
+              {sourceError && <Alert kind="error" className="mt-2">{sourceError}</Alert>}
+              {(displayedVersionControl || versionMessage) && (
+                <VersionControlSummary state={displayedVersionControl} message={versionMessage} />
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {draft.code_context.working_directory && treeByPath[draft.code_context.working_directory] ? (
+                <SourceTree
+                  root={draft.code_context.working_directory}
+                  treeByPath={treeByPath}
+                  openDirs={openDirs}
+                  activeFile={sourcePath}
+                  onToggleDir={(path) => void toggleDir(path)}
+                  onOpenFile={(path) => void openFile(path)}
+                />
+              ) : (
+                <Empty
+                  dense
+                  title="ソース一覧はまだ読み込まれていません"
+                  description="作業ディレクトリを入力して「読込」を押してください。"
+                />
+              )}
+            </div>
+          </>
+        )}
       </aside>
-      <ResizeHandle axis="x" label="依頼一覧の幅を調整" onPointerDown={(event) => beginResize("requestList", event)} />
+      <ResizeHandle
+        axis="x"
+        label="依頼一覧の幅を調整"
+        onPointerDown={(event) => beginResize("requestList", event)}
+        onAdjust={(delta) => adjustResize("requestList", delta)}
+      />
 
-      <main
-        className="grid min-w-0 overflow-hidden"
-        style={{ gridTemplateColumns: `${layout.sourceTree}px 6px minmax(0,1fr)` }}
-      >
-        <section className="flex min-w-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
-          <div className="border-b border-[var(--color-border)] p-3">
-            <Label>作業ディレクトリ</Label>
-            <div className="space-y-2">
-              <Input
-                value={draft.code_context.working_directory}
-                placeholder="/path/to/repo"
-                onChange={(event) => updateCodeContext({ working_directory: event.target.value })}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" variant="outline" onClick={() => void pickDirectory()}>
-                  フォルダを選択
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => void loadTree()}>
-                  読込
-                </Button>
-              </div>
-            </div>
-            {sourceError && (
-              <div className="mt-2 rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300">
-                {sourceError}
-              </div>
-            )}
-            {(displayedVersionControl || versionMessage) && (
-              <VersionControlSummary state={displayedVersionControl} message={versionMessage} />
-            )}
-          </div>
-          <div className="flex-1 overflow-y-auto p-2">
-            {draft.code_context.working_directory && treeByPath[draft.code_context.working_directory] ? (
-              <SourceTree
-                root={draft.code_context.working_directory}
-                treeByPath={treeByPath}
-                openDirs={openDirs}
-                activeFile={sourcePath}
-                onToggleDir={(path) => void toggleDir(path)}
-                onOpenFile={(path) => void openFile(path)}
-              />
-            ) : (
-              <div className="rounded-md border border-dashed border-[var(--color-border)] p-4 text-xs text-[var(--color-fg-subtle)]">
-                作業ディレクトリを入力して読み込むと、ソースコード一覧が表示されます。
-              </div>
-            )}
-          </div>
-        </section>
-        <ResizeHandle axis="x" label="ソース一覧の幅を調整" onPointerDown={(event) => beginResize("sourceTree", event)} />
-
+      <main className="flex min-w-0 flex-col overflow-hidden">
         <section className="flex min-w-0 flex-col overflow-hidden">
           <div className="border-b border-[var(--color-border)] p-3">
             <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
@@ -833,7 +902,12 @@ export function Coding() {
               </div>
               {saveMessage && <div className="mt-2 text-xs text-[var(--color-fg-muted)]">{saveMessage}</div>}
             </div>
-            <ResizeHandle axis="y" label="依頼フォームとソース表示の高さを調整" onPointerDown={(event) => beginResize("formPane", event)} />
+            <ResizeHandle
+              axis="y"
+              label="依頼フォームとソース表示の高さを調整"
+              onPointerDown={(event) => beginResize("formPane", event)}
+              onAdjust={(delta) => adjustResize("formPane", delta)}
+            />
 
             <div className="flex min-h-0 flex-col overflow-hidden">
               <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-fg-muted)]">
@@ -859,7 +933,12 @@ export function Coding() {
           </div>
         </section>
       </main>
-      <ResizeHandle axis="x" label="作業状況の幅を調整" onPointerDown={(event) => beginResize("statusPanel", event)} />
+      <ResizeHandle
+        axis="x"
+        label="作業状況の幅を調整"
+        onPointerDown={(event) => beginResize("statusPanel", event)}
+        onAdjust={(delta) => adjustResize("statusPanel", delta)}
+      />
 
       <aside className="flex min-w-0 flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)]">
         <CardHeader>
@@ -912,7 +991,10 @@ export function Coding() {
             </div>
           )}
           {resultTab === "agents" && (
-            <AgentWorkList agents={draft.agents} turns={displayedTurns} events={displayedEvents} />
+            <div className="space-y-3">
+              <ProviderHealthBar providers={draft.agents.map((a) => a.provider)} />
+              <AgentWorkList agents={draft.agents} turns={displayedTurns} events={displayedEvents} />
+            </div>
           )}
           {resultTab === "diff" && (
             <div className="space-y-3">
@@ -921,7 +1003,10 @@ export function Coding() {
             </div>
           )}
           {resultTab === "logs" && (
-            <RunLogView events={displayedEvents} turns={displayedTurns} error={displayedError} />
+            <div className="space-y-3">
+              <RunLogView events={displayedEvents} turns={displayedTurns} error={displayedError} />
+              <ServerLogPanel />
+            </div>
           )}
           {resultTab === "chat" && (
             <CodingCEOChat
@@ -939,38 +1024,6 @@ export function Coding() {
           )}
         </div>
       </aside>
-    </div>
-  );
-}
-
-function ResizeHandle({
-  axis,
-  label,
-  onPointerDown,
-}: {
-  axis: "x" | "y";
-  label: string;
-  onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
-}) {
-  return (
-    <div
-      role="separator"
-      aria-label={label}
-      aria-orientation={axis === "x" ? "vertical" : "horizontal"}
-      className={clsx(
-        "group relative z-10 shrink-0 bg-[var(--color-bg)] transition-colors hover:bg-[var(--color-accent)]/20",
-        axis === "x" ? "cursor-col-resize border-x border-[var(--color-border)]" : "cursor-row-resize border-y border-[var(--color-border)]",
-      )}
-      onPointerDown={onPointerDown}
-    >
-      <div
-        className={clsx(
-          "absolute rounded-full bg-[var(--color-border-strong)] opacity-0 transition-opacity group-hover:opacity-100",
-          axis === "x"
-            ? "left-1/2 top-1/2 h-12 w-0.5 -translate-x-1/2 -translate-y-1/2"
-            : "left-1/2 top-1/2 h-0.5 w-12 -translate-x-1/2 -translate-y-1/2",
-        )}
-      />
     </div>
   );
 }
@@ -1166,6 +1219,77 @@ function AgentWorkList({
         );
       })}
     </div>
+  );
+}
+
+function ServerLogPanel() {
+  const [content, setContent] = useState("");
+  const [path, setPath] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.getServerLogs();
+      setContent(res.content || (res.exists ? "(空)" : "(ログファイル未生成)"));
+      setPath(res.path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = window.setInterval(() => void load(), 3000);
+    return () => window.clearInterval(id);
+  }, [autoRefresh]);
+
+  return (
+    <Card>
+      <CardBody className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold text-[var(--color-fg)]">サーバーログ</div>
+          <div className="flex items-center gap-2 text-xs">
+            <label className="flex items-center gap-1 text-[var(--color-fg-muted)]">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(event) => setAutoRefresh(event.target.checked)}
+              />
+              自動更新
+            </label>
+            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
+              {loading ? "読込中" : "更新"}
+            </Button>
+          </div>
+        </div>
+        {path && (
+          <div className="text-[var(--color-fg-muted)]" style={{ fontSize: "var(--text-xs)" }}>{path}</div>
+        )}
+        {error && <Alert kind="error" title="ログ取得に失敗">{error}</Alert>}
+        {loading && !content ? (
+          <Skeleton variant="text" lines={6} />
+        ) : content ? (
+          <pre
+            className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 font-mono text-[var(--color-fg-muted)]"
+            style={{ fontSize: "var(--text-code)", lineHeight: "var(--text-code--line-height)" }}
+          >
+            {content}
+          </pre>
+        ) : (
+          <Empty title="ログはまだありません" description="実行を開始するとここに表示されます。" dense />
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -1408,8 +1532,8 @@ function CodingCEOChat({
         </div>
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 text-xs text-[var(--color-fg-muted)]">{status}</div>
-          <Button disabled={!message.trim() || sending} onClick={onSend}>
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          <Button disabled={!message.trim()} loading={sending} onClick={onSend}>
+            {!sending && <Send className="h-4 w-4" />}
             送信
           </Button>
         </div>

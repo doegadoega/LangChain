@@ -262,6 +262,21 @@ export interface ProviderModelsResponse {
   error?: string | null;
 }
 
+export interface ProviderHealth {
+  provider: ProviderKind;
+  alive: boolean;
+  detail: string;
+  start_command: string | null;
+  docs_url: string | null;
+  binary: string | null;
+  endpoint: string | null;
+}
+
+export interface ProviderHealthResponse {
+  providers: ProviderHealth[];
+  summary: { total: number; alive: number; dead: number };
+}
+
 export interface TurnResult {
   agent_id: string;
   agent_name: string;
@@ -337,7 +352,45 @@ export type StreamEvent = (
   | { type: "round_completed"; round_index: number; draft_after_round: string }
   | { type: "run_completed"; result: RefineResponse }
   | { type: "run_failed"; error: string }
+  | {
+      type: "turn_phase";
+      agent_id: string;
+      agent_name: string;
+      round_index?: number;
+      batch_index?: number;
+      turn_index?: number;
+      phase:
+        | "research_fetching"
+        | "prompt_building"
+        | "mcp_loading"
+        | "provider_calling"
+        | "provider_completed"
+        | "provider_failed";
+      provider?: ProviderKind;
+      prompt_chars?: number;
+      model?: string | null;
+      elapsed_sec?: number;
+      output_chars?: number;
+      error?: string;
+      servers?: string[];
+      sources?: number;
+    }
 ) & { received_at?: string; sequence?: number };
+
+export interface AgentLogSummary {
+  agent_id: string;
+  path: string;
+  size: number;
+  modified_at: number;
+}
+
+export interface AgentLogResponse {
+  agent_id: string;
+  path: string;
+  exists: boolean;
+  size: number;
+  content: string;
+}
 
 export type QAJudgement = "PASS" | "REWORK" | "ESCALATE";
 

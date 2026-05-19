@@ -1,5 +1,7 @@
 import type {
   AgentConfig,
+  AgentLogResponse,
+  AgentLogSummary,
   CandidateBatch,
   ChatMessageRequest,
   ChatSession,
@@ -7,6 +9,8 @@ import type {
   ManagedRequest,
   KnowledgeResource,
   ExternalSkillImportResult,
+  ProviderHealth,
+  ProviderHealthResponse,
   ProviderKind,
   ProviderModelsResponse,
   DirectoryPickResponse,
@@ -36,6 +40,45 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+async function postChatMessageStreaming(payload: ChatMessageRequest): Promise<ChatSession> {
+  const res = await fetch(BASE + "/api/chats/message/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("ストリームを取得できませんでした");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalChat: ChatSession | null = null;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex >= 0) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      newlineIndex = buffer.indexOf("\n");
+      if (!line) continue;
+      try {
+        const event = JSON.parse(line) as { type: string; chat?: ChatSession };
+        if (event.type === "completed" && event.chat) {
+          finalChat = event.chat;
+        }
+      } catch {
+        // ignore malformed lines
+      }
+    }
+  }
+  if (!finalChat) throw new Error("ストリームが完了せず応答を取得できませんでした");
+  return finalChat;
 }
 
 export const api = {
@@ -94,11 +137,34 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  // server logs
+  getServerLogs: (tailBytes = 64 * 1024) =>
+    req<{ path: string; exists: boolean; size: number; content: string }>(
+      `/api/logs?tail_bytes=${tailBytes}`,
+    ),
+  listAgentLogs: () =>
+    req<{ agents: AgentLogSummary[] }>("/api/logs/agents"),
+  getAgentLog: (agentId: string, tailBytes = 64 * 1024) =>
+    req<AgentLogResponse>(
+      `/api/logs/agents/${encodeURIComponent(agentId)}?tail_bytes=${tailBytes}`,
+    ),
+
+  // provider health
+  getProvidersHealth: (providers?: ProviderKind[]) => {
+    const qs = providers && providers.length ? `?providers=${providers.join(",")}` : "";
+    return req<ProviderHealthResponse>(`/api/providers/health${qs}`);
+  },
+  precheckRun: (payload: unknown) =>
+    req<{ ok: boolean; dead: ProviderHealth[]; checked: ProviderHealth[] }>(
+      "/api/runs/precheck",
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+
   // chats
   listChats: () => req<ChatSession[]>("/api/chats"),
   getChat: (id: string) => req<ChatSession>(`/api/chats/${id}`),
-  postChatMessage: (payload: ChatMessageRequest) =>
-    req<ChatSession>("/api/chats/message", { method: "POST", body: JSON.stringify(payload) }),
+  postChatMessage: async (payload: ChatMessageRequest) =>
+    postChatMessageStreaming(payload),
   deleteChat: (id: string) => req<void>(`/api/chats/${id}`, { method: "DELETE" }),
 
   // templates

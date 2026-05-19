@@ -22,6 +22,17 @@ from app.evaluation import (
     create_evaluation,
     get_agent_evaluations_across_projects,
 )
+from app.health import check_providers, precheck_agents
+from app.logging_setup import (
+    LOG_FILE,
+    agent_log_path,
+    configure_logging,
+    list_agent_logs,
+    read_agent_log_tail,
+    read_log_tail,
+)
+
+configure_logging()
 from app.models import AgentConfig, KnowledgeContextItem, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
 from app.providers import ProviderError, list_provider_models, resolve_provider
@@ -553,6 +564,62 @@ def home() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/api/providers/health")
+def get_providers_health(providers: str | None = None) -> JSONDict:
+    """各 provider が起動/接続可能かをチェック。
+
+    クエリ `providers=codex_cli,ollama` で対象を絞れる。未指定なら全種。
+    """
+    kinds: list[ProviderKind] | None = None
+    if providers:
+        wanted = [p.strip() for p in providers.split(",") if p.strip()]
+        kinds = []
+        for token in wanted:
+            try:
+                kinds.append(ProviderKind(token))
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"unknown provider: {token}")
+    results = check_providers(kinds)
+    return {
+        "providers": [r.to_dict() for r in results],
+        "summary": {
+            "total": len(results),
+            "alive": sum(1 for r in results if r.alive),
+            "dead": sum(1 for r in results if not r.alive),
+        },
+    }
+
+
+@app.get("/api/logs")
+def get_logs(tail_bytes: int = 64 * 1024) -> JSONDict:
+    tail_bytes = max(1024, min(int(tail_bytes), 1_000_000))
+    return {
+        "path": str(LOG_FILE),
+        "exists": LOG_FILE.exists(),
+        "size": LOG_FILE.stat().st_size if LOG_FILE.exists() else 0,
+        "content": read_log_tail(max_bytes=tail_bytes),
+    }
+
+
+@app.get("/api/logs/agents")
+def list_agent_log_files() -> JSONDict:
+    return {"agents": list_agent_logs()}
+
+
+@app.get("/api/logs/agents/{agent_id}")
+def get_agent_log(agent_id: str, tail_bytes: int = 64 * 1024) -> JSONDict:
+    safe_id = _validate_record_id(agent_id)
+    tail_bytes = max(1024, min(int(tail_bytes), 1_000_000))
+    path = agent_log_path(safe_id)
+    return {
+        "agent_id": safe_id,
+        "path": str(path),
+        "exists": path.exists(),
+        "size": path.stat().st_size if path.exists() else 0,
+        "content": read_agent_log_tail(safe_id, max_bytes=tail_bytes),
+    }
+
+
 @app.post("/api/refine", response_model=RefineResponse)
 def refine(payload: RefineRequest) -> RefineResponse:
     try:
@@ -564,8 +631,24 @@ def refine(payload: RefineRequest) -> RefineResponse:
 
 
 @app.post("/api/refine/stream")
-def refine_stream(payload: RefineRequest) -> StreamingResponse:
+def refine_stream(payload: RefineRequest, force: bool = False) -> StreamingResponse:
     def event_stream():
+        if not force:
+            precheck = precheck_agents(payload.agents)
+            if not precheck["ok"]:
+                yield json.dumps(
+                    {"type": "precheck_failed", **precheck},
+                    ensure_ascii=False,
+                ) + "\n"
+                names = ", ".join(d["provider"] for d in precheck["dead"])
+                yield json.dumps(
+                    {
+                        "type": "run_failed",
+                        "error": f"事前チェック失敗: 起動していない provider があります ({names})。",
+                    },
+                    ensure_ascii=False,
+                ) + "\n"
+                return
         try:
             for event in iter_refinement_events(payload):
                 yield json.dumps(event, ensure_ascii=False) + "\n"
@@ -576,6 +659,15 @@ def refine_stream(payload: RefineRequest) -> StreamingResponse:
             ) + "\n"
 
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+
+
+@app.post("/api/runs/precheck")
+def runs_precheck(payload: RefineRequest) -> JSONDict:
+    """Pre-flight check of provider health for the enabled agents in the request.
+
+    Returns { ok, dead[], checked[] }. Used by the UI to gate the Run button.
+    """
+    return precheck_agents(payload.agents)
 
 
 @app.get("/api/providers/{provider}/models")
@@ -982,8 +1074,7 @@ def delete_chat(chat_id: str, store: FileStore = Depends(get_store)):
     store.delete_chat(_validate_record_id(chat_id))
 
 
-@app.post("/api/chats/message")
-def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
+def _prepare_chat_turn(payload: JSONDict, store: FileStore) -> tuple[JSONDict, str, AgentConfig, str, JSONDict, list[JSONDict], list[JSONDict], str | None, bool]:
     from datetime import datetime, timezone
 
     raw_question = _safe_text(payload.get("question"), max_chars=8000)
@@ -1041,7 +1132,7 @@ def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
     messages = list(chat.get("messages") or [])
 
     sources: list[JSONDict] = []
-    search_error = None
+    search_error: str | None = None
     if web_search_enabled:
         sources, search_error = _search_web(raw_question)
 
@@ -1063,7 +1154,49 @@ def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
         history=messages,
     )
 
-    assistant_error = None
+    return chat, session_id, agent, prompt, user_message, messages, sources, search_error, web_search_enabled
+
+
+def _finalize_chat_turn(
+    *,
+    chat: JSONDict,
+    session_id: str,
+    agent: AgentConfig,
+    user_message: JSONDict,
+    messages: list[JSONDict],
+    answer: str,
+    assistant_error: str | None,
+    search_error: str | None,
+    sources: list[JSONDict],
+    web_search_enabled: bool,
+    store: FileStore,
+) -> JSONDict:
+    from datetime import datetime, timezone
+
+    assistant_message = _make_chat_message(
+        role="assistant",
+        content=answer,
+        agent_id=agent.id,
+        agent_name=agent.name,
+        web_search_enabled=web_search_enabled,
+        sources=sources,
+        error=assistant_error or search_error,
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    chat.update(
+        {
+            "id": session_id,
+            "agent_id": agent.id,
+            "agent_name": agent.name,
+            "messages": [*messages, user_message, assistant_message],
+            "updated_at": now,
+        }
+    )
+    store.save_chat(chat)
+    return chat
+
+
+def _run_provider_for_chat(agent: AgentConfig, prompt: str) -> tuple[str, str | None]:
     try:
         provider = resolve_provider(
             provider_kind=agent.provider,
@@ -1076,6 +1209,7 @@ def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
             mcp_config_path=agent.mcp_config_path,
             mcp_servers=agent.mcp_servers,
         ).strip()
+        return answer, None
     except ProviderError as exc:
         assistant_error = str(exc)
         answer = (
@@ -1083,28 +1217,95 @@ def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
             f"{assistant_error}\n\n"
             "エージェント設定の provider / model / command_template と、CLI またはローカルLLMサーバーの起動状態を確認してください。"
         )
+        return answer, assistant_error
 
-    assistant_message = _make_chat_message(
-        role="assistant",
-        content=answer,
-        agent_id=agent.id,
-        agent_name=agent.name,
-        web_search_enabled=web_search_enabled,
+
+@app.post("/api/chats/message")
+def post_chat_message(payload: JSONDict, store: FileStore = Depends(get_store)):
+    (
+        chat,
+        session_id,
+        agent,
+        prompt,
+        user_message,
+        messages,
+        sources,
+        search_error,
+        web_search_enabled,
+    ) = _prepare_chat_turn(payload, store)
+    answer, assistant_error = _run_provider_for_chat(agent, prompt)
+    return _finalize_chat_turn(
+        chat=chat,
+        session_id=session_id,
+        agent=agent,
+        user_message=user_message,
+        messages=messages,
+        answer=answer,
+        assistant_error=assistant_error,
+        search_error=search_error,
         sources=sources,
-        error=assistant_error or search_error,
+        web_search_enabled=web_search_enabled,
+        store=store,
     )
 
-    chat.update(
-        {
-            "id": session_id,
-            "agent_id": agent.id,
-            "agent_name": agent.name,
-            "messages": [*messages, user_message, assistant_message],
-            "updated_at": now,
-        }
-    )
-    store.save_chat(chat)
-    return chat
+
+@app.post("/api/chats/message/stream")
+def post_chat_message_stream(payload: JSONDict, store: FileStore = Depends(get_store)) -> StreamingResponse:
+    import threading
+    import time as _time
+
+    (
+        chat,
+        session_id,
+        agent,
+        prompt,
+        user_message,
+        messages,
+        sources,
+        search_error,
+        web_search_enabled,
+    ) = _prepare_chat_turn(payload, store)
+
+    result: dict[str, Any] = {}
+
+    def worker() -> None:
+        try:
+            answer, assistant_error = _run_provider_for_chat(agent, prompt)
+            result["answer"] = answer
+            result["error"] = assistant_error
+        except Exception as exc:  # safety net
+            result["answer"] = f"内部エラー: {exc}"
+            result["error"] = str(exc)
+
+    def event_stream():
+        started = _time.monotonic()
+        yield json.dumps({"type": "started", "session_id": session_id}, ensure_ascii=False) + "\n"
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+        while thread.is_alive():
+            thread.join(timeout=5.0)
+            elapsed = _time.monotonic() - started
+            yield json.dumps({"type": "heartbeat", "elapsed": round(elapsed, 1)}, ensure_ascii=False) + "\n"
+
+        answer = result.get("answer", "")
+        assistant_error = result.get("error")
+        final_chat = _finalize_chat_turn(
+            chat=chat,
+            session_id=session_id,
+            agent=agent,
+            user_message=user_message,
+            messages=messages,
+            answer=answer,
+            assistant_error=assistant_error,
+            search_error=search_error,
+            sources=sources,
+            web_search_enabled=web_search_enabled,
+            store=store,
+        )
+        yield json.dumps({"type": "completed", "chat": final_chat}, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
 
 # -- Template CRUD --

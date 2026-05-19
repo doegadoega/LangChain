@@ -5,6 +5,7 @@ import type {
   KnowledgeResource,
   ModelDecision,
   OrgRole,
+  ProviderHealth,
   ProviderKind,
   Project,
   QAJudgement,
@@ -726,9 +727,11 @@ interface AppState {
 
   run: RunState;
   abortCtrl?: AbortController;
-  startRun: () => Promise<void>;
+  startRun: (options?: { force?: boolean }) => Promise<void>;
   stopRun: () => void;
   resetRun: () => void;
+  pendingPrecheck?: ProviderHealth[];
+  clearPendingPrecheck: () => void;
 
   qaVerdicts: QAVerdict[];
   setQaVerdict: (v: QAVerdict) => void;
@@ -950,7 +953,11 @@ export const useApp = create<AppState>((set, get) => ({
 
   run: { status: "idle", events: [], turns: [], currentRound: 0 },
 
-  startRun: async () => {
+  pendingPrecheck: undefined,
+  clearPendingPrecheck: () => set({ pendingPrecheck: undefined }),
+
+  startRun: async (options) => {
+    const force = options?.force === true;
     const { request } = get();
     const enabledAgents = request.agents.filter((a) => a.enabled !== false);
     if (enabledAgents.length === 0) {
@@ -961,10 +968,44 @@ export const useApp = create<AppState>((set, get) => ({
       set({ run: { status: "failed", events: [], turns: [], currentRound: 0, error: "要件 (source_text) を入力してください" } });
       return;
     }
+    const payload: RefineRequest = { ...request, agents: enabledAgents.map((a) => ({ ...a })) };
+
+    if (!force) {
+      try {
+        const precheck = await api.precheckRun(payload);
+        if (!precheck.ok) {
+          set({
+            pendingPrecheck: precheck.dead,
+            run: {
+              status: "failed",
+              events: [],
+              turns: [],
+              currentRound: 0,
+              error: `事前チェック失敗: 起動していない provider があります (${precheck.dead.map((d) => d.provider).join(", ")})`,
+            },
+          });
+          return;
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        set({
+          run: {
+            status: "failed",
+            events: [],
+            turns: [],
+            currentRound: 0,
+            error: `事前チェックに失敗しました: ${message}`,
+          },
+        });
+        return;
+      }
+    }
+
     const ctrl = new AbortController();
     set({
       abortCtrl: ctrl,
       qaVerdicts: [],
+      pendingPrecheck: undefined,
       run: {
         status: "running",
         events: [],
@@ -974,8 +1015,7 @@ export const useApp = create<AppState>((set, get) => ({
       },
     });
     try {
-      const payload: RefineRequest = { ...request, agents: enabledAgents.map((a) => ({ ...a })) };
-      for await (const ev of streamRefine(payload, ctrl.signal)) {
+      for await (const ev of streamRefine(payload, ctrl.signal, { force })) {
         const cur = get().run;
         const next: RunState = { ...cur, events: [...cur.events, ev] };
         if (ev.type === "round_started") next.currentRound = ev.round_index;
