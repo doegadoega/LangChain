@@ -16,6 +16,9 @@ import clsx from "clsx";
 import { Button } from "../components/ui/Button";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { KnowledgePicker } from "../components/KnowledgePicker";
+import { ProviderHealthBar } from "../components/ProviderHealthBar";
+import { useToast } from "../components/ui/Toast";
+import { Empty } from "../components/ui/Empty";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { formatDuration, PROVIDER_LABEL, ROLE_LABEL } from "../lib/format";
 import { useApp } from "../state/store";
@@ -502,8 +505,7 @@ export function Workspace() {
   const [codingOpen, setCodingOpen] = useState(false);
   const [workMode, setWorkMode] = useState<WorkMode>("subwork");
   const [contentMode, setContentMode] = useState<ContentMode>("edit");
-  const [inspectorTab, setInspectorTab] =
-    useState<"summary" | "conversation" | "events" | "payload">("summary");
+  const [inspectorTab, setInspectorTab] = useState<"run" | "output" | "context">("run");
   const [selectedVersionId, setSelectedVersionId] = useState("");
   const managedRequests = useApp((state) => state.managedRequests);
   const templates = useApp((state) => state.templates);
@@ -518,6 +520,7 @@ export function Workspace() {
   const [selectedTeamTemplateId, setSelectedTeamTemplateId] = useState("");
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const { notify } = useToast();
   const [feedbackKind] = useState<VerificationFeedback["kind"]>("fix_request");
   const [feedbackText, setFeedbackText] = useState("");
   const [pendingParentSubWorkId, setPendingParentSubWorkId] = useState<string | undefined>();
@@ -1047,6 +1050,7 @@ export function Workspace() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setSaveMessage(`自動保存に失敗しました: ${message}`);
+      notify({ kind: "error", title: "自動保存に失敗しました", description: message });
       return undefined;
     }
   };
@@ -1108,6 +1112,7 @@ export function Workspace() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setSaveMessage(`削除に失敗しました: ${message}`);
+      notify({ kind: "error", title: "削除に失敗しました", description: message });
     }
   };
 
@@ -1129,6 +1134,7 @@ export function Workspace() {
       setRequestStatus(saved.status);
       setFeedbackText("");
       setSaveMessage("レビューを反映しました。");
+      notify({ kind: "success", title: "レビューを反映しました" });
       return { feedback: nextFeedback, feedbackList: saved.verification_feedback ?? [] };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1203,7 +1209,7 @@ export function Workspace() {
     updateRequest(nextRequest);
     setWorkMode("subwork");
     setContentMode("progress");
-    setInspectorTab("summary");
+    setInspectorTab("run");
     setSaveMessage("フィードバックを反映して、AIチームの議論を再開します。");
     await startRun();
   };
@@ -1212,7 +1218,7 @@ export function Workspace() {
     setSelectedVersionId(CURRENT_SUBWORK_ID);
     setWorkMode("subwork");
     setContentMode("progress");
-    setInspectorTab("summary");
+    setInspectorTab("run");
     setRequestStatus("running");
     await startRun();
   };
@@ -1960,6 +1966,11 @@ export function Workspace() {
               </div>
               <div>
                 <h3 className="mb-2 text-sm font-semibold">{agentCardsLabel}</h3>
+                <ProviderHealthBar
+                  className="mb-2"
+                  providers={activeExecutionEnabledAgents.map((agent) => agent.provider)}
+                  compact
+                />
                 <AgentProgressCards
                   agents={activeExecutionEnabledAgents}
                   turns={activeRunTurns}
@@ -2207,45 +2218,72 @@ export function Workspace() {
         </CardHeader>
         <CardBody className="flex-1 space-y-4 overflow-y-auto">
           <section>
-            <div className="mb-3 grid grid-cols-4 gap-1 rounded-md bg-[var(--color-surface-2)] p-1 text-xs">
-              {(["summary", "conversation", "events", "payload"] as const).map((tab) => (
+            <div
+              role="tablist"
+              className="mb-3 grid grid-cols-3 gap-1 rounded-md bg-[var(--color-surface-2)] p-1"
+              style={{ fontSize: "var(--text-sm)" }}
+            >
+              {(["run", "output", "context"] as const).map((tab) => (
                 <button
                   key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={inspectorTab === tab}
                   onClick={() => setInspectorTab(tab)}
                   className={clsx(
-                    "rounded px-2 py-1.5",
+                    "rounded px-2 py-1.5 transition-colors",
                     inspectorTab === tab
                       ? "bg-[var(--color-surface-3)] text-[var(--color-fg)]"
-                      : "text-[var(--color-fg-muted)]",
+                      : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]",
                   )}
                 >
-                  {tab === "summary"
-                    ? "概要"
-                    : tab === "conversation"
-                      ? "会話"
-                      : tab === "events"
-                        ? "ログ"
-                        : "JSON"}
+                  {tab === "run" ? "Run" : tab === "output" ? "Output" : "Context"}
                 </button>
               ))}
             </div>
-            <div className="min-h-72 overflow-y-auto pb-2 text-sm">
-              {inspectorTab === "summary" && (
+            <div
+              className="min-h-72 overflow-y-auto pb-2"
+              style={{ fontSize: "var(--text-body)" }}
+            >
+              {inspectorTab === "run" && (
                 <div className="space-y-3">
-                    <Info
-                      label="現在のサブワーク"
-                      value={
-                        selectedSubWork
+                  <Info
+                    label="現在のサブワーク"
+                    value={
+                      selectedSubWork
                         ? `${selectedSubWork.label} / ${subWorkStatusLabel(selectedSubWork.status)}`
                         : "未選択"
-                      }
-                    />
-                  {activeOutputText && (
-                    <Info label="最新の実行結果" value={activeOutputText} />
-                  )}
-                  <Info label="依頼内容" value={requestPreview || "未設定"} />
+                    }
+                  />
                   <Info label="AIチーム" value={`${activeExecutionEnabledAgents.length}人が有効`} />
                   <Info label="ターン数" value={`${activeRunTurns.length}件`} />
+                  {activeRunState.error && <Info label="エラー" value={activeRunState.error} />}
+                  <div className="border-t border-[var(--color-border)] pt-3">
+                    <div
+                      className="mb-2 font-semibold text-[var(--color-fg)]"
+                      style={{ fontSize: "var(--text-sm)" }}
+                    >
+                      会話
+                    </div>
+                    <Conversation
+                      agents={activeExecutionEnabledAgents}
+                      turns={activeRunTurns}
+                      events={activeRunEvents}
+                    />
+                  </div>
+                </div>
+              )}
+              {inspectorTab === "output" && (
+                <div className="space-y-3">
+                  {activeOutputText ? (
+                    <Info label="最新の実行結果" value={activeOutputText} />
+                  ) : (
+                    <Empty
+                      dense
+                      title="まだ結果はありません"
+                      description="実行が完了するとここに最新の出力が表示されます。"
+                    />
+                  )}
                   {activeDiff && (
                     <Info
                       label="変更点"
@@ -2260,25 +2298,45 @@ export function Workspace() {
                       icon={<FileDiff className="h-3.5 w-3.5" />}
                     />
                   )}
-                  {activeRunState.error && <Info label="エラー" value={activeRunState.error} />}
+                  <Info label="依頼内容" value={requestPreview || "未設定"} />
                 </div>
               )}
-              {inspectorTab === "conversation" && (
-                <Conversation
-                  agents={activeExecutionEnabledAgents}
-                  turns={activeRunTurns}
-                  events={activeRunEvents}
-                />
-              )}
-              {inspectorTab === "events" && (
-                <pre className="whitespace-pre-wrap rounded-md bg-[var(--color-surface-2)] p-3 font-mono text-xs text-[var(--color-fg-muted)]">
-                  {activeRunEvents.length ? JSON.stringify(activeRunEvents, null, 2) : "ログはまだありません。"}
-                </pre>
-              )}
-              {inspectorTab === "payload" && (
-                <pre className="whitespace-pre-wrap rounded-md bg-[var(--color-surface-2)] p-3 font-mono text-xs text-[var(--color-fg-muted)]">
-                  {JSON.stringify(request, null, 2)}
-                </pre>
+              {inspectorTab === "context" && (
+                <div className="space-y-3">
+                  <details
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2"
+                    open
+                  >
+                    <summary
+                      className="cursor-pointer font-semibold text-[var(--color-fg)]"
+                      style={{ fontSize: "var(--text-sm)" }}
+                    >
+                      payload (RefineRequest)
+                    </summary>
+                    <pre
+                      className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-[var(--color-fg-muted)]"
+                      style={{ fontSize: "var(--text-code)" }}
+                    >
+                      {JSON.stringify(request, null, 2)}
+                    </pre>
+                  </details>
+                  <details className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
+                    <summary
+                      className="cursor-pointer font-semibold text-[var(--color-fg)]"
+                      style={{ fontSize: "var(--text-sm)" }}
+                    >
+                      raw events ({activeRunEvents.length})
+                    </summary>
+                    <pre
+                      className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-[var(--color-fg-muted)]"
+                      style={{ fontSize: "var(--text-code)" }}
+                    >
+                      {activeRunEvents.length
+                        ? JSON.stringify(activeRunEvents, null, 2)
+                        : "ログはまだありません。"}
+                    </pre>
+                  </details>
+                </div>
               )}
             </div>
           </section>
@@ -2486,6 +2544,13 @@ function AgentProgressCards({
     );
   }
 
+  const latestPhaseByAgent = new Map<string, Extract<StreamEvent, { type: "turn_phase" }>>();
+  for (const ev of events) {
+    if (ev.type === "turn_phase") {
+      latestPhaseByAgent.set(ev.agent_id, ev);
+    }
+  }
+
   return (
     <div className="grid gap-3 xl:grid-cols-2">
       {agents.map((agent) => {
@@ -2493,6 +2558,7 @@ function AgentProgressCards({
         const latestTurn = agentTurns[agentTurns.length - 1];
         const status = getAgentStatus(agent.id, turns, events);
         const workDescription = getAgentWorkDescription(agent, status, latestTurn);
+        const phaseEvent = latestPhaseByAgent.get(agent.id);
         return (
           <div
             key={agent.id}
@@ -2516,8 +2582,20 @@ function AgentProgressCards({
             </div>
 
             <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs leading-relaxed text-[var(--color-fg-muted)]">
-              <div className="mb-1 font-semibold text-[var(--color-fg)]">現在の作業</div>
-              {workDescription}
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="font-semibold text-[var(--color-fg)]">現在の作業</span>
+                {phaseEvent && <PhaseBadge phase={phaseEvent.phase} />}
+              </div>
+              {phaseEvent ? (
+                <div className="space-y-0.5">
+                  <div>{describePhase(phaseEvent)}</div>
+                  <div className="text-[10px] text-[var(--color-fg-subtle)]">
+                    {workDescription}
+                  </div>
+                </div>
+              ) : (
+                workDescription
+              )}
             </div>
 
             <div className="mt-3 grid gap-2 text-xs text-[var(--color-fg-muted)] md:grid-cols-2">
@@ -2642,6 +2720,51 @@ function ResearchResultsList({
       ))}
     </div>
   );
+}
+
+const PHASE_LABEL: Record<string, string> = {
+  research_fetching: "Web 検索中",
+  prompt_building: "プロンプト構築中",
+  mcp_loading: "MCP コンテキスト取得中",
+  provider_calling: "AI 呼び出し中",
+  provider_completed: "応答取得",
+  provider_failed: "失敗",
+};
+
+function PhaseBadge({ phase }: { phase: string }) {
+  const tone =
+    phase === "provider_failed"
+      ? "border-red-500/40 bg-red-500/10 text-red-200"
+      : phase === "provider_completed"
+        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+        : "border-sky-500/40 bg-sky-500/10 text-sky-200";
+  return (
+    <span
+      className={clsx("inline-flex rounded-full border px-1.5 py-0.5", tone)}
+      style={{ fontSize: "var(--text-xs)" }}
+    >
+      {PHASE_LABEL[phase] ?? phase}
+    </span>
+  );
+}
+
+function describePhase(ev: Extract<StreamEvent, { type: "turn_phase" }>): string {
+  switch (ev.phase) {
+    case "research_fetching":
+      return `${ev.sources ?? 0} 件のリサーチソースを取得中…`;
+    case "prompt_building":
+      return "プロンプトを組み立てています…";
+    case "mcp_loading":
+      return `MCP サーバ (${(ev.servers ?? []).join(", ") || "default"}) からコンテキスト取得中…`;
+    case "provider_calling":
+      return `${ev.provider ?? "AI"} を呼び出し中 (prompt ${ev.prompt_chars ?? "?"}文字${ev.model ? ` / ${ev.model}` : ""})…`;
+    case "provider_completed":
+      return `応答を受信 (${ev.output_chars ?? "?"}文字 / ${ev.elapsed_sec ?? "?"}s)`;
+    case "provider_failed":
+      return `エラー: ${ev.error ?? "詳細不明"}`;
+    default:
+      return ev.phase;
+  }
 }
 
 function AgentStatusBadge({ status }: { status: AgentRunStatus }) {

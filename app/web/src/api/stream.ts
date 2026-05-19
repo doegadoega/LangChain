@@ -3,8 +3,10 @@ import type { RefineRequest, StreamEvent } from "../types";
 export async function* streamRefine(
   request: RefineRequest,
   signal?: AbortSignal,
+  options?: { force?: boolean },
 ): AsyncGenerator<StreamEvent, void, unknown> {
-  const res = await fetch("/api/refine/stream", {
+  const qs = options?.force ? "?force=true" : "";
+  const res = await fetch(`/api/refine/stream${qs}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),

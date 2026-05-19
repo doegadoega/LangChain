@@ -22,6 +22,25 @@
 
   --font-sans: ui-sans-serif, -apple-system, "SF Pro Text", "Hiragino Sans", "Noto Sans JP", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  /* Typography scale (px / line-height / weight) — 6 levels */
+  --text-display: 20px;
+  --text-display--line-height: 1.3;
+  --text-heading: 16px;
+  --text-heading--line-height: 1.35;
+  --text-body: 13px;
+  --text-body--line-height: 1.55;
+  --text-sm: 12px;
+  --text-sm--line-height: 1.5;
+  --text-xs: 11px;
+  --text-xs--line-height: 1.4;
+  --text-code: 12px;
+  --text-code--line-height: 1.5;
+
+  /* Radius scale */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 }
 
 @layer base {
@@ -32,7 +51,10 @@
     font-family: var(--font-sans);
     background: var(--color-bg);
     color: var(--color-fg);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
     -webkit-font-smoothing: antialiased;
+    font-feature-settings: "palt";
   }
   * {
     box-sizing: border-box;

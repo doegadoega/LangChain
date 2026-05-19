@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import logging
 import pathlib
 import subprocess as _sp
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from difflib import unified_diff
 from typing import Iterator
+
+from app.logging_setup import get_agent_logger
+
+logger = logging.getLogger("app.orchestrator")
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -665,6 +671,19 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                             f"元の要件:\n{original}\n\nまだファイル変更はありません。"
                         )
 
+                agent_logger = get_agent_logger(agent.id)
+                turn_started_at = time.monotonic()
+                agent_logger.info(
+                    "turn.start round=%d batch=%d turn=%d agent=%s role=%s provider=%s mcp=%s",
+                    round_index,
+                    batch_index,
+                    turn_index,
+                    agent.name,
+                    agent.org_role.value,
+                    agent.provider.value,
+                    agent.mcp_enabled,
+                )
+
                 yield {
                     "type": "turn_started",
                     "round_index": round_index,
@@ -678,17 +697,34 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     "mcp_enabled": agent.mcp_enabled,
                 }
 
+                def emit_phase(phase: str, **extra) -> dict[str, object]:
+                    return {
+                        "type": "turn_phase",
+                        "round_index": round_index,
+                        "batch_index": batch_index,
+                        "turn_index": turn_index,
+                        "agent_id": agent.id,
+                        "agent_name": agent.name,
+                        "phase": phase,
+                        **extra,
+                    }
+
                 research_results: list[ResearchSourceResult] = []
                 research_error = None
                 if agent.allow_web_search and agent.research_sources:
+                    yield emit_phase("research_fetching", sources=len(agent.research_sources))
+                    agent_logger.info("research.fetch sources=%d", len(agent.research_sources))
                     try:
                         research_results = fetch_research_sources(
                             agent.research_sources,
                             max_results=agent.max_search_results,
                         )
+                        agent_logger.info("research.done results=%d", len(research_results))
                     except Exception as exc:
                         research_error = str(exc)
+                        agent_logger.warning("research.failed error=%s", exc)
 
+                yield emit_phase("prompt_building")
                 prompt = _build_task_prompt(
                     agent=agent,
                     context=context,
@@ -704,16 +740,34 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                 mcp_context = ""
                 mcp_context_error = None
                 if agent.mcp_enabled:
+                    yield emit_phase("mcp_loading", servers=agent.mcp_servers)
+                    agent_logger.info("mcp.load servers=%s", agent.mcp_servers)
                     mcp_context, mcp_context_error = _load_mcp_context(
                         agent=agent,
                         prompt=prompt,
                         cwd=cwd,
                     )
+                    if mcp_context_error:
+                        agent_logger.warning("mcp.error %s", mcp_context_error)
                     prompt = (
                         f"{prompt}\n\n"
                         f"{_build_mcp_context_block(mcp_context, mcp_context_error)}"
                     )
 
+                agent_logger.info(
+                    "prompt.built chars=%d coding=%s cwd=%s",
+                    len(prompt),
+                    has_working_dir,
+                    cwd or "-",
+                )
+                yield emit_phase(
+                    "provider_calling",
+                    provider=agent.provider.value,
+                    prompt_chars=len(prompt),
+                    model=agent.model,
+                )
+
+                provider_started_at = time.monotonic()
                 try:
                     use_coding = has_working_dir
                     provider = resolve_provider(
@@ -728,6 +782,17 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                         mcp_config_path=agent.mcp_config_path,
                         mcp_servers=agent.mcp_servers,
                     ).strip()
+                    provider_elapsed = time.monotonic() - provider_started_at
+                    agent_logger.info(
+                        "provider.completed elapsed=%.1fs output_chars=%d",
+                        provider_elapsed,
+                        len(output),
+                    )
+                    yield emit_phase(
+                        "provider_completed",
+                        elapsed_sec=round(provider_elapsed, 2),
+                        output_chars=len(output),
+                    )
 
                     file_changes = None
                     if has_working_dir and can_edit_files:
@@ -765,6 +830,17 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                         context.draft = output or context.draft
 
                 except ProviderError as exc:
+                    provider_elapsed = time.monotonic() - provider_started_at
+                    agent_logger.warning(
+                        "provider.failed elapsed=%.1fs error=%s",
+                        provider_elapsed,
+                        exc,
+                    )
+                    yield emit_phase(
+                        "provider_failed",
+                        elapsed_sec=round(provider_elapsed, 2),
+                        error=str(exc),
+                    )
                     turn = TurnResult(
                         agent_id=agent.id,
                         agent_name=agent.name,
@@ -784,6 +860,12 @@ def iter_refinement_events(request: RefineRequest) -> Iterator[dict[str, object]
                     round_outputs[agent.id] = ""
 
                 completed_turns += 1
+                turn_elapsed = time.monotonic() - turn_started_at
+                agent_logger.info(
+                    "turn.end elapsed=%.1fs has_error=%s",
+                    turn_elapsed,
+                    bool(turn.error),
+                )
                 yield {
                     "type": "turn_completed",
                     "round_index": round_index,

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shlex
 import subprocess
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -11,6 +13,11 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.models import ProviderKind
+
+logger = logging.getLogger("app.providers")
+
+# CLIs whose argv form is unsafe for large prompts; always feed prompt via stdin.
+_STDIN_CAPABLE = {"codex", "gemini", "claude"}
 
 
 DEFAULT_COMMANDS = {
@@ -151,9 +158,13 @@ class CLITemplateProvider:
         executable = os.path.basename(args[0]) if args else ""
         if executable == "codex":
             return "-"
-        if executable == "gemini":
+        if executable in {"gemini", "claude"}:
             return ""
         return None
+
+    def _is_stdin_capable(self, args: list[str]) -> bool:
+        executable = os.path.basename(args[0]) if args else ""
+        return executable in _STDIN_CAPABLE
 
     def _build_args(
         self,
@@ -187,7 +198,15 @@ class CLITemplateProvider:
             built.append(replaced)
 
         if all("{prompt}" not in token and "{query}" not in token for token in args):
-            if len(prompt) > 16_000:
+            # No placeholder in the template. Prefer stdin for any CLI we know
+            # supports it (codex/gemini/claude) regardless of length — avoids
+            # E2BIG. Otherwise fall back to argv only for short prompts.
+            if self._is_stdin_capable(args):
+                stdin_prompt = True
+                stdin_arg = self._stdin_prompt_arg(args)
+                if stdin_arg:
+                    built.append(stdin_arg)
+            elif len(prompt) > 16_000:
                 stdin_prompt = True
             else:
                 built.append(prompt)
@@ -209,6 +228,25 @@ class CLITemplateProvider:
             mcp_config_path=mcp_config_path,
             mcp_servers=mcp_servers,
         )
+
+        argv_bytes = sum(len(a.encode("utf-8")) + 1 for a in args)
+        prompt_chars = len(prompt)
+        head = " ".join(args[:3])
+        logger.info(
+            "cli.start argv0=%s argv_bytes=%d prompt_chars=%d stdin=%s timeout=%ds",
+            args[0] if args else "",
+            argv_bytes,
+            prompt_chars,
+            stdin_prompt,
+            self.timeout_sec,
+        )
+        if not stdin_prompt and argv_bytes > 200_000:
+            raise ProviderError(
+                f"prompt too large for argv ({argv_bytes} bytes). "
+                f"Use a template containing {{prompt}} so the prompt is sent via stdin."
+            )
+
+        started = time.monotonic()
         try:
             completed = subprocess.run(
                 args,
@@ -220,23 +258,46 @@ class CLITemplateProvider:
                 input=prompt if stdin_prompt else None,
             )
         except FileNotFoundError as exc:
+            logger.warning("cli.not_found argv0=%s", args[0] if args else "")
             raise ProviderError(
                 f"command not found: {args[0]} (check CLI install and PATH)"
             ) from exc
         except OSError as exc:
+            logger.warning(
+                "cli.oserror argv0=%s errno=%s argv_bytes=%d prompt_chars=%d stdin=%s detail=%s",
+                args[0] if args else "",
+                getattr(exc, "errno", None),
+                argv_bytes,
+                prompt_chars,
+                stdin_prompt,
+                exc,
+            )
             raise ProviderError(
-                f"could not start CLI command: {exc}"
+                f"could not start CLI command ({head}...): {exc}"
             ) from exc
         except subprocess.TimeoutExpired as exc:
+            elapsed = time.monotonic() - started
+            logger.warning("cli.timeout argv0=%s elapsed=%.1fs", args[0] if args else "", elapsed)
             raise ProviderError(
-                f"command timed out after {self.timeout_sec}s: {' '.join(args[:3])}..."
+                f"command timed out after {self.timeout_sec}s: {head}..."
             ) from exc
 
+        elapsed = time.monotonic() - started
         stdout = (completed.stdout or "").strip()
         stderr = (completed.stderr or "").strip()
+        logger.info(
+            "cli.end argv0=%s rc=%d elapsed=%.1fs stdout_chars=%d stderr_chars=%d",
+            args[0] if args else "",
+            completed.returncode,
+            elapsed,
+            len(stdout),
+            len(stderr),
+        )
         if completed.returncode != 0:
             detail = stderr or stdout or "unknown CLI error"
-            raise ProviderError(f"CLI exited with code {completed.returncode}: {detail}")
+            raise ProviderError(
+                f"CLI exited with code {completed.returncode} ({head}): {detail[:500]}"
+            )
 
         if stdout:
             return stdout

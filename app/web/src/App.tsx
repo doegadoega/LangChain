@@ -15,6 +15,7 @@ import { Settings } from "./screens/Settings";
 import { AgentChat } from "./screens/AgentChat";
 import { Skills } from "./screens/Skills";
 import { Knowledge } from "./screens/Knowledge";
+import { PrecheckBlockedDialog } from "./components/PrecheckBlockedDialog";
 
 export function App() {
   const screen = useApp((s) => s.screen);
@@ -47,6 +48,7 @@ export function App() {
           <Drawer />
         </main>
       </div>
+      <PrecheckBlockedDialog />
     </div>
   );
 }

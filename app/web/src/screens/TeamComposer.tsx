@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Empty } from "../components/ui/Empty";
 import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { ModelPicker } from "../components/ModelPicker";
 import { useApp, builtinAgents } from "../state/store";
@@ -282,34 +283,40 @@ export function TeamComposer() {
                 className="pl-7"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label>role</Label>
-                <Select
-                  value={filterRole}
-                  onChange={(event) => setFilterRole(event.target.value as OrgRole | "all")}
-                >
-                  <option value="all">All</option>
-                  {ROLE_OPTIONS.map((role) => (
-                    <option key={role} value={role}>
-                      {ROLE_LABEL[role]}
-                    </option>
-                  ))}
-                </Select>
+            <div className="space-y-1.5">
+              <Label className="mb-0">role</Label>
+              <div className="flex flex-wrap gap-1">
+                <TCChip
+                  active={filterRole === "all"}
+                  label="All"
+                  onClick={() => setFilterRole("all")}
+                />
+                {ROLE_OPTIONS.map((role) => (
+                  <TCChip
+                    key={role}
+                    active={filterRole === role}
+                    label={ROLE_LABEL[role]}
+                    onClick={() => setFilterRole(role)}
+                  />
+                ))}
               </div>
-              <div>
-                <Label>provider</Label>
-                <Select
-                  value={filterProvider}
-                  onChange={(event) => setFilterProvider(event.target.value as ProviderKind | "all")}
-                >
-                  <option value="all">All</option>
-                  {(Object.keys(PROVIDER_LABEL) as ProviderKind[]).map((provider) => (
-                    <option key={provider} value={provider}>
-                      {PROVIDER_LABEL[provider]}
-                    </option>
-                  ))}
-                </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="mb-0">provider</Label>
+              <div className="flex flex-wrap gap-1">
+                <TCChip
+                  active={filterProvider === "all"}
+                  label="All"
+                  onClick={() => setFilterProvider("all")}
+                />
+                {(Object.keys(PROVIDER_LABEL) as ProviderKind[]).map((provider) => (
+                  <TCChip
+                    key={provider}
+                    active={filterProvider === provider}
+                    label={PROVIDER_LABEL[provider]}
+                    onClick={() => setFilterProvider(provider)}
+                  />
+                ))}
               </div>
             </div>
             <div>
@@ -324,9 +331,11 @@ export function TeamComposer() {
             </div>
             <div className="space-y-2">
               {candidates.length === 0 && (
-                <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs text-[var(--color-fg-subtle)]">
-                  保存済み候補がありません。Agent Studio で保存してください。
-                </div>
+                <Empty
+                  dense
+                  title="候補がありません"
+                  description="検索キーワード・フィルタを見直すか、Agent Studio で保存してください。"
+                />
               )}
               {candidates.map((agent) => (
                 <CandidateCard key={agent.id} agent={agent} onAdd={() => addCandidateToTeam(agent)} />
@@ -567,6 +576,33 @@ function TeamTemplateCard({
       <div className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--color-fg-muted)]">
         {template.description || "説明なし"}
       </div>
+    </button>
+  );
+}
+
+function TCChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={clsx(
+        "rounded-full border px-2.5 py-0.5 font-medium tracking-wider transition-colors",
+        active
+          ? "border-[var(--color-accent)]/60 bg-[var(--color-accent)]/15 text-[var(--color-fg)]"
+          : "border-[var(--color-border)] text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)]",
+      )}
+      style={{ fontSize: "var(--text-xs)" }}
+    >
+      {label}
     </button>
   );
 }
