@@ -244,7 +244,8 @@ def _prepare_coding_worktree(
     worktree_path = (store.worktrees_dir / branch_segment).resolve()
     store.worktrees_dir.mkdir(parents=True, exist_ok=True)
 
-    if not worktree_path.exists():
+    worktree_created = not worktree_path.exists()
+    if worktree_created:
         branch_exists = (
             _run_git(repo_root, ["rev-parse", "--verify", ai_branch], check=False).returncode == 0
         )
@@ -254,8 +255,12 @@ def _prepare_coding_worktree(
         args.extend([str(worktree_path), status["base_commit"] if not branch_exists else ai_branch])
         _run_git(repo_root, args)
 
+    # Seed the worktree with the user's uncommitted changes only when it is
+    # freshly created. A follow-up run reuses the existing worktree so the AI
+    # can continue on code it already implemented; re-applying the source patch
+    # there would conflict with work already present.
     user_patch_applied = False
-    if status["changed_files"]:
+    if worktree_created and status["changed_files"]:
         diff = _run_git(repo_root, ["diff", "--binary", "HEAD"]).stdout
         if diff.strip():
             apply_result = _run_git(
@@ -284,7 +289,8 @@ def _prepare_coding_worktree(
         "user_patch_applied": user_patch_applied,
         "user_changed_files": status["changed_files"],
         "user_untracked_files": status["untracked_files"],
-        "status": "prepared",
+        "reused": not worktree_created,
+        "status": "reused" if not worktree_created else "prepared",
     }
 
 

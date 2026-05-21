@@ -49,6 +49,11 @@ CODING_COMMANDS = {
     ),
 }
 
+# CLI turns (codex/claude/gemini) can run long, especially in coding mode where
+# the agent edits files. The default 300s was too short and caused timeouts.
+CLI_TIMEOUT_SEC = int(os.getenv("CLI_TIMEOUT_SEC", "300"))
+CLI_CODING_TIMEOUT_SEC = int(os.getenv("CLI_CODING_TIMEOUT_SEC", "900"))
+
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/api")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 # Local models have small context windows; cap the prompt and (for Ollama) the
@@ -274,6 +279,14 @@ class CLITemplateProvider:
                 f"Use a template containing {{prompt}} so the prompt is sent via stdin."
             )
 
+        env = None
+        executable = os.path.basename(args[0]) if args else ""
+        if executable == "gemini":
+            # Gemini CLI refuses to run in an "untrusted" directory (e.g. an AI
+            # worktree) and exits 55. Trust the workspace for these headless runs
+            # so coding turns can actually edit files.
+            env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
+
         started = time.monotonic()
         try:
             completed = subprocess.run(
@@ -284,6 +297,7 @@ class CLITemplateProvider:
                 check=False,
                 cwd=cwd or None,
                 input=prompt if stdin_prompt else None,
+                env=env,
             )
         except FileNotFoundError as exc:
             logger.warning("cli.not_found argv0=%s", args[0] if args else "")
@@ -739,10 +753,12 @@ def resolve_provider(
     if provider_kind == ProviderKind.DEEPSEEK_API:
         return DeepSeekAPIProvider()
 
+    cli_timeout = CLI_CODING_TIMEOUT_SEC if coding_mode else CLI_TIMEOUT_SEC
+
     if provider_kind == ProviderKind.CUSTOM_CLI:
         if not command_template:
             raise ProviderError("custom_cli requires command_template")
-        return CLITemplateProvider(command_template=command_template)
+        return CLITemplateProvider(command_template=command_template, timeout_sec=cli_timeout)
 
     template = command_template or _default_cli_command(
         provider_kind, coding_mode=coding_mode
@@ -751,4 +767,4 @@ def resolve_provider(
     if not template:
         raise ProviderError(f"unsupported provider: {provider_kind}")
 
-    return CLITemplateProvider(command_template=template)
+    return CLITemplateProvider(command_template=template, timeout_sec=cli_timeout)

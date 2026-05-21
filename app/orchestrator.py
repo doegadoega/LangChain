@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import pathlib
 import subprocess as _sp
 import time
@@ -42,6 +43,12 @@ DIRECT_EDIT_PROVIDERS = {
 LIMITED_EXTERNAL_API_PROVIDERS = {
     ProviderKind.DEEPSEEK_API,
 }
+
+# In coding mode the running draft becomes the full repository diff, which can
+# grow unbounded (observed ~670K chars) and make CLI turns slow or time out.
+# Cap what we embed in the prompt; direct-edit agents can still read the actual
+# files in their working directory.
+CODING_DRAFT_MAX_CHARS = int(os.getenv("CODING_DRAFT_MAX_CHARS", "60000"))
 
 
 @dataclass
@@ -251,6 +258,23 @@ def _truncate_output(text: str, max_chars: int = 2800) -> str:
     return text[:max_chars] + "\n...(truncated)"
 
 
+def _clamp_middle(text: str, max_chars: int, *, label: str = "text") -> str:
+    """Trim an over-long block by eliding its middle, keeping head and tail.
+
+    For diffs this preserves both the earliest and most recent hunks, which is
+    more useful than a head-only cut.
+    """
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text
+    marker = f"\n...[中略: {len(text)}→{max_chars}文字 / {label}]...\n"
+    budget = max_chars - len(marker)
+    if budget <= 0:
+        return text[:max_chars]
+    head = int(budget * 0.6)
+    tail = budget - head
+    return text[:head] + marker + text[-tail:]
+
+
 def _build_dependency_context_block(
     agent: AgentConfig, round_outputs: dict[str, str]
 ) -> str:
@@ -376,6 +400,15 @@ def _build_task_prompt(
         else "議論履歴: codingモードのため未使用\n"
     )
 
+    # In coding mode the draft is the (potentially huge) repository diff. Cap it
+    # so prompts stay bounded; the writing-mode draft is the actual content being
+    # refined, so it is left intact.
+    draft_for_prompt = (
+        _clamp_middle(context.draft, CODING_DRAFT_MAX_CHARS, label="diff")
+        if workflow_mode == WorkflowMode.CODING
+        else context.draft
+    )
+
     return (
         f"{_build_system_directive(agent, installed_skills=installed_skills)}\n"
         f"ワークフローモード: {workflow_mode.value}\n"
@@ -390,7 +423,7 @@ def _build_task_prompt(
         f"{research_block}\n"
         f"{interaction_history}\n"
         f"これまでの依存出力サマリー:\n{output_history}\n\n"
-        f"現在の状態:\n<<DRAFT>>\n{context.draft}\n<</DRAFT>>\n\n"
+        f"現在の状態:\n<<DRAFT>>\n{draft_for_prompt}\n<</DRAFT>>\n\n"
         f"タスク:\n{role_instruction}"
     )
 
