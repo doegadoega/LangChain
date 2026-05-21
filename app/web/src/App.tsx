@@ -16,6 +16,12 @@ import { AgentChat } from "./screens/AgentChat";
 import { Skills } from "./screens/Skills";
 import { Knowledge } from "./screens/Knowledge";
 import { PrecheckBlockedDialog } from "./components/PrecheckBlockedDialog";
+import type { ScreenId } from "./types";
+
+// Screens migrated to the STRAND design system render their own chrome
+// (TopBar + SideBar) full-bleed. Unmigrated screens keep the legacy shell
+// (old Sidebar + Header) during the progressive migration.
+const STRAND_SCREENS = new Set<ScreenId>(["dashboard", "settings", "qa", "team", "agents", "logs"]);
 
 export function App() {
   const screen = useApp((s) => s.screen);
@@ -25,26 +31,39 @@ export function App() {
     void loadAll();
   }, [loadAll]);
 
+  const content = (
+    <>
+      {screen === "workspace" && <Workspace />}
+      {screen === "coding" && <Coding />}
+      {screen === "dashboard" && <Dashboard />}
+      {screen === "team" && <TeamComposer />}
+      {screen === "agents" && <AgentStudio />}
+      {screen === "skills" && <Skills />}
+      {screen === "knowledge" && <Knowledge />}
+      {screen === "execution" && <Execution />}
+      {screen === "qa" && <QAGate />}
+      {screen === "logs" && <Logs />}
+      {screen === "settings" && <Settings />}
+      {screen === "chat" && <AgentChat />}
+    </>
+  );
+
+  if (STRAND_SCREENS.has(screen)) {
+    return (
+      <div className="h-full w-full">
+        {content}
+        <PrecheckBlockedDialog />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full w-full bg-[var(--color-bg)]">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex flex-1 overflow-hidden">
-          <div className="flex-1 overflow-hidden">
-            {screen === "workspace" && <Workspace />}
-            {screen === "coding" && <Coding />}
-            {screen === "dashboard" && <Dashboard />}
-            {screen === "team" && <TeamComposer />}
-            {screen === "agents" && <AgentStudio />}
-            {screen === "skills" && <Skills />}
-            {screen === "knowledge" && <Knowledge />}
-            {screen === "execution" && <Execution />}
-            {screen === "qa" && <QAGate />}
-            {screen === "logs" && <Logs />}
-            {screen === "settings" && <Settings />}
-            {screen === "chat" && <AgentChat />}
-          </div>
+          <div className="flex-1 overflow-hidden">{content}</div>
           <Drawer />
         </main>
       </div>

@@ -69,6 +69,8 @@ export const describeEvent = (event: StreamEvent): string => {
       return "AIチームの最終回答が完成しました。";
     case "run_failed":
       return `実行中に問題が起きました: ${event.error}`;
+    default:
+      return "処理を進めています…";
   }
 };
 

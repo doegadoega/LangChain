@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AgentRefinement — system redesign</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+
+<link rel="stylesheet" href="tokens.css"/>
+
+<style>
+  html, body, #root { height: 100%; }
+  body { margin: 0; background: #ECE6D5; font-family: "Geist", system-ui, sans-serif; color: #14110D; }
+  /* Pulse for live indicators */
+  @keyframes pulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(1.6);opacity:0} }
+</style>
+
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Starters & component files -->
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="js/shared.jsx"></script>
+<script type="text/babel" src="js/brand.jsx"></script>
+<script type="text/babel" src="js/dashboard.jsx"></script>
+<script type="text/babel" src="js/observatory.jsx"></script>
+<script type="text/babel" src="js/qa-gate.jsx"></script>
+<script type="text/babel" src="js/team-composer.jsx"></script>
+<script type="text/babel" src="js/agent-studio.jsx"></script>
+<script type="text/babel" src="js/workflow-editor.jsx"></script>
+<script type="text/babel" src="js/logs.jsx"></script>
+<script type="text/babel" src="js/settings.jsx"></script>
+<script type="text/babel" src="js/mobile.jsx"></script>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "light",
+  "density": "normal",
+  "sidebar": "expanded"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // Apply theme + density at the document root so every artboard reflects it
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = t.theme;
+    document.documentElement.dataset.density = t.density;
+  }, [t.theme, t.density]);
+
+  const sidebarMode = t.sidebar; // "expanded" | "rail"
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="foundation" title="Foundation" subtitle="Brand, tokens, voice">
+          <DCArtboard id="brand" label="01 · Identity" width={1280} height={820}>
+            <BrandArtboard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="desktop" title="Desktop · Console" subtitle="Light, terminal-grade, organisation of agents">
+          <DCArtboard id="dashboard" label="02 · Dashboard" width={1440} height={920}>
+            <Dashboard density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+
+          <DCArtboard id="execution" label="03 · Execution — Coding mode ★" width={1600} height={1000}>
+            <Observatory density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+
+          <DCArtboard id="qa-gate" label="04 · QA Gate · 3 reviewers" width={1600} height={1000}>
+            <QAGate density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+
+          <DCArtboard id="team" label="05 · Team Composer" width={1440} height={1000}>
+            <TeamComposer density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+
+          <DCArtboard id="studio" label="06 · Agent Studio · skill_refs" width={1600} height={1000}>
+            <AgentStudio density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+
+          <DCArtboard id="workflow" label="07 · Workflow Editor" width={1600} height={1000}>
+            <WorkflowEditor density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+
+          <DCArtboard id="logs" label="08 · Logs & Artifacts" width={1600} height={1000}>
+            <LogsArtifacts density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+
+          <DCArtboard id="settings" label="09 · Settings" width={1440} height={1000}>
+            <Settings density={t.density} sidebarMode={sidebarMode}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="mobile" title="Mobile" subtitle="Resume, watch, gate from anywhere">
+          <DCArtboard id="m-home" label="10 · Mobile Dashboard" width={390} height={844}>
+            <MobileDashboard density={t.density}/>
+          </DCArtboard>
+          <DCArtboard id="m-obs"  label="11 · Mobile Execution" width={390} height={844}>
+            <MobileObservatory density={t.density}/>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Theme">
+          <TweakRadio label="Mode" value={t.theme} onChange={(v)=>setTweak("theme", v)}
+            options={[{value:"light", label:"Light"},{value:"dark", label:"Dark"}]}/>
+        </TweakSection>
+
+        <TweakSection title="Information density">
+          <TweakRadio label="Spacing" value={t.density} onChange={(v)=>setTweak("density", v)}
+            options={[
+              {value:"compact", label:"Compact"},
+              {value:"normal",  label:"Normal"},
+              {value:"cozy",    label:"Cozy"},
+            ]}/>
+        </TweakSection>
+
+        <TweakSection title="Sidebar">
+          <TweakRadio label="Layout" value={t.sidebar} onChange={(v)=>setTweak("sidebar", v)}
+            options={[
+              {value:"expanded", label:"Expanded"},
+              {value:"rail",     label:"Rail"},
+            ]}/>
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+</body>
+</html>

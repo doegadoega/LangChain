@@ -561,7 +561,12 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 def home() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    # Never cache the HTML shell so a rebuilt SPA (new hashed asset names) is
+    # always picked up — prevents stale-bundle issues after each frontend build.
+    return FileResponse(
+        STATIC_DIR / "index.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/api/providers/health")

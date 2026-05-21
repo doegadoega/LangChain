@@ -1,12 +1,18 @@
+// STRAND — QA Gate (artboard 04). 3-person QA judgment lanes, real verdicts.
 import { useMemo, useState } from "react";
-import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
-import { Button } from "../components/ui/Button";
-import { Textarea } from "../components/ui/Field";
-import { StatusBadge } from "../components/ui/StatusBadge";
 import { useApp } from "../state/store";
+import { StrandShell } from "../components/strand/Chrome";
+import { Avatar, Btn, Dot, Icon, Pill, RoleBadge, type IconName, type Tone } from "../components/strand/primitives";
 import type { QAJudgement } from "../types";
-import clsx from "clsx";
-import { AlertTriangle, Send } from "lucide-react";
+
+type Verdict = QAJudgement | "PENDING";
+
+const VERDICT_TONE: Record<Verdict, Tone> = {
+  PASS: "ok",
+  REWORK: "warn",
+  ESCALATE: "danger",
+  PENDING: "info",
+};
 
 export function QAGate() {
   const agents = useApp((s) => s.request.agents);
@@ -16,189 +22,285 @@ export function QAGate() {
   const managedRequests = useApp((s) => s.managedRequests);
   const selectedManagedRequestId = useApp((s) => s.selectedManagedRequestId);
   const selectedRequest = managedRequests.find((item) => item.id === selectedManagedRequestId);
-  const feedback = selectedRequest?.verification_feedback ?? [];
 
   const qaList = useMemo(
     () => agents.filter((a) => a.org_role === "qa" && a.enabled !== false),
     [agents],
   );
 
-  const overall = useMemo<QAJudgement | "PENDING">(() => {
-    if (qaList.length < 3) return "PENDING";
-    if (qaList.some((q) => !verdicts.find((v) => v.qaId === q.id))) return "PENDING";
-    if (qaList.every((q) => verdicts.find((v) => v.qaId === q.id)?.judgement === "PASS"))
-      return "PASS";
-    if (qaList.some((q) => verdicts.find((v) => v.qaId === q.id)?.judgement === "ESCALATE"))
-      return "ESCALATE";
-    return "REWORK";
-  }, [qaList, verdicts]);
+  const passCount = qaList.filter((q) => verdicts.find((v) => v.qaId === q.id)?.judgement === "PASS").length;
+  const pendingCount = qaList.filter((q) => !verdicts.find((v) => v.qaId === q.id)).length;
+  const reworkCount = qaList.filter((q) => verdicts.find((v) => v.qaId === q.id)?.judgement === "REWORK").length;
+  const escalateCount = qaList.filter((q) => verdicts.find((v) => v.qaId === q.id)?.judgement === "ESCALATE").length;
+
+  const overall: Verdict = useMemo(() => {
+    if (qaList.length < 3 || pendingCount > 0) return "PENDING";
+    if (escalateCount > 0) return "ESCALATE";
+    if (reworkCount > 0) return "REWORK";
+    return "PASS";
+  }, [qaList.length, pendingCount, escalateCount, reworkCount]);
+
+  const title = selectedRequest?.title ?? "未選択のワーク";
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">QA Gate</h2>
-          <p className="text-xs text-[var(--color-fg-muted)]">
-            QA 3名ルール · 全員 PASS で次工程に進行可能
-          </p>
-        </div>
-        {qaList.length < 3 ? (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
-            <AlertTriangle className="h-3.5 w-3.5" /> QA が {qaList.length} 名 (最低3名必要)
-          </span>
-        ) : (
-          <StatusBadge status={overall === "PENDING" ? "RUNNING" : (overall as never)} />
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        {qaList.map((q) => {
-          const verdict = verdicts.find((v) => v.qaId === q.id);
-          const myTurn = [...turns].reverse().find((t) => t.agent_id === q.id);
-          return (
-            <QALane
-              key={q.id}
-              name={q.name}
-              output={myTurn?.output}
-              verdict={verdict?.judgement}
-              reason={verdict?.reason ?? ""}
-              onSubmit={(j, reason) => setQaVerdict({ qaId: q.id, judgement: j, reason })}
-            />
-          );
-        })}
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>合意判定サマリー</CardTitle>
-          {overall !== "PENDING" && <StatusBadge status={overall as never} />}
-        </CardHeader>
-        <CardBody className="space-y-2">
-          {verdicts.length === 0 && (
-            <div className="text-xs text-[var(--color-fg-subtle)]">未判定</div>
-          )}
-          {verdicts.map((v) => (
-            <div
-              key={v.qaId}
-              className="flex items-start gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3"
+    <StrandShell
+      breadcrumb={["workspace", "qa-gate", selectedRequest?.id?.slice(0, 18) ?? "—"]}
+      mainStyle={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
+          {/* Header */}
+          <div style={{ padding: "16px 22px", borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <Pill tone={VERDICT_TONE[overall]}>
+                <Dot tone={VERDICT_TONE[overall]} size={5} /> {overall === "PENDING" ? "AWAITING DECISION" : overall}
+              </Pill>
+              <Pill tone="agent">
+                {qaList.length} QA · {passCount} PASS · {pendingCount} PENDING
+              </Pill>
+              <span style={{ flex: 1 }} />
+              <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                {selectedRequest?.id ?? "no request selected"}
+              </span>
+            </div>
+            <h1
+              className="serif"
+              style={{ fontSize: 28, fontStyle: "italic", letterSpacing: "-0.02em", marginTop: 10 }}
             >
-              <StatusBadge status={v.judgement} />
-              <div className="flex-1 text-xs">
-                <div className="font-semibold">{v.qaId}</div>
-                <div className="text-[var(--color-fg-muted)] whitespace-pre-wrap">
-                  {v.reason || "(理由未記載)"}
-                </div>
-              </div>
+              {title}
+            </h1>
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 18, fontSize: 12, color: "var(--ink-2)", flexWrap: "wrap" }}>
+              <span className="mono">2 / 3 PASS で次工程へ · 全 PASS でマージ可</span>
+              <span style={{ flex: 1 }} />
+              <Btn variant="outline" icon="branch" size="sm">View diff</Btn>
+              <Btn variant="outline" icon="eye" size="sm">Replay turns</Btn>
+              <Btn variant="solid" tone="accent" icon="check" size="md">Commit verdict</Btn>
             </div>
-          ))}
-          {overall === "ESCALATE" && (
-            <Button variant="danger" className="mt-2">
-              <Send className="h-3.5 w-3.5" /> CEO へエスカレーション
-            </Button>
-          )}
-        </CardBody>
-      </Card>
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>保存済みフィードバック</CardTitle>
-          <span className="text-xs text-[var(--color-fg-muted)]">{feedback.length}件</span>
-        </CardHeader>
-        <CardBody className="space-y-2">
-          {feedback.length === 0 && (
-            <div className="text-xs text-[var(--color-fg-subtle)]">
-              Workspaceで保存したフィードバックはありません。
-            </div>
-          )}
-          {feedback.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3"
-            >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[10px] font-semibold text-[var(--color-fg-muted)]">
-                  {item.kind}
-                </span>
-                <span className="text-[10px] text-[var(--color-fg-subtle)]">
-                  {new Date(item.created_at).toLocaleString("ja-JP")}
-                </span>
+          {/* Aggregate strip */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.2fr 1fr 1fr 1fr",
+              borderBottom: "1px solid var(--border)",
+              background: "var(--paper-2)",
+            }}
+          >
+            <VerdictCell label="GATE STATUS" value={`${passCount} PASS · ${pendingCount} PENDING`} tone={pendingCount ? "warn" : "ok"} icon="check" />
+            <VerdictCell label="ESCALATIONS" value={`${escalateCount}`} tone={escalateCount ? "danger" : "ok"} icon="issue" />
+            <VerdictCell label="REWORK ITEMS" value={`${reworkCount}`} tone={reworkCount ? "warn" : "ok"} icon="x" />
+            <VerdictCell label="NEXT STAGE" value={overall === "PASS" ? "Act → CEO sign-off" : "Awaiting QA"} tone="info" icon="arrow" />
+          </div>
+
+          {/* QA lanes */}
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: qaList.length ? `repeat(${Math.max(qaList.length, 1)}, 1fr)` : "1fr", minHeight: 0 }}>
+            {qaList.length === 0 ? (
+              <div style={{ display: "grid", placeItems: "center", color: "var(--ink-3)", fontSize: 13 }}>
+                QA エージェントが有効になっていません (最低 3 名推奨)。Team Composer で追加してください。
               </div>
-              <div className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                {item.comment}
-              </div>
+            ) : (
+              qaList.map((q) => {
+                const verdict = verdicts.find((v) => v.qaId === q.id);
+                const myTurn = [...turns].reverse().find((t) => t.agent_id === q.id);
+                return (
+                  <QALane
+                    key={q.id}
+                    name={q.name}
+                    model={q.model ? `${q.provider} · ${q.model}` : q.provider}
+                    output={myTurn?.output}
+                    verdict={(verdict?.judgement as Verdict) ?? "PENDING"}
+                    reason={verdict?.reason ?? ""}
+                    onSubmit={(j, reason) => setQaVerdict({ qaId: q.id, judgement: j, reason })}
+                  />
+                );
+              })
+            )}
+          </div>
+
+          {/* Escalation bar */}
+          <div
+            style={{
+              borderTop: "1px solid var(--border)",
+              background: "var(--paper-2)",
+              padding: "10px 18px",
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: 14,
+              alignItems: "center",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span className="mono" style={{ fontSize: 9, color: "var(--ink-3)", letterSpacing: "0.12em" }}>UNCLEAR-SPEC ISSUES</span>
+              <span className="mono" style={{ fontSize: 11, color: "var(--ink-2)" }}>
+                {escalateCount} open
+              </span>
             </div>
-          ))}
-        </CardBody>
-      </Card>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn variant="outline" icon="plus" size="md">Open issue</Btn>
+              <Btn variant="solid" tone="accent" icon="arrow" size="md">Escalate to CEO</Btn>
+            </div>
+          </div>
+    </StrandShell>
+  );
+}
+
+function VerdictCell({ label, value, tone, icon }: { label: string; value: string; tone: Tone; icon: IconName }) {
+  return (
+    <div style={{ padding: "12px 18px", borderRight: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12 }}>
+      <span style={{ width: 28, height: 28, display: "grid", placeItems: "center", background: `var(--${tone}-bg)`, color: `var(--${tone})`, borderRadius: 3 }}>
+        <Icon name={icon} size={14} />
+      </span>
+      <div>
+        <div className="mono" style={{ fontSize: 9, color: "var(--ink-3)", letterSpacing: "0.1em" }}>{label}</div>
+        <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 2 }}>{value}</div>
+      </div>
     </div>
   );
 }
 
 function QALane({
   name,
+  model,
   output,
   verdict,
   reason: initialReason,
   onSubmit,
 }: {
   name: string;
+  model: string;
   output?: string;
-  verdict?: QAJudgement;
+  verdict: Verdict;
   reason: string;
   onSubmit: (j: QAJudgement, reason: string) => void;
 }) {
   const [reason, setReason] = useState(initialReason);
-  const [draft, setDraft] = useState<QAJudgement>(verdict ?? "PASS");
+  const [draft, setDraft] = useState<QAJudgement>(verdict === "PENDING" ? "PASS" : verdict);
+  const tone = VERDICT_TONE[verdict];
+
   return (
-    <Card className="flex flex-col overflow-hidden">
-      <CardHeader>
-        <CardTitle>{name}</CardTitle>
-        {verdict ? <StatusBadge status={verdict} /> : <StatusBadge status="IDLE" />}
-      </CardHeader>
-      <CardBody className="flex flex-col gap-3">
-        <div>
-          <div className="mb-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
-            レビュー対象
+    <div style={{ borderRight: "1px solid var(--border)", background: "var(--paper)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <header
+        style={{
+          padding: "14px 16px",
+          borderBottom: `2px solid var(--${tone})`,
+          background: `color-mix(in oklab, var(--${tone}-bg) 35%, var(--surface))`,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Avatar ai size={26} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{name}</div>
+            <div className="mono" style={{ fontSize: 10, color: "var(--ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{model}</div>
           </div>
-          <div className="max-h-40 overflow-auto rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-2 font-mono text-[11px] text-[var(--color-fg-muted)]">
-            {output ?? "(未実行)"}
-          </div>
+          <RoleBadge role="QA" />
         </div>
-        <div>
-          <div className="mb-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
-            理由 / 差し戻し点
-          </div>
-          <Textarea
-            rows={3}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="必要に応じて記載"
-          />
+        <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+          <VerdictStamp verdict={verdict} />
         </div>
-        <div className="flex items-center gap-1">
-          {(["PASS", "REWORK", "ESCALATE"] as QAJudgement[]).map((j) => (
-            <button
-              key={j}
-              onClick={() => setDraft(j)}
-              className={clsx(
-                "flex-1 rounded-md border py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors",
-                draft === j
-                  ? j === "PASS"
-                    ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                    : j === "REWORK"
-                    ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
-                    : "border-red-500/60 bg-red-500/15 text-red-300"
-                  : "border-[var(--color-border)] text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)]",
-              )}
-            >
-              {j}
-            </button>
-          ))}
+      </header>
+
+      {/* Rationale = latest turn output */}
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+        <div className="mono" style={{ fontSize: 9, color: "var(--ink-3)", letterSpacing: "0.1em", marginBottom: 6 }}>レビュー対象 (直近出力)</div>
+        <div
+          className="mono"
+          style={{
+            maxHeight: 160,
+            overflow: "auto",
+            background: "var(--surface-sunk)",
+            border: "1px solid var(--border)",
+            borderRadius: 3,
+            padding: "8px 10px",
+            fontSize: 11,
+            lineHeight: 1.55,
+            color: "var(--ink-2)",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {output ?? "(未実行)"}
         </div>
-        <Button variant="primary" size="sm" onClick={() => onSubmit(draft, reason)}>
+      </div>
+
+      {/* Reason */}
+      <div style={{ padding: "12px 16px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <div className="mono" style={{ fontSize: 9, color: "var(--ink-3)", letterSpacing: "0.1em", marginBottom: 6 }}>理由 / 差し戻し点</div>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="必要に応じて記載"
+          style={{
+            flex: 1,
+            minHeight: 72,
+            resize: "none",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 3,
+            padding: "8px 10px",
+            fontSize: 12,
+            color: "var(--ink)",
+            fontFamily: "var(--strand-font-sans)",
+            outline: "none",
+          }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--paper-2)", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {(["PASS", "REWORK", "ESCALATE"] as QAJudgement[]).map((j) => {
+            const jt = VERDICT_TONE[j];
+            const active = draft === j;
+            return (
+              <button
+                key={j}
+                onClick={() => setDraft(j)}
+                className="mono"
+                style={{
+                  flex: 1,
+                  height: 26,
+                  borderRadius: 3,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                  border: `1px solid ${active ? `var(--${jt})` : "var(--border)"}`,
+                  background: active ? `var(--${jt})` : "var(--surface)",
+                  color: active ? "white" : "var(--ink-2)",
+                }}
+              >
+                {j}
+              </button>
+            );
+          })}
+        </div>
+        <Btn variant="solid" tone="accent" size="sm" icon="check" style={{ justifyContent: "center" }} onClick={() => onSubmit(draft, reason)}>
           判定を提出
-        </Button>
-      </CardBody>
-    </Card>
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+function VerdictStamp({ verdict }: { verdict: Verdict }) {
+  const tone = VERDICT_TONE[verdict];
+  const running = verdict === "PENDING";
+  return (
+    <div
+      className="mono"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "4px 10px",
+        background: `var(--${tone}-bg)`,
+        border: `1px solid var(--${tone})`,
+        borderRadius: 3,
+        color: `var(--${tone})`,
+        fontSize: 13,
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+      }}
+    >
+      {running && <span style={{ width: 8, height: 8, borderRadius: 99, background: `var(--${tone})`, animation: "pulse 1.6s ease-out infinite" }} />}
+      {verdict}
+    </div>
   );
 }

@@ -117,7 +117,7 @@ export function Execution() {
                 停止
               </Button>
             ) : (
-              <Button variant="primary" onClick={startRun} className="flex-1">
+              <Button variant="primary" onClick={() => startRun()} className="flex-1">
                 ▶ 実行開始
               </Button>
             )}
