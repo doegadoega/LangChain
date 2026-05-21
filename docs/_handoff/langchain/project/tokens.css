@@ -1,0 +1,149 @@
+/* STRAND — design tokens. Light is canonical; [data-theme=dark] overrides. */
+
+:root,
+[data-theme="light"] {
+  /* Surfaces */
+  --paper:        #F4EFE3;
+  --paper-2:      #ECE6D5;
+  --surface:      #FFFFFF;
+  --surface-2:    #FAF6EC;
+  --surface-sunk: #F0EAD9;
+
+  /* Ink */
+  --ink:          #14110D;
+  --ink-2:        #4F4A41;
+  --ink-3:        #8A857A;
+  --ink-4:        #B8B1A0;
+
+  /* Edges */
+  --border:       #E2DBC6;
+  --border-2:     #D2CAB1;
+  --border-hard:  #14110D;
+
+  /* Accent — electric tangerine */
+  --accent:       #FF5B1F;
+  --accent-deep:  #C44210;
+  --accent-soft:  #FFE2D2;
+  --accent-ink:   #FFFFFF;
+
+  /* Semantic */
+  --ok:           #1E7A4A;
+  --ok-bg:        #D6E9D3;
+  --warn:         #A56A0E;
+  --warn-bg:      #F5E2BB;
+  --danger:       #B62A2A;
+  --danger-bg:    #F2D1CC;
+  --info:         #2B5BBA;
+  --info-bg:      #D7E1F4;
+
+  /* AI / Agent — distinct from human */
+  --agent:        #5B3FD9;
+  --agent-deep:   #3D27A6;
+  --agent-bg:     #E2DBF8;
+  --agent-ink:    #FFFFFF;
+
+  /* Status dots / git */
+  --git-add:      #1E7A4A;
+  --git-del:      #B62A2A;
+
+  /* Type */
+  --font-sans:    "Geist", "Söhne", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-serif:   "Instrument Serif", "Iowan Old Style", "Georgia", serif;
+
+  /* Density (overridden by Tweaks) */
+  --d-row:        36px;
+  --d-pad:        16px;
+  --d-gap:        12px;
+  --d-text:       13px;
+  --d-text-sm:    11px;
+  --d-text-lg:    15px;
+
+  /* Misc */
+  --radius:       4px;
+  --radius-lg:    8px;
+  --shadow-pop:   0 1px 0 rgba(20,17,13,.04), 0 6px 24px -8px rgba(20,17,13,.18);
+  --shadow-line:  inset 0 -1px 0 var(--border);
+}
+
+[data-theme="dark"] {
+  --paper:        #0E0D0B;
+  --paper-2:      #161410;
+  --surface:      #1B1814;
+  --surface-2:    #221E18;
+  --surface-sunk: #100E0B;
+
+  --ink:          #F2ECDB;
+  --ink-2:        #B6AE99;
+  --ink-3:        #80796A;
+  --ink-4:        #4A453C;
+
+  --border:       #2A2620;
+  --border-2:     #3A342B;
+  --border-hard:  #F2ECDB;
+
+  --accent:       #FF7339;
+  --accent-deep:  #FF5B1F;
+  --accent-soft:  #3A1F0E;
+  --accent-ink:   #14110D;
+
+  --ok:           #5CC086;
+  --ok-bg:        #163521;
+  --warn:         #E0A845;
+  --warn-bg:      #3B2A0E;
+  --danger:       #E26A6A;
+  --danger-bg:    #3B1D1D;
+  --info:         #7CA2EE;
+  --info-bg:      #16264A;
+
+  --agent:        #9D86F0;
+  --agent-deep:   #7B5DE0;
+  --agent-bg:     #251D45;
+
+  --shadow-pop:   0 1px 0 rgba(0,0,0,.4), 0 8px 28px -10px rgba(0,0,0,.6);
+}
+
+/* Density modes */
+[data-density="compact"] {
+  --d-row: 28px; --d-pad: 10px; --d-gap: 8px;
+  --d-text: 12px; --d-text-sm: 10px; --d-text-lg: 13px;
+}
+[data-density="cozy"] {
+  --d-row: 44px; --d-pad: 20px; --d-gap: 16px;
+  --d-text: 14px; --d-text-sm: 12px; --d-text-lg: 16px;
+}
+
+/* Resets within artboards */
+.strand,
+.strand * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+.strand {
+  width: 100%;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--d-text);
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  font-feature-settings: "ss01", "cv11";
+  position: relative;
+  overflow: hidden;
+}
+.strand .mono { font-family: var(--font-mono); letter-spacing: 0; }
+.strand .serif { font-family: var(--font-serif); }
+
+/* Subtle dotted grid background */
+.strand-grid {
+  background-image:
+    radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--ink) 8%, transparent) 1px, transparent 0);
+  background-size: 16px 16px;
+}
+
+/* Reusable */
+.strand button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.strand a { color: inherit; text-decoration: none; }
+.strand svg { display: block; }

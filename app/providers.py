@@ -51,8 +51,13 @@ CODING_COMMANDS = {
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/api")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
+# Local models have small context windows; cap the prompt and (for Ollama) the
+# server-side context. Tune via env. ~4 chars/token is a rough heuristic.
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
+OLLAMA_MAX_PROMPT_CHARS = int(os.getenv("OLLAMA_MAX_PROMPT_CHARS", "24000"))
 LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
 LM_STUDIO_MODEL = os.getenv("LM_STUDIO_MODEL", "local-model")
+LM_STUDIO_MAX_PROMPT_CHARS = int(os.getenv("LM_STUDIO_MAX_PROMPT_CHARS", "24000"))
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2-chat-latest")
 ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1")
@@ -63,6 +68,29 @@ DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 class ProviderError(RuntimeError):
     pass
+
+
+def _clamp_prompt(prompt: str, max_chars: int, *, label: str = "local model") -> str:
+    """Trim an over-long prompt by removing the middle, keeping the head
+    (system/instructions) and tail (most recent context). Local models have
+    small context windows, so this prevents context-overflow errors.
+    """
+    if max_chars <= 0 or len(prompt) <= max_chars:
+        return prompt
+    marker = (
+        f"\n\n... [プロンプトが長すぎるため中央を省略しました: "
+        f"{len(prompt)}→{max_chars} 文字 / {label}] ...\n\n"
+    )
+    budget = max_chars - len(marker)
+    if budget <= 0:
+        return prompt[:max_chars]
+    head = int(budget * 0.6)
+    tail = budget - head
+    clamped = prompt[:head] + marker + prompt[-tail:]
+    logger.warning(
+        "prompt clamped for %s: %d -> %d chars", label, len(prompt), len(clamped)
+    )
+    return clamped
 
 
 def _model_item(model_id: str, name: str | None = None) -> dict[str, str]:
@@ -503,12 +531,14 @@ class OllamaProvider:
         mcp_servers: list[str] | None = None,
     ) -> str:
         selected_model = model or self.default_model
+        prompt = _clamp_prompt(prompt, OLLAMA_MAX_PROMPT_CHARS, label=f"ollama:{selected_model}")
         data = _post_json(
             _join_url(self.base_url, "chat"),
             {
                 "model": selected_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "stream": False,
+                "options": {"num_ctx": OLLAMA_NUM_CTX},
             },
             timeout_sec=self.timeout_sec,
         )
@@ -537,6 +567,7 @@ class LMStudioProvider:
         mcp_servers: list[str] | None = None,
     ) -> str:
         selected_model = model or self.default_model
+        prompt = _clamp_prompt(prompt, LM_STUDIO_MAX_PROMPT_CHARS, label=f"lm_studio:{selected_model}")
         data = _post_json(
             _join_url(self.base_url, "chat/completions"),
             {
