@@ -384,15 +384,23 @@ export function Coding() {
     requestValue: RefineRequest,
     recordId: string,
   ): Promise<{ requestValue: RefineRequest; versionControl?: CodingWorktreeState }> => {
+    const existing = selectedRecord?.version_control;
     const baseWorkingDirectory =
-      selectedRecord?.version_control?.source_working_directory ||
+      existing?.source_working_directory ||
       requestValue.code_context.repository ||
       requestValue.code_context.working_directory;
     if (!baseWorkingDirectory.trim()) {
       return { requestValue };
     }
+    // Use a stable worktree per coding record so follow-up / re-runs continue on
+    // the code already implemented, instead of forking a fresh worktree from the
+    // source HEAD every time. If the record already has a worktree, target that
+    // exact one; otherwise key the new worktree by the record id.
+    const worktreeKey = existing?.worktree_path
+      ? existing.worktree_path.split("/").filter(Boolean).pop() ?? recordId
+      : recordId;
     const versionControl = await api.prepareCodingWorktree({
-      request_id: `${recordId}-${Date.now().toString(36)}`,
+      request_id: worktreeKey,
       working_directory: baseWorkingDirectory,
     });
     const preparedRequest = createCodingRequest({
