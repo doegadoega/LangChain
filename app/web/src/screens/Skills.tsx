@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+// STRAND — Library / Skills. Left list (library | local | candidates) + detail pane.
+// Presentation migrated to the strand design system; behavior preserved verbatim.
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, FolderInput, Library, Trash2, Upload, X } from "lucide-react";
-import clsx from "clsx";
-import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
-import { Button } from "../components/ui/Button";
-import { Input, Label, Textarea } from "../components/ui/Field";
+import { StrandShell } from "../components/strand/Chrome";
+import { Btn, Pill } from "../components/strand/primitives";
 import { api } from "../api/client";
 import type { CandidateBatch, SkillDocument } from "../types";
 
@@ -29,6 +29,42 @@ OpenAI 固有の指示。
 
 worker 固有の指示。
 `;
+
+// ---------- shared strand input styles (mirrors AgentStudio/Coding) ----------
+const inputStyle = (disabled = false): CSSProperties => ({
+  width: "100%",
+  height: 30,
+  padding: "0 10px",
+  border: "1px solid var(--border)",
+  borderRadius: 3,
+  background: disabled ? "var(--surface-2)" : "var(--surface)",
+  color: disabled ? "var(--ink-3)" : "var(--ink)",
+  fontSize: 12,
+  outline: "none",
+});
+
+const textareaStyle = (disabled = false): CSSProperties => ({
+  width: "100%",
+  padding: 10,
+  border: "1px solid var(--border)",
+  borderRadius: 3,
+  background: disabled ? "var(--surface-2)" : "var(--surface)",
+  color: disabled ? "var(--ink-3)" : "var(--ink)",
+  fontSize: 12,
+  fontFamily: "var(--strand-font-sans)",
+  lineHeight: 1.5,
+  resize: "vertical",
+  outline: "none",
+});
+
+const fieldLabelStyle: CSSProperties = {
+  fontSize: 9,
+  color: "var(--ink-3)",
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  marginBottom: 6,
+  display: "block",
+};
 
 function splitExternalUrls(value: string): string[] {
   const seen = new Set<string>();
@@ -260,256 +296,498 @@ export function Skills() {
     }
   };
 
+  const candidateCount = candidates.reduce((sum, b) => sum + b.skills.length, 0);
+
   return (
-    <div className="grid h-full grid-cols-[360px_minmax(0,1fr)] overflow-hidden">
-      <div className="flex flex-col overflow-hidden border-r border-[var(--color-border)]">
-        <div className="border-b border-[var(--color-border)] p-3 space-y-2">
-          <div>
-            <div className="text-sm font-semibold text-[var(--color-fg)]">スキル管理</div>
-            <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
-              SKILL.md の登録、候補承認、エージェントへの参照元を管理します。
-            </div>
-          </div>
-          <div className="flex gap-1">
-            <TabButton label={`登録済み (${groupedInstalled.length})`} active={tab === "library"} onClick={() => setTab("library")} icon={<Library className="h-3.5 w-3.5" />} />
-            <TabButton
-              label={`ローカル (${groupedLocalInstalled.length})`}
-              active={tab === "local"}
-              onClick={() => setTab("local")}
-              icon={<Library className="h-3.5 w-3.5" />}
-            />
-            <TabButton
-              label={`候補 (${candidates.reduce((sum, b) => sum + b.skills.length, 0)})`}
-              active={tab === "candidates"}
-              onClick={() => setTab("candidates")}
-              icon={<FolderInput className="h-3.5 w-3.5" />}
-            />
-          </div>
-          {tab === "library" && (
-            <div className="space-y-2">
-              <Button size="sm" variant="primary" className="w-full" onClick={() => setShowInstaller((value) => !value)}>
-                <Upload className="h-3.5 w-3.5" /> SKILL.md を直接登録
-              </Button>
-              <div className="space-y-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                <Label className="text-[10px]">外部 URL から候補へ取り込み</Label>
-                <Textarea
-                  placeholder={"https://github.com/org/repo/blob/main/path/SKILL.md\nhttps://raw.githubusercontent.com/org/repo/main/other/SKILL.md"}
-                  value={externalUrl}
-                  onChange={(event) => setExternalUrl(event.target.value)}
-                  className="min-h-20 text-xs"
-                />
-                <Button size="sm" variant="outline" className="w-full" onClick={() => void handleImportExternal()}>
-                  <Upload className="h-3.5 w-3.5" /> URLを一括取り込み
-                </Button>
+    <StrandShell breadcrumb={["library", "skills"]} mainStyle={{ display: "flex", overflow: "hidden" }}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "grid",
+          gridTemplateColumns: "360px minmax(0,1fr)",
+          background: "var(--paper)",
+          overflow: "hidden",
+        }}
+      >
+        {/* LEFT — list + import controls */}
+        <aside
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            borderRight: "1px solid var(--border)",
+            background: "var(--paper)",
+          }}
+        >
+          <div style={{ borderBottom: "1px solid var(--border)", padding: 12 }}>
+            <div style={{ marginBottom: 12 }}>
+              <div className="mono" style={{ fontSize: 10, color: "var(--ink-3)", letterSpacing: "0.12em" }}>
+                LIBRARY · SKILLS
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>スキル管理</div>
+              <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                SKILL.md の登録、候補承認、エージェントへの参照元を管理します。
               </div>
             </div>
-          )}
-          {tab === "candidates" && (
-            <div className="space-y-2">
-              <div className="space-y-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                <Label className="text-[10px]">外部 URL から取り込み</Label>
-                <Textarea
-                  placeholder={"https://github.com/org/repo/blob/main/path/SKILL.md\nhttps://raw.githubusercontent.com/org/repo/main/other/SKILL.md"}
-                  value={externalUrl}
-                  onChange={(event) => setExternalUrl(event.target.value)}
-                  className="min-h-20 text-xs"
-                />
-                <Button size="sm" variant="primary" className="w-full" onClick={() => void handleImportExternal()}>
-                  <Upload className="h-3.5 w-3.5" /> URLを一括取り込み
-                </Button>
-              </div>
-              <div className="space-y-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                <Label className="text-[10px]">ローカルディレクトリから取り込み</Label>
-                <Input
-                  placeholder="例: /Users/me/skills"
-                  value={importPath}
-                  onChange={(event) => setImportPath(event.target.value)}
-                  className="text-xs"
-                />
-                <Button size="sm" variant="primary" className="w-full" onClick={() => void handleImportLocal()}>
-                  <FolderInput className="h-3.5 w-3.5" /> 取り込み
-                </Button>
-              </div>
-            </div>
-          )}
-          {tab === "local" && (
-            <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-              <Label className="text-[10px]">ローカル Skill ディレクトリ</Label>
-              <Input
-                placeholder="空なら ~/.codex/skills"
-                value={localPath}
-                onChange={(event) => setLocalPath(event.target.value)}
-                className="text-xs"
+            <div
+              role="tablist"
+              style={{
+                display: "flex",
+                gap: 4,
+              }}
+            >
+              <TabButton
+                label={`登録済み (${groupedInstalled.length})`}
+                active={tab === "library"}
+                onClick={() => setTab("library")}
+                icon={<Library style={{ width: 14, height: 14 }} />}
               />
-              <Button size="sm" variant="primary" className="w-full" onClick={() => void handleRefreshLocalInstalled()}>
-                <Library className="h-3.5 w-3.5" /> インストール済みを再読込
-              </Button>
+              <TabButton
+                label={`ローカル (${groupedLocalInstalled.length})`}
+                active={tab === "local"}
+                onClick={() => setTab("local")}
+                icon={<Library style={{ width: 14, height: 14 }} />}
+              />
+              <TabButton
+                label={`候補 (${candidateCount})`}
+                active={tab === "candidates"}
+                onClick={() => setTab("candidates")}
+                icon={<FolderInput style={{ width: 14, height: 14 }} />}
+              />
             </div>
-          )}
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {tab === "library" && groupedInstalled.length === 0 && (
-            <EmptyState message="登録済みスキルはありません。SKILL.md を直接登録するか、候補から承認してください。" />
-          )}
-          {tab === "library" &&
-            groupedInstalled.map((entry) => {
-              const skill = entry.latest;
-              return (
-                <button
-                  key={entry.id}
-                  onClick={() => setSelectedId(entry.id)}
-                  className={clsx(
-                    "block w-full rounded-md border bg-[var(--color-surface-2)] p-2.5 text-left transition-colors",
-                    selectedId === entry.id
-                      ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
-                      : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]",
-                  )}
+            {tab === "library" && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <Btn
+                  variant="solid"
+                  tone="accent"
+                  size="sm"
+                  onClick={() => setShowInstaller((value) => !value)}
+                  style={{ width: "100%", justifyContent: "center" }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">{skill.metadata.name}</div>
-                    <span className="text-[10px] tabular-nums text-[var(--color-fg-subtle)]">v{skill.metadata.version}</span>
-                  </div>
-                  <div className="mt-1 truncate text-[11px] text-[var(--color-fg-muted)]">
-                    {skill.metadata.description || "(説明なし)"}
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1 text-[9px]">
-                    {skill.metadata.providers.map((p) => (
-                      <span key={p} className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-1 py-[1px] text-[var(--color-fg-muted)]">
-                        {p}
-                      </span>
-                    ))}
-                    {skill.metadata.roles.map((r) => (
-                      <span key={r} className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-1 py-[1px] text-emerald-300">
-                        {r}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
-          {tab === "local" && groupedLocalInstalled.length === 0 && (
-            <EmptyState message="ローカルにインストール済みの Skill が見つかりません。既定では ~/.codex/skills を読みます。" />
-          )}
-          {tab === "local" &&
-            groupedLocalInstalled.map((entry) => {
-              const skill = entry.latest;
-              return (
-                <button
-                  key={entry.id}
-                  onClick={() => setSelectedLocalId(entry.id)}
-                  className={clsx(
-                    "block w-full rounded-md border bg-[var(--color-surface-2)] p-2.5 text-left transition-colors",
-                    selectedLocalId === entry.id
-                      ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
-                      : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]",
-                  )}
+                  <Upload style={{ width: 14, height: 14 }} /> SKILL.md を直接登録
+                </Btn>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface-2)",
+                    padding: 8,
+                  }}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="truncate text-sm font-semibold">{skill.metadata.name}</div>
-                    <span className="shrink-0 text-[10px] tabular-nums text-[var(--color-fg-subtle)]">v{skill.metadata.version}</span>
+                  <span className="mono" style={fieldLabelStyle}>
+                    外部 URL から候補へ取り込み
+                  </span>
+                  <textarea
+                    placeholder={"https://github.com/org/repo/blob/main/path/SKILL.md\nhttps://raw.githubusercontent.com/org/repo/main/other/SKILL.md"}
+                    value={externalUrl}
+                    onChange={(event) => setExternalUrl(event.target.value)}
+                    rows={3}
+                    style={textareaStyle()}
+                  />
+                  <Btn
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleImportExternal()}
+                    style={{ width: "100%", justifyContent: "center" }}
+                  >
+                    <Upload style={{ width: 14, height: 14 }} /> URLを一括取り込み
+                  </Btn>
+                </div>
+              </div>
+            )}
+            {tab === "candidates" && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface-2)",
+                    padding: 8,
+                  }}
+                >
+                  <span className="mono" style={fieldLabelStyle}>
+                    外部 URL から取り込み
+                  </span>
+                  <textarea
+                    placeholder={"https://github.com/org/repo/blob/main/path/SKILL.md\nhttps://raw.githubusercontent.com/org/repo/main/other/SKILL.md"}
+                    value={externalUrl}
+                    onChange={(event) => setExternalUrl(event.target.value)}
+                    rows={3}
+                    style={textareaStyle()}
+                  />
+                  <Btn
+                    variant="solid"
+                    tone="accent"
+                    size="sm"
+                    onClick={() => void handleImportExternal()}
+                    style={{ width: "100%", justifyContent: "center" }}
+                  >
+                    <Upload style={{ width: 14, height: 14 }} /> URLを一括取り込み
+                  </Btn>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface-2)",
+                    padding: 8,
+                  }}
+                >
+                  <span className="mono" style={fieldLabelStyle}>
+                    ローカルディレクトリから取り込み
+                  </span>
+                  <input
+                    placeholder="例: /Users/me/skills"
+                    value={importPath}
+                    onChange={(event) => setImportPath(event.target.value)}
+                    className="mono"
+                    style={{ ...inputStyle(), fontFamily: "var(--strand-font-mono)" }}
+                  />
+                  <Btn
+                    variant="solid"
+                    tone="accent"
+                    size="sm"
+                    onClick={() => void handleImportLocal()}
+                    style={{ width: "100%", justifyContent: "center" }}
+                  >
+                    <FolderInput style={{ width: 14, height: 14 }} /> 取り込み
+                  </Btn>
+                </div>
+              </div>
+            )}
+            {tab === "local" && (
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  borderRadius: 3,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface-2)",
+                  padding: 8,
+                }}
+              >
+                <span className="mono" style={fieldLabelStyle}>
+                  ローカル Skill ディレクトリ
+                </span>
+                <input
+                  placeholder="空なら ~/.codex/skills"
+                  value={localPath}
+                  onChange={(event) => setLocalPath(event.target.value)}
+                  className="mono"
+                  style={{ ...inputStyle(), fontFamily: "var(--strand-font-mono)" }}
+                />
+                <Btn
+                  variant="solid"
+                  tone="accent"
+                  size="sm"
+                  onClick={() => void handleRefreshLocalInstalled()}
+                  style={{ width: "100%", justifyContent: "center" }}
+                >
+                  <Library style={{ width: 14, height: 14 }} /> インストール済みを再読込
+                </Btn>
+              </div>
+            )}
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+            {tab === "library" && groupedInstalled.length === 0 && (
+              <EmptyState message="登録済みスキルはありません。SKILL.md を直接登録するか、候補から承認してください。" />
+            )}
+            {tab === "library" &&
+              groupedInstalled.map((entry) => {
+                const skill = entry.latest;
+                const sel = selectedId === entry.id;
+                return (
+                  <button
+                    key={entry.id}
+                    onClick={() => setSelectedId(entry.id)}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      padding: 10,
+                      borderRadius: 3,
+                      border: "1px solid var(--border)",
+                      borderLeft: sel ? "2px solid var(--accent)" : "1px solid var(--border)",
+                      background: sel ? "var(--surface)" : "var(--surface-2)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{skill.metadata.name}</div>
+                      <span className="mono" style={{ fontSize: 10, color: "var(--ink-3)" }}>
+                        v{skill.metadata.version}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 11,
+                        color: "var(--ink-3)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {skill.metadata.description || "(説明なし)"}
+                    </div>
+                    <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {skill.metadata.providers.map((p) => (
+                        <Pill key={p} tone="neutral">
+                          {p}
+                        </Pill>
+                      ))}
+                      {skill.metadata.roles.map((r) => (
+                        <Pill key={r} tone="ok">
+                          {r}
+                        </Pill>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            {tab === "local" && groupedLocalInstalled.length === 0 && (
+              <EmptyState message="ローカルにインストール済みの Skill が見つかりません。既定では ~/.codex/skills を読みます。" />
+            )}
+            {tab === "local" &&
+              groupedLocalInstalled.map((entry) => {
+                const skill = entry.latest;
+                const sel = selectedLocalId === entry.id;
+                return (
+                  <button
+                    key={entry.id}
+                    onClick={() => setSelectedLocalId(entry.id)}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      padding: 10,
+                      borderRadius: 3,
+                      border: "1px solid var(--border)",
+                      borderLeft: sel ? "2px solid var(--accent)" : "1px solid var(--border)",
+                      background: sel ? "var(--surface)" : "var(--surface-2)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "var(--ink)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {skill.metadata.name}
+                      </div>
+                      <span className="mono" style={{ flexShrink: 0, fontSize: 10, color: "var(--ink-3)" }}>
+                        v{skill.metadata.version}
+                      </span>
+                    </div>
+                    <div
+                      className="mono"
+                      style={{
+                        marginTop: 4,
+                        fontSize: 10,
+                        color: "var(--ink-3)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {skill.root_directory || skill.metadata.description || "(説明なし)"}
+                    </div>
+                  </button>
+                );
+              })}
+            {tab === "candidates" && candidates.length === 0 && (
+              <EmptyState message="候補はありません。外部URLまたはローカルディレクトリから取り込んでください。" />
+            )}
+            {tab === "candidates" &&
+              candidates.map((batch) => (
+                <div
+                  key={batch.id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface-2)",
+                    padding: 8,
+                  }}
+                >
+                  <div className="mono" style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-3)" }}>
+                    {batch.id}
                   </div>
-                  <div className="mt-1 truncate text-[11px] text-[var(--color-fg-muted)]">
-                    {skill.root_directory || skill.metadata.description || "(説明なし)"}
-                  </div>
-                </button>
-              );
-            })}
-          {tab === "candidates" && candidates.length === 0 && (
-            <EmptyState message="候補はありません。外部URLまたはローカルディレクトリから取り込んでください。" />
-          )}
-          {tab === "candidates" &&
-            candidates.map((batch) => (
-              <div key={batch.id} className="space-y-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                <div className="text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">{batch.id}</div>
-                {batch.skills.map((skill) => (
-                  <div key={skill.metadata.id} className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold">{skill.metadata.name}</div>
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="primary" onClick={() => void handleApprove(batch.id, skill.metadata.id)}>
-                          <CheckCircle2 className="h-3.5 w-3.5" /> 承認
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => void handleDiscardCandidate(batch.id, skill.metadata.id)}>
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
+                  {batch.skills.map((skill) => (
+                    <div
+                      key={skill.metadata.id}
+                      style={{
+                        borderRadius: 3,
+                        border: "1px solid var(--border)",
+                        background: "var(--surface)",
+                        padding: 8,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{skill.metadata.name}</div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <Btn variant="solid" tone="accent" size="sm" onClick={() => void handleApprove(batch.id, skill.metadata.id)}>
+                            <CheckCircle2 style={{ width: 14, height: 14 }} /> 承認
+                          </Btn>
+                          <Btn
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleDiscardCandidate(batch.id, skill.metadata.id)}
+                            style={{ padding: "0 8px" }}
+                          >
+                            <X style={{ width: 14, height: 14 }} />
+                          </Btn>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          fontSize: 11,
+                          color: "var(--ink-3)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {skill.metadata.description || "(説明なし)"} · v{skill.metadata.version}
                       </div>
                     </div>
-                    <div className="mt-1 truncate text-[11px] text-[var(--color-fg-muted)]">
-                      {skill.metadata.description || "(説明なし)"} · v{skill.metadata.version}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              ))}
+          </div>
+        </aside>
+
+        {/* RIGHT — detail / installer */}
+        <div style={{ overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          {(status || error) && (
+            <div
+              style={{
+                borderRadius: 3,
+                border: `1px solid ${error ? "var(--danger)" : "var(--ok)"}`,
+                background: error ? "var(--danger-bg)" : "var(--ok-bg)",
+                color: error ? "var(--danger)" : "var(--ok)",
+                padding: 8,
+                fontSize: 11,
+                lineHeight: 1.5,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {error || status}
+            </div>
+          )}
+
+          {showInstaller && (
+            <section
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                overflow: "hidden",
+              }}
+            >
+              <header
+                className="mono"
+                style={{
+                  height: 32,
+                  padding: "0 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  borderBottom: "1px solid var(--border)",
+                  background: "var(--surface-2)",
+                  fontSize: 11,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-2)",
+                  fontWeight: 500,
+                }}
+              >
+                SKILL.md を登録済みに追加
+                <span style={{ flex: 1 }} />
+                <Btn variant="ghost" size="sm" onClick={() => setShowInstaller(false)} style={{ padding: "0 6px" }}>
+                  <X style={{ width: 14, height: 14 }} />
+                </Btn>
+              </header>
+              <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                <textarea
+                  rows={14}
+                  value={installMarkdown || SAMPLE_MARKDOWN}
+                  onChange={(event) => setInstallMarkdown(event.target.value)}
+                  className="mono"
+                  style={{ ...textareaStyle(), fontFamily: "var(--strand-font-mono)" }}
+                />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Btn variant="solid" tone="accent" onClick={() => void handleInstall()}>
+                    <Upload style={{ width: 14, height: 14 }} /> 登録済みに追加
+                  </Btn>
+                  <Btn variant="ghost" onClick={() => setInstallMarkdown(SAMPLE_MARKDOWN)}>
+                    サンプルを挿入
+                  </Btn>
+                </div>
               </div>
-            ))}
+            </section>
+          )}
+
+          {selectedSkill && tab === "library" ? (
+            <SkillDetail
+              skill={selectedSkill}
+              versions={groupedInstalled.find((entry) => entry.id === selectedSkill.metadata.id)?.versions ?? []}
+              onDeleteSkill={() => void handleDeleteSkill(selectedSkill.metadata.id)}
+              onDeleteVersion={(version) => void handleDeleteVersion(selectedSkill.metadata.id, version)}
+            />
+          ) : selectedLocalSkill && tab === "local" ? (
+            <SkillDetail
+              skill={selectedLocalSkill}
+              versions={groupedLocalInstalled.find((entry) => entry.id === selectedLocalSkill.metadata.id)?.versions ?? []}
+              readOnly
+              onInstallLocal={() => void handleInstallLocalSkill(selectedLocalSkill)}
+            />
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                padding: "32px 16px",
+                textAlign: "center",
+                border: "1px dashed var(--border-2)",
+                borderRadius: 4,
+                background: "var(--surface-2)",
+                fontSize: 12,
+                color: "var(--ink-3)",
+              }}
+            >
+              {tab === "library"
+                ? "Skill を選択して詳細を表示"
+                : tab === "local"
+                  ? "ローカル Skill を選択して詳細を表示"
+                  : "候補を承認すると登録済みに移動します。"}
+            </div>
+          )}
         </div>
       </div>
-
-      <div className="overflow-y-auto p-4 space-y-3">
-        {(status || error) && (
-          <div
-            className={clsx(
-              "rounded-md border p-2 text-xs",
-              error
-                ? "border-red-500/40 bg-red-500/10 text-red-200"
-                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-            )}
-          >
-            {error || status}
-          </div>
-        )}
-
-        {showInstaller && (
-          <Card>
-            <CardHeader>
-              <CardTitle>SKILL.md を登録済みに追加</CardTitle>
-              <Button size="sm" variant="ghost" onClick={() => setShowInstaller(false)}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </CardHeader>
-            <CardBody className="space-y-3">
-              <Textarea
-                rows={14}
-                value={installMarkdown || SAMPLE_MARKDOWN}
-                onChange={(event) => setInstallMarkdown(event.target.value)}
-                className="font-mono text-xs"
-              />
-              <div className="flex gap-2">
-                <Button variant="primary" onClick={() => void handleInstall()}>
-                  <Upload className="h-3.5 w-3.5" /> 登録済みに追加
-                </Button>
-                <Button variant="ghost" onClick={() => setInstallMarkdown(SAMPLE_MARKDOWN)}>
-                  サンプルを挿入
-                </Button>
-              </div>
-            </CardBody>
-          </Card>
-        )}
-
-        {selectedSkill && tab === "library" ? (
-          <SkillDetail
-            skill={selectedSkill}
-            versions={groupedInstalled.find((entry) => entry.id === selectedSkill.metadata.id)?.versions ?? []}
-            onDeleteSkill={() => void handleDeleteSkill(selectedSkill.metadata.id)}
-            onDeleteVersion={(version) => void handleDeleteVersion(selectedSkill.metadata.id, version)}
-          />
-        ) : selectedLocalSkill && tab === "local" ? (
-          <SkillDetail
-            skill={selectedLocalSkill}
-            versions={groupedLocalInstalled.find((entry) => entry.id === selectedLocalSkill.metadata.id)?.versions ?? []}
-            readOnly
-            onInstallLocal={() => void handleInstallLocalSkill(selectedLocalSkill)}
-          />
-        ) : (
-          <div className="rounded-md border border-dashed border-[var(--color-border)] p-6 text-center text-xs text-[var(--color-fg-subtle)]">
-            {tab === "library"
-              ? "Skill を選択して詳細を表示"
-              : tab === "local"
-                ? "ローカル Skill を選択して詳細を表示"
-                : "候補を承認すると登録済みに移動します。"}
-          </div>
-        )}
-      </div>
-    </div>
+    </StrandShell>
   );
 }
 
@@ -522,18 +800,29 @@ function TabButton({
   label: string;
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
-      className={clsx(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-colors",
-        active
-          ? "border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-[var(--color-fg)]"
-          : "border-[var(--color-border)] text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)]",
-      )}
+      className="mono"
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        padding: "6px 8px",
+        fontSize: 11,
+        letterSpacing: "0.02em",
+        borderRadius: 3,
+        border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
+        background: active ? "var(--accent-soft)" : "var(--surface)",
+        color: active ? "var(--accent-deep)" : "var(--ink-2)",
+      }}
     >
       {icon}
       {label}
@@ -543,9 +832,53 @@ function TabButton({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-center text-[11px] text-[var(--color-fg-subtle)]">
+    <div
+      style={{
+        padding: "12px 14px",
+        textAlign: "center",
+        border: "1px dashed var(--border-2)",
+        borderRadius: 4,
+        background: "var(--surface-2)",
+        fontSize: 11,
+        color: "var(--ink-3)",
+      }}
+    >
       {message}
     </div>
+  );
+}
+
+function SectionPanel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 4,
+        overflow: "hidden",
+      }}
+    >
+      <header
+        className="mono"
+        style={{
+          height: 32,
+          padding: "0 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          borderBottom: "1px solid var(--border)",
+          background: "var(--surface-2)",
+          fontSize: 11,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: "var(--ink-2)",
+          fontWeight: 500,
+        }}
+      >
+        {title}
+      </header>
+      <div style={{ padding: 14 }}>{children}</div>
+    </section>
   );
 }
 
@@ -565,82 +898,122 @@ function SkillDetail({
   readOnly?: boolean;
 }) {
   return (
-    <div className="space-y-3">
-      <Card>
-        <CardHeader>
-          <div>
-            <CardTitle>{skill.metadata.name}</CardTitle>
-            <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <section
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 4,
+          overflow: "hidden",
+        }}
+      >
+        <header
+          style={{
+            padding: "10px 12px",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 8,
+            borderBottom: "1px solid var(--border)",
+            background: "var(--surface-2)",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{skill.metadata.name}</div>
+            <div className="mono" style={{ marginTop: 4, fontSize: 10, color: "var(--ink-3)" }}>
               id: {skill.metadata.id} · source: {skill.source}
             </div>
           </div>
           {readOnly ? (
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-muted)]">
-                read only
-              </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Pill tone="neutral">read only</Pill>
               {onInstallLocal && (
-                <Button variant="primary" size="sm" onClick={onInstallLocal}>
-                  <Upload className="h-3.5 w-3.5" /> Webアプリに登録
-                </Button>
+                <Btn variant="solid" tone="accent" size="sm" onClick={onInstallLocal}>
+                  <Upload style={{ width: 14, height: 14 }} /> Webアプリに登録
+                </Btn>
               )}
             </div>
           ) : (
-            <Button variant="danger" size="sm" onClick={onDeleteSkill ?? (() => undefined)}>
-              <Trash2 className="h-3.5 w-3.5" /> Skill を削除
-            </Button>
+            <Btn
+              variant="outline"
+              size="sm"
+              onClick={onDeleteSkill ?? (() => undefined)}
+              style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+            >
+              <Trash2 style={{ width: 14, height: 14 }} /> Skill を削除
+            </Btn>
           )}
-        </CardHeader>
-        <CardBody className="space-y-2 text-xs">
+        </header>
+        <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "var(--ink-2)" }}>
           {skill.metadata.description && <div>{skill.metadata.description}</div>}
-          <div className="flex flex-wrap gap-1.5">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {skill.metadata.providers.map((p) => (
-              <span key={p} className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-2)] px-1.5 py-[1px] text-[var(--color-fg-muted)]">
+              <Pill key={p} tone="neutral">
                 provider: {p}
-              </span>
+              </Pill>
             ))}
             {skill.metadata.roles.map((r) => (
-              <span key={r} className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-2)] px-1.5 py-[1px] text-emerald-300">
+              <Pill key={r} tone="ok">
                 role: {r}
-              </span>
+              </Pill>
             ))}
             {skill.metadata.tags.map((t) => (
-              <span key={t} className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-2)] px-1.5 py-[1px] text-[var(--color-fg-subtle)]">
+              <Pill key={t} tone="neutral">
                 #{t}
-              </span>
+              </Pill>
             ))}
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>バージョン</CardTitle>
-        </CardHeader>
-        <CardBody className="space-y-1 text-xs">
+      <SectionPanel title="バージョン">
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
           {versions.map((v) => (
-            <div key={v.metadata.version} className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1">
-              <span className="tabular-nums">v{v.metadata.version}</span>
+            <div
+              key={v.metadata.version}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderRadius: 3,
+                border: "1px solid var(--border)",
+                background: "var(--surface-2)",
+                padding: "4px 10px",
+              }}
+            >
+              <span className="mono" style={{ fontSize: 11, color: "var(--ink-2)" }}>
+                v{v.metadata.version}
+              </span>
               {!readOnly && onDeleteVersion && (
-                <Button size="sm" variant="ghost" onClick={() => onDeleteVersion(v.metadata.version)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <Btn variant="ghost" size="sm" onClick={() => onDeleteVersion(v.metadata.version)} style={{ padding: "0 6px" }}>
+                  <Trash2 style={{ width: 14, height: 14 }} />
+                </Btn>
               )}
             </div>
           ))}
-        </CardBody>
-      </Card>
+        </div>
+      </SectionPanel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>SKILL.md 本文</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 font-mono text-[11px] leading-relaxed text-[var(--color-fg)]">
-            {skill.markdown}
-          </pre>
-        </CardBody>
-      </Card>
+      <SectionPanel title="SKILL.md 本文">
+        <pre
+          className="mono"
+          style={{
+            maxHeight: 384,
+            overflow: "auto",
+            whiteSpace: "pre-wrap",
+            borderRadius: 3,
+            border: "1px solid var(--border)",
+            background: "var(--surface-2)",
+            padding: 12,
+            fontSize: 11,
+            lineHeight: 1.6,
+            color: "var(--ink)",
+            margin: 0,
+          }}
+        >
+          {skill.markdown}
+        </pre>
+      </SectionPanel>
     </div>
   );
 }

@@ -21,7 +21,12 @@ import type { ScreenId } from "./types";
 // Screens migrated to the STRAND design system render their own chrome
 // (TopBar + SideBar) full-bleed. Unmigrated screens keep the legacy shell
 // (old Sidebar + Header) during the progressive migration.
-const STRAND_SCREENS = new Set<ScreenId>(["dashboard", "settings", "qa", "team", "agents", "logs"]);
+// All screens are migrated to the STRAND design system; each renders its own
+// chrome (TopBar + SideBar). The legacy shell below is kept only as a fallback.
+const STRAND_SCREENS = new Set<ScreenId>([
+  "dashboard", "settings", "qa", "team", "agents", "logs", "coding",
+  "workspace", "knowledge", "skills", "execution", "chat",
+]);
 
 export function App() {
   const screen = useApp((s) => s.screen);

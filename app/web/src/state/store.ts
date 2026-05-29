@@ -759,7 +759,7 @@ const initialRequest: RefineRequest = {
 };
 
 export const useApp = create<AppState>((set, get) => ({
-  screen: "workspace",
+  screen: ((typeof location !== "undefined" ? new URLSearchParams(location.search).get("screen") : null) as ScreenId | null) ?? "workspace",
   setScreen: (s) => set({ screen: s }),
 
   drawerOpen: false,

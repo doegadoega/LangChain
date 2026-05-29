@@ -1,5 +1,6 @@
-import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
-import clsx from "clsx";
+// STRAND — 相談チャット. Left: partner + attachments + history | Right: conversation + composer.
+// Presentation migrated to the strand design system; behavior preserved verbatim.
+import { type CSSProperties, type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
   Bot,
   FileText,
@@ -11,15 +12,50 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
+import { StrandShell } from "../components/strand/Chrome";
+import { Btn } from "../components/strand/primitives";
 import { api } from "../api/client";
-import { Button } from "../components/ui/Button";
-import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
-import { Label, Select, Textarea } from "../components/ui/Field";
 import { PROVIDER_LABEL, ROLE_LABEL } from "../lib/format";
 import { useApp } from "../state/store";
 import type { AgentConfig, ChatAttachment, ChatSession, StreamEvent } from "../types";
 
 const chatSessionId = (agentId: string) => `chat_${agentId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 48) || "agent"}`;
+
+// ---------- shared strand input styles (mirrors Coding) ----------
+const selectStyle: CSSProperties = {
+  width: "100%",
+  height: 30,
+  padding: "0 8px",
+  border: "1px solid var(--border)",
+  borderRadius: 3,
+  background: "var(--surface)",
+  color: "var(--ink)",
+  fontSize: 12,
+  outline: "none",
+};
+
+const textareaStyle: CSSProperties = {
+  width: "100%",
+  padding: 10,
+  border: "1px solid var(--border)",
+  borderRadius: 3,
+  background: "var(--surface)",
+  color: "var(--ink)",
+  fontSize: 12,
+  fontFamily: "var(--strand-font-sans)",
+  lineHeight: 1.5,
+  resize: "vertical",
+  outline: "none",
+};
+
+const fieldLabelStyle: CSSProperties = {
+  fontSize: 9,
+  color: "var(--ink-3)",
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  marginBottom: 6,
+  display: "block",
+};
 
 export function AgentChat() {
   const request = useApp((state) => state.request);
@@ -90,275 +126,368 @@ export function AgentChat() {
   };
 
   return (
-    <div className="grid h-full grid-cols-[320px_minmax(420px,1fr)] gap-4 overflow-hidden p-4">
-      <Card className="flex min-w-0 flex-col overflow-hidden">
-        <CardHeader>
-          <div>
-            <CardTitle>相談チャット</CardTitle>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--color-fg-muted)]">
-              エージェントを選んで、普段の相談やエラー確認を直接できます。
-            </p>
-          </div>
-          <MessageSquareMore className="h-4 w-4 text-[var(--color-fg-muted)]" />
-        </CardHeader>
-        <CardBody className="flex-1 space-y-4 overflow-y-auto">
-          <div>
-            <Label>チャット相手</Label>
-            <Select
-              value={selectedAgent?.id ?? ""}
-              onChange={(event) => setSelectedAgentId(event.target.value)}
-            >
-              {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name} / {ROLE_LABEL[agent.org_role]}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          {selectedAgent && (
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-              <div className="flex items-start gap-2">
-                <Bot className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-accent)]" />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{selectedAgent.name}</div>
-                  <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
-                    {ROLE_LABEL[selectedAgent.org_role]} · {PROVIDER_LABEL[selectedAgent.provider]}
-                  </div>
-                  <div className="mt-2 line-clamp-4 text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                    {selectedAgent.persona || "ペルソナ未設定"}
-                  </div>
-                </div>
+    <StrandShell breadcrumb={["work", "相談チャット"]} mainStyle={{ display: "flex", overflow: "hidden" }}>
+      <style>{"@keyframes chat-spin{to{transform:rotate(360deg)}}.chat .spin{animation:chat-spin 0.8s linear infinite}"}</style>
+      <div
+        className="chat"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "grid",
+          gridTemplateColumns: "320px minmax(420px,1fr)",
+          background: "var(--paper)",
+          overflow: "hidden",
+        }}
+      >
+        {/* LEFT — partner / attachments / history */}
+        <aside
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            borderRight: "1px solid var(--border)",
+            background: "var(--paper)",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 8,
+              background: "var(--paper-2)",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div className="mono" style={{ fontSize: 10, color: "var(--ink-3)", letterSpacing: "0.12em" }}>
+                WORK · CHAT
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>相談チャット</div>
+              <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.5, color: "var(--ink-3)" }}>
+                エージェントを選んで、普段の相談やエラー確認を直接できます。
               </div>
             </div>
-          )}
-
-          <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-            <div className="text-xs font-semibold">添付する情報</div>
-            <ToggleRow
-              checked={attachRequest}
-              onChange={setAttachRequest}
-              label="依頼内容"
-              detail="今の Workspace の入力内容を一緒に渡す"
-            />
-            <ToggleRow
-              checked={attachLogs}
-              onChange={setAttachLogs}
-              label="直近ログ"
-              detail="直近の実行イベントを一緒に渡す"
-            />
-            <ToggleRow
-              checked={attachError}
-              onChange={setAttachError}
-              label="エラー内容"
-              detail="最後のエラーを一緒に渡す"
-              disabled={!run.error}
-            />
+            <MessageSquareMore style={{ width: 16, height: 16, flexShrink: 0, color: "var(--ink-3)" }} />
           </div>
 
-          <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-            <ToggleRow
-              checked={useWebSearch}
-              onChange={setUseWebSearch}
-              label="Web検索を使う"
-              detail="回答に使ったURLを保存して表示します"
-              icon={<Globe2 className="h-4 w-4" />}
-            />
-          </div>
-
-          <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold">履歴</div>
-              {selectedSession && (
-                <button
-                  type="button"
-                  onClick={() => void clearSession()}
-                  className="rounded p-1 text-[var(--color-fg-muted)] hover:bg-red-500/20 hover:text-red-300"
-                  title="履歴を削除"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <span className="mono" style={fieldLabelStyle}>
+                チャット相手
+              </span>
+              <select
+                value={selectedAgent?.id ?? ""}
+                onChange={(event) => setSelectedAgentId(event.target.value)}
+                style={selectStyle}
+              >
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name} / {ROLE_LABEL[agent.org_role]}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="text-xs text-[var(--color-fg-muted)]">
-              {selectedSession
-                ? `${selectedSession.messages.length} messages / ${new Date(
-                    selectedSession.updated_at ?? selectedSession.created_at,
-                  ).toLocaleString("ja-JP")}`
-                : "このエージェントとの履歴はまだありません。"}
-            </div>
-          </div>
-        </CardBody>
-      </Card>
 
-      <Card className="flex min-w-0 flex-col overflow-hidden">
-        <CardHeader>
-          <div className="min-w-0">
-            <CardTitle>{selectedAgent ? selectedAgent.name : "チャット"}</CardTitle>
-            <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
-              通常質問、設計相談、使い方確認、エラー相談に使えます。
-            </p>
-          </div>
-          {sending && <Loader2 className="h-4 w-4 animate-spin text-sky-200" />}
-        </CardHeader>
-        <CardBody className="flex flex-1 flex-col gap-4 overflow-hidden">
-          <div className="flex-1 space-y-3 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
-            {!selectedSession && (
-              <div className="grid h-full place-items-center text-sm text-[var(--color-fg-subtle)]">
-                質問を送ると、このエージェントとの会話がここに残ります。
+            {selectedAgent && (
+              <div style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <Bot style={{ width: 16, height: 16, marginTop: 2, flexShrink: 0, color: "var(--accent-deep)" }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {selectedAgent.name}
+                    </div>
+                    <div className="mono" style={{ marginTop: 4, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
+                      {ROLE_LABEL[selectedAgent.org_role]} · {PROVIDER_LABEL[selectedAgent.provider]}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 8,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 4,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        fontSize: 11,
+                        lineHeight: 1.6,
+                        color: "var(--ink-2)",
+                      }}
+                    >
+                      {selectedAgent.persona || "ペルソナ未設定"}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
-            {selectedSession?.messages.map((item) => (
-              <div
-                key={item.id}
-                className={clsx(
-                  "max-w-[86%] rounded-lg border p-3",
-                  item.role === "user"
-                    ? "ml-auto border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10"
-                    : "mr-auto border-[var(--color-border)] bg-[var(--color-surface)]",
+
+            <div style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>添付する情報</div>
+              <ToggleRow
+                checked={attachRequest}
+                onChange={setAttachRequest}
+                label="依頼内容"
+                detail="今の Workspace の入力内容を一緒に渡す"
+              />
+              <ToggleRow
+                checked={attachLogs}
+                onChange={setAttachLogs}
+                label="直近ログ"
+                detail="直近の実行イベントを一緒に渡す"
+              />
+              <ToggleRow
+                checked={attachError}
+                onChange={setAttachError}
+                label="エラー内容"
+                detail="最後のエラーを一緒に渡す"
+                disabled={!run.error}
+              />
+            </div>
+
+            <div style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <ToggleRow
+                checked={useWebSearch}
+                onChange={setUseWebSearch}
+                label="Web検索を使う"
+                detail="回答に使ったURLを保存して表示します"
+                icon={<Globe2 style={{ width: 16, height: 16, color: "var(--ink-2)" }} />}
+              />
+            </div>
+
+            <div style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>履歴</div>
+                {selectedSession && (
+                  <button
+                    type="button"
+                    onClick={() => void clearSession()}
+                    title="履歴を削除"
+                    style={{ borderRadius: 3, padding: 4, color: "var(--ink-3)", background: "transparent", border: "1px solid transparent" }}
+                  >
+                    <Trash2 style={{ width: 16, height: 16 }} />
+                  </button>
                 )}
-              >
-                <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-[var(--color-fg-subtle)]">
-                  <span>{item.role === "user" ? "あなた" : item.agent_name ?? "Agent"}</span>
-                  <span>{new Date(item.created_at).toLocaleString("ja-JP")}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                {selectedSession
+                  ? `${selectedSession.messages.length} messages / ${new Date(
+                      selectedSession.updated_at ?? selectedSession.created_at,
+                    ).toLocaleString("ja-JP")}`
+                  : "このエージェントとの履歴はまだありません。"}
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* RIGHT — conversation + composer */}
+        <main style={{ display: "flex", minWidth: 0, flexDirection: "column", overflow: "hidden" }}>
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 8,
+              background: "var(--paper-2)",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selectedAgent ? selectedAgent.name : "チャット"}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                通常質問、設計相談、使い方確認、エラー相談に使えます。
+              </div>
+            </div>
+            {sending && <Loader2 style={{ width: 16, height: 16, color: "var(--ok)" }} className="spin" />}
+          </div>
+
+          <div style={{ flex: 1, display: "flex", minHeight: 0, flexDirection: "column", overflow: "hidden", padding: 14, gap: 12 }}>
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+                background: "var(--surface-2)",
+                padding: 14,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              {!selectedSession && (
+                <div style={{ display: "grid", placeItems: "center", height: "100%", textAlign: "center", fontSize: 12, lineHeight: 1.6, color: "var(--ink-3)" }}>
+                  質問を送ると、このエージェントとの会話がここに残ります。
                 </div>
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--color-fg)]">
-                  {item.content}
-                </pre>
-                {item.attachments && item.attachments.length > 0 && (
-                  <div className="mt-3 space-y-1 border-t border-[var(--color-border)] pt-2">
-                    {item.attachments.map((attachment) => (
+              )}
+              {selectedSession?.messages.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    maxWidth: "86%",
+                    marginLeft: item.role === "user" ? "auto" : undefined,
+                    marginRight: item.role === "user" ? undefined : "auto",
+                    borderRadius: 4,
+                    border: item.role === "user" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                    background: item.role === "user" ? "var(--accent-soft)" : "var(--surface)",
+                    padding: 12,
+                  }}
+                >
+                  <div className="mono" style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 9, color: "var(--ink-4)" }}>
+                    <span>{item.role === "user" ? "あなた" : item.agent_name ?? "Agent"}</span>
+                    <span>{new Date(item.created_at).toLocaleString("ja-JP")}</span>
+                  </div>
+                  <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 12, lineHeight: 1.6, color: "var(--ink)", margin: 0 }}>
+                    {item.content}
+                  </pre>
+                  {item.attachments && item.attachments.length > 0 && (
+                    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+                      {item.attachments.map((attachment) => (
+                        <div
+                          key={`${item.id}-${attachment.kind}-${attachment.title}`}
+                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--ink-3)" }}
+                        >
+                          {attachment.kind === "image" ? (
+                            <ImageIcon style={{ width: 14, height: 14 }} />
+                          ) : (
+                            <FileText style={{ width: 14, height: 14 }} />
+                          )}
+                          {attachment.title}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {item.sources && item.sources.length > 0 && (
+                    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-3)" }}>参照URL</div>
+                      {item.sources.map((source) => (
+                        <a
+                          key={source.url}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-all", fontSize: 11, color: "var(--info)" }}
+                        >
+                          <Link style={{ width: 14, height: 14, marginTop: 2, flexShrink: 0 }} />
+                          <span>{source.title || source.url}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {item.error && (
+                    <div style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--warn)", background: "var(--warn-bg)", padding: 8, fontSize: 11, color: "var(--warn)" }}>
+                      {item.error}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <textarea
+                rows={4}
+                value={message}
+                placeholder="聞きたいことを書いてください。例: このエラーは何？ / この設計で大丈夫？ / 初心者向けに説明して"
+                onChange={(event) => setMessage(event.target.value)}
+                onPaste={(event) => {
+                  const files = Array.from(event.clipboardData.files).filter((file) =>
+                    file.type.startsWith("image/"),
+                  );
+                  if (files.length) {
+                    event.preventDefault();
+                    void addImageFiles(files, setImageAttachments, setStatus);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                    void sendMessage();
+                  }
+                }}
+                style={textareaStyle}
+              />
+              <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      cursor: "pointer",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 3,
+                      border: "1px solid var(--border)",
+                      background: "var(--surface)",
+                      padding: "5px 8px",
+                      fontSize: 11,
+                      color: "var(--ink-2)",
+                    }}
+                  >
+                    <ImageIcon style={{ width: 16, height: 16 }} />
+                    画像を添付
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: "none" }}
+                      onChange={(event) => {
+                        const files = Array.from(event.target.files ?? []);
+                        event.target.value = "";
+                        void addImageFiles(files, setImageAttachments, setStatus);
+                      }}
+                    />
+                  </label>
+                  <div style={{ fontSize: 10, color: "var(--ink-4)" }}>スクショは貼り付けでも追加できます。</div>
+                </div>
+                {imageAttachments.length > 0 && (
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {imageAttachments.map((attachment, index) => (
                       <div
-                        key={`${item.id}-${attachment.kind}-${attachment.title}`}
-                        className="flex items-center gap-1.5 text-xs text-[var(--color-fg-muted)]"
+                        key={`${attachment.title}-${index}`}
+                        style={{ display: "flex", alignItems: "center", gap: 8, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: "5px 8px", fontSize: 11 }}
                       >
-                        {attachment.kind === "image" ? (
-                          <ImageIcon className="h-3.5 w-3.5" />
+                        {attachment.content.startsWith("data:image/") ? (
+                          <img
+                            src={attachment.content}
+                            alt={attachment.title}
+                            style={{ width: 32, height: 32, borderRadius: 3, border: "1px solid var(--border)", objectFit: "cover" }}
+                          />
                         ) : (
-                          <FileText className="h-3.5 w-3.5" />
+                          <ImageIcon style={{ width: 16, height: 16, color: "var(--ink-3)" }} />
                         )}
-                        {attachment.title}
+                        <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink)" }}>
+                          {attachment.title}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setImageAttachments((items) => items.filter((_, i) => i !== index))
+                          }
+                          style={{ borderRadius: 3, padding: 2, color: "var(--ink-3)", background: "transparent", border: "1px solid transparent" }}
+                        >
+                          <Trash2 style={{ width: 14, height: 14 }} />
+                        </button>
                       </div>
                     ))}
                   </div>
                 )}
-                {item.sources && item.sources.length > 0 && (
-                  <div className="mt-3 space-y-1 border-t border-[var(--color-border)] pt-2">
-                    <div className="text-xs font-semibold text-[var(--color-fg-muted)]">
-                      参照URL
-                    </div>
-                    {item.sources.map((source) => (
-                      <a
-                        key={source.url}
-                        href={source.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-start gap-1.5 break-all text-xs text-sky-300 hover:text-sky-200"
-                      >
-                        <Link className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        <span>{source.title || source.url}</span>
-                      </a>
-                    ))}
-                  </div>
-                )}
-                {item.error && (
-                  <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200">
-                    {item.error}
-                  </div>
-                )}
               </div>
-            ))}
-          </div>
-
-          <div className="space-y-2">
-            <Textarea
-              rows={4}
-              value={message}
-              className="font-sans"
-              placeholder="聞きたいことを書いてください。例: このエラーは何？ / この設計で大丈夫？ / 初心者向けに説明して"
-              onChange={(event) => setMessage(event.target.value)}
-              onPaste={(event) => {
-                const files = Array.from(event.clipboardData.files).filter((file) =>
-                  file.type.startsWith("image/"),
-                );
-                if (files.length) {
-                  event.preventDefault();
-                  void addImageFiles(files, setImageAttachments, setStatus);
-                }
-              }}
-              onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                  void sendMessage();
-                }
-              }}
-            />
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-fg)]">
-                  <ImageIcon className="h-4 w-4" />
-                  画像を添付
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(event) => {
-                      const files = Array.from(event.target.files ?? []);
-                      event.target.value = "";
-                      void addImageFiles(files, setImageAttachments, setStatus);
-                    }}
-                  />
-                </label>
-                <div className="text-[11px] text-[var(--color-fg-subtle)]">
-                  スクショは貼り付けでも追加できます。
-                </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ minWidth: 0, fontSize: 11, color: "var(--ink-3)" }}>{status}</div>
+                <Btn
+                  variant="solid"
+                  tone="accent"
+                  disabled={!message.trim() || !selectedAgent || sending}
+                  onClick={() => void sendMessage()}
+                >
+                  {sending ? <Loader2 style={{ width: 14, height: 14 }} className="spin" /> : <Send style={{ width: 14, height: 14 }} />}
+                  送信
+                </Btn>
               </div>
-              {imageAttachments.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {imageAttachments.map((attachment, index) => (
-                    <div
-                      key={`${attachment.title}-${index}`}
-                      className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs"
-                    >
-                      {attachment.content.startsWith("data:image/") ? (
-                        <img
-                          src={attachment.content}
-                          alt={attachment.title}
-                          className="h-8 w-8 rounded border border-[var(--color-border)] object-cover"
-                        />
-                      ) : (
-                        <ImageIcon className="h-4 w-4 text-[var(--color-fg-muted)]" />
-                      )}
-                      <span className="max-w-40 truncate">{attachment.title}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setImageAttachments((items) => items.filter((_, i) => i !== index))
-                        }
-                        className="rounded p-0.5 text-[var(--color-fg-muted)] hover:bg-red-500/20 hover:text-red-300"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-[var(--color-fg-muted)]">{status}</div>
-              <Button
-                variant="primary"
-                disabled={!message.trim() || !selectedAgent || sending}
-                onClick={() => void sendMessage()}
-              >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                送信
-              </Button>
             </div>
           </div>
-        </CardBody>
-      </Card>
-    </div>
+        </main>
+      </div>
+    </StrandShell>
   );
 }
 
@@ -379,22 +508,29 @@ function ToggleRow({
 }) {
   return (
     <label
-      className={clsx(
-        "flex cursor-pointer items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2",
-        disabled && "cursor-not-allowed opacity-50",
-      )}
+      style={{
+        display: "flex",
+        cursor: disabled ? "not-allowed" : "pointer",
+        alignItems: "center",
+        gap: 12,
+        borderRadius: 3,
+        border: "1px solid var(--border)",
+        background: "var(--surface)",
+        padding: 8,
+        opacity: disabled ? 0.5 : 1,
+      }}
     >
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 accent-[var(--color-accent)]"
+        style={{ width: 16, height: 16, accentColor: "var(--accent)", flexShrink: 0 }}
       />
       {icon}
-      <span className="min-w-0">
-        <span className="block text-xs font-semibold">{label}</span>
-        <span className="block text-xs text-[var(--color-fg-muted)]">{detail}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>{label}</span>
+        <span style={{ display: "block", fontSize: 11, color: "var(--ink-3)" }}>{detail}</span>
       </span>
     </label>
   );

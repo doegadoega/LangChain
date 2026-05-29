@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+// STRAND — Knowledge / Library. Resource list | center register-edit form.
+// Presentation migrated to the strand design system; behavior preserved verbatim.
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { Database, FilePlus2, Trash2 } from "lucide-react";
+import { StrandShell } from "../components/strand/Chrome";
+import { Btn, Icon, Panel } from "../components/strand/primitives";
 import { api } from "../api/client";
-import { Button } from "../components/ui/Button";
-import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
-import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { useApp } from "../state/store";
 import type { KnowledgeKind, KnowledgeResource } from "../types";
 
@@ -19,6 +20,65 @@ const emptyResource = (): KnowledgeResource => ({
   content_type: "text/plain",
   tags: [],
 });
+
+// ---------- shared strand input styles (mirrors Coding / AgentStudio) ----------
+const inputStyle = (disabled = false): CSSProperties => ({
+  width: "100%",
+  height: 30,
+  padding: "0 10px",
+  border: "1px solid var(--border)",
+  borderRadius: 3,
+  background: disabled ? "var(--surface-2)" : "var(--surface)",
+  color: disabled ? "var(--ink-3)" : "var(--ink)",
+  fontSize: 12,
+  outline: "none",
+});
+
+const textareaStyle = (disabled = false): CSSProperties => ({
+  width: "100%",
+  padding: 10,
+  border: "1px solid var(--border)",
+  borderRadius: 3,
+  background: disabled ? "var(--surface-2)" : "var(--surface)",
+  color: disabled ? "var(--ink-3)" : "var(--ink)",
+  fontSize: 12,
+  fontFamily: "var(--strand-font-sans)",
+  lineHeight: 1.5,
+  resize: "vertical",
+  outline: "none",
+});
+
+const selectStyle: CSSProperties = {
+  width: "100%",
+  height: 30,
+  padding: "0 8px",
+  border: "1px solid var(--border)",
+  borderRadius: 3,
+  background: "var(--surface)",
+  color: "var(--ink)",
+  fontSize: 12,
+  outline: "none",
+};
+
+const fieldLabelStyle: CSSProperties = {
+  fontSize: 9,
+  color: "var(--ink-3)",
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  marginBottom: 6,
+  display: "block",
+};
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <span className="mono" style={fieldLabelStyle}>
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 export function Knowledge() {
   const knowledge = useApp((state) => state.knowledge);
@@ -55,117 +115,189 @@ export function Knowledge() {
     }
   };
 
-  return (
-    <div className="grid h-full grid-cols-[360px_minmax(0,1fr)] overflow-hidden">
-      <aside className="border-r border-[var(--color-border)] p-3">
-        <div className="mb-3">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Database className="h-4 w-4 text-[var(--color-accent)]" />
-            Knowledge
-          </div>
-          <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
-            Workspace と Coding に添付する学習用リソースを管理します。
-          </div>
-        </div>
-        <div className="space-y-1">
-          {knowledge.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setDraft(item)}
-              className="block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-left hover:border-[var(--color-border-strong)]"
-            >
-              <div className="truncate text-sm font-semibold">{item.title}</div>
-              <div className="mt-1 text-xs text-[var(--color-fg-subtle)]">{item.kind}</div>
-            </button>
-          ))}
-          {knowledge.length === 0 && (
-            <div className="rounded-md border border-dashed border-[var(--color-border)] p-4 text-center text-xs text-[var(--color-fg-subtle)]">
-              リソースはまだありません。
-            </div>
-          )}
-        </div>
-      </aside>
+  const canDelete = knowledge.some((item) => item.id === draft.id);
 
-      <main className="overflow-y-auto p-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>リソース登録 / 編集</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setDraft(emptyResource())}>
-                新規
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                disabled={!knowledge.some((item) => item.id === draft.id)}
-                onClick={() => void deleteKnowledge(draft.id)}
+  return (
+    <StrandShell breadcrumb={["library", "knowledge"]} mainStyle={{ display: "flex", overflow: "hidden" }}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "grid",
+          gridTemplateColumns: "360px minmax(0,1fr)",
+          background: "var(--paper)",
+          overflow: "hidden",
+        }}
+      >
+        {/* LEFT — resource list */}
+        <aside
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            borderRight: "1px solid var(--border)",
+            background: "var(--paper)",
+          }}
+        >
+          <div style={{ borderBottom: "1px solid var(--border)", padding: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+              <Database style={{ width: 16, height: 16, color: "var(--accent)" }} />
+              Knowledge
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: "var(--ink-3)", lineHeight: 1.5 }}>
+              Workspace と Coding に添付する学習用リソースを管理します。
+            </div>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+            {knowledge.length === 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  padding: "24px 16px",
+                  textAlign: "center",
+                  border: "1px dashed var(--border-2)",
+                  borderRadius: 4,
+                  background: "var(--surface-2)",
+                }}
               >
-                <Trash2 className="h-4 w-4" />
-                削除
-              </Button>
-            </div>
-          </CardHeader>
-          <CardBody className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
-              <div>
-                <Label>title</Label>
-                <Input
-                  value={draft.title}
-                  placeholder="例: iOSコーディング規約"
-                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                />
+                <div style={{ fontSize: 11, color: "var(--ink-3)" }}>リソースはまだありません。</div>
               </div>
-              <div>
-                <Label>kind</Label>
-                <Select
-                  value={draft.kind}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, kind: event.target.value as KnowledgeKind }))
-                  }
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {knowledge.map((item) => {
+                  const sel = draft.id === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setDraft(item)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: 10,
+                        borderRadius: 3,
+                        border: "1px solid var(--border)",
+                        borderLeft: sel ? "2px solid var(--accent)" : "1px solid var(--border)",
+                        background: sel ? "var(--surface)" : "var(--surface-2)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: sel ? 600 : 500,
+                          color: "var(--ink)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {item.title}
+                      </div>
+                      <div className="mono" style={{ marginTop: 6, fontSize: 10, color: "var(--ink-4)" }}>
+                        {item.kind}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* CENTER — register / edit form */}
+        <main style={{ minWidth: 0, overflowY: "auto", padding: 16 }}>
+          <Panel
+            title="リソース登録 / 編集"
+            action={
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Btn variant="outline" size="sm" onClick={() => setDraft(emptyResource())}>
+                  新規
+                </Btn>
+                <Btn
+                  variant="outline"
+                  size="sm"
+                  disabled={!canDelete}
+                  onClick={() => void deleteKnowledge(draft.id)}
+                  style={{ color: canDelete ? "var(--danger)" : "var(--ink-3)" }}
                 >
-                  {kinds.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {kind}
-                    </option>
-                  ))}
-                </Select>
+                  <Trash2 style={{ width: 14, height: 14 }} />
+                  削除
+                </Btn>
+              </span>
+            }
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0,1fr) 160px", alignItems: "start" }}>
+                <Field label="title">
+                  <input
+                    value={draft.title}
+                    placeholder="例: iOSコーディング規約"
+                    onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                    style={inputStyle()}
+                  />
+                </Field>
+                <Field label="kind">
+                  <select
+                    value={draft.kind}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, kind: event.target.value as KnowledgeKind }))
+                    }
+                    className="mono"
+                    style={selectStyle}
+                  >
+                    {kinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {kind}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
+              <Field label="source">
+                <input
+                  value={draft.source}
+                  placeholder="URL / file path / figma file note / MCP config"
+                  onChange={(event) => setDraft((current) => ({ ...current, source: event.target.value }))}
+                  style={inputStyle()}
+                />
+              </Field>
+              <Field label="content">
+                <textarea
+                  rows={14}
+                  value={draft.content}
+                  placeholder="MD本文、MCPメモ、Figma連携情報、補足メモなど"
+                  onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
+                  style={textareaStyle()}
+                />
+              </Field>
+              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) 160px", alignItems: "end" }}>
+                <input
+                  value={path}
+                  placeholder="/path/to/README.md"
+                  onChange={(event) => setPath(event.target.value)}
+                  className="mono"
+                  style={{ ...inputStyle(), fontFamily: "var(--strand-font-mono)" }}
+                />
+                <Btn variant="outline" onClick={() => void importLocal()} style={{ justifyContent: "center" }}>
+                  <FilePlus2 style={{ width: 14, height: 14 }} />
+                  ファイル取込
+                </Btn>
+              </div>
+              <div>
+                <Btn variant="solid" tone="accent" onClick={() => void save()}>
+                  <Icon name="check" size={12} />
+                  保存
+                </Btn>
+              </div>
+              {status && <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{status}</div>}
             </div>
-            <div>
-              <Label>source</Label>
-              <Input
-                value={draft.source}
-                placeholder="URL / file path / figma file note / MCP config"
-                onChange={(event) => setDraft((current) => ({ ...current, source: event.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>content</Label>
-              <Textarea
-                rows={14}
-                value={draft.content}
-                className="font-sans"
-                placeholder="MD本文、MCPメモ、Figma連携情報、補足メモなど"
-                onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
-              />
-            </div>
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px]">
-              <Input
-                value={path}
-                placeholder="/path/to/README.md"
-                onChange={(event) => setPath(event.target.value)}
-              />
-              <Button variant="outline" onClick={() => void importLocal()}>
-                <FilePlus2 className="h-4 w-4" />
-                ファイル取込
-              </Button>
-            </div>
-            <Button onClick={() => void save()}>保存</Button>
-            {status && <div className="text-xs text-[var(--color-fg-muted)]">{status}</div>}
-          </CardBody>
-        </Card>
-      </main>
-    </div>
+          </Panel>
+        </main>
+      </div>
+    </StrandShell>
   );
 }
