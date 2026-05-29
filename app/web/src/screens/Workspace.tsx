@@ -1,3 +1,5 @@
+// STRAND — Workspace. Management list | center subwork edit/progress/history | logs inspector.
+// Presentation migrated to the strand design system; behavior preserved verbatim.
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
@@ -11,24 +13,36 @@ import {
   RefreshCcw,
   Square,
   Users,
+  X,
 } from "lucide-react";
-import clsx from "clsx";
-import { Button } from "../components/ui/Button";
-import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
-import { KnowledgePicker } from "../components/KnowledgePicker";
-import { ProviderHealthBar } from "../components/ProviderHealthBar";
+import { StrandShell } from "../components/strand/Chrome";
+import { Btn, Dot, Icon, Panel, Pill } from "../components/strand/primitives";
+import { inputStyle, selectStyle, textareaStyle } from "../components/strand/formStyles";
+import { EmptyState, Field, InlineAlert } from "../components/refine/primitives";
+import { buildBaseVersion, isDuplicateVersion } from "../lib/versions";
+import {
+  codeContextToText,
+  downloadTextFile,
+  markdownBlock,
+  sanitizeFileNamePart,
+  statusTone,
+  teamLabel,
+  textToCodeContextItems,
+} from "../lib/refine";
 import { useToast } from "../components/ui/Toast";
-import { Empty } from "../components/ui/Empty";
-import { Input, Label, Select, Textarea } from "../components/ui/Field";
+import { api } from "../api/client";
 import { formatDuration, PROVIDER_LABEL, ROLE_LABEL } from "../lib/format";
 import { useApp } from "../state/store";
 import type { RunState } from "../state/store";
 import type {
   AgentConfig,
   CodeContext,
+  KnowledgeKind,
+  KnowledgeResource,
   ManagedRequest,
   ManagedRequestStatus,
-  Template,
+  ProviderHealth,
+  ProviderKind,
   SubworkFlowEvent,
   SubworkFlowJson,
   TurnResult,
@@ -119,14 +133,6 @@ interface WorkspaceExportPayload {
 const cloneRequest = (value: ManagedRequest["request"]): ManagedRequest["request"] =>
   JSON.parse(JSON.stringify(value)) as ManagedRequest["request"];
 
-const codeContextToText = (items: string[]) => items.join("\n");
-
-const textToCodeContextItems = (value: string) =>
-  value
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
 const cloneAgentConfig = (agent: AgentConfig): AgentConfig => ({
   ...agent,
   skills: [...agent.skills],
@@ -165,8 +171,6 @@ const summarizeProviders = (agents: AgentConfig[]) =>
     "プロバイダー未設定",
   );
 
-const teamLabel = (template: Template) =>
-  `${template.locked || template.is_builtin ? "Built-in" : "Custom"} · ${template.name}`;
 
 const subWorkLabel = (versionNo: number) =>
   versionNo <= 1 ? "ワーク（初回）" : `サブワーク${versionNo}（議論${versionNo}）`;
@@ -378,31 +382,6 @@ const extractFeedbackFromSource = (value: string) => {
   const index = value.indexOf(marker);
   if (index < 0) return "";
   return value.slice(index + marker.length).trim();
-};
-
-const sanitizeFileNamePart = (value: string) =>
-  (value || "untitled")
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "-")
-    .replace(/\s+/g, "-")
-    .slice(0, 80) || "untitled";
-
-const downloadTextFile = (fileName: string, content: string, mimeType: string) => {
-  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-};
-
-const markdownBlock = (value?: string, lang = "") => {
-  const text = (value ?? "").trim();
-  if (!text) return "_なし_";
-  return `\`\`\`${lang}\n${text.replace(/```/g, "``\\`")}\n\`\`\``;
 };
 
 const buildSubworkMarkdown = (payload: SubworkExportPayload) => {
@@ -972,19 +951,9 @@ export function Workspace() {
     const runStartedAt = run.startedAt ? new Date(run.startedAt).toISOString() : undefined;
     const runEndedAt = run.endedAt ? new Date(run.endedAt).toISOString() : undefined;
     return {
-      id,
-      version_no: versionNo,
-      title,
-      created_at: createdAt,
-      request: requestSnapshot,
+      ...buildBaseVersion({ id, versionNo, title, createdAt, request: requestSnapshot, run }),
       parent_version_id: pendingParentSubWorkId,
       review_feedback: pendingReviewFeedback,
-      final_text: run.finalText,
-      diff: run.diff,
-      file_changes: run.fileChanges,
-      error: run.error,
-      agent_turns: run.turns.length > 0 ? run.turns : undefined,
-      stream_events: run.events.length > 0 ? run.events : undefined,
       flow_json: buildSubworkFlowJson({
         workId: localRequestIdRef.current ?? selectedManagedRequestId ?? "pending-work",
         subworkId: id,
@@ -1001,19 +970,8 @@ export function Workspace() {
         diff: run.diff,
         fileChanges: run.fileChanges,
       }),
-      run_started_at: runStartedAt,
-      run_ended_at: runEndedAt,
     };
   };
-
-  const isDuplicateVersion = (latest: WorkspaceVersion | undefined, next: WorkspaceVersion) =>
-    Boolean(
-      latest &&
-        latest.run_started_at === next.run_started_at &&
-        latest.run_ended_at === next.run_ended_at &&
-        latest.final_text === next.final_text &&
-        latest.diff === next.diff,
-    );
 
   const persistManagedRequestAuto = async ({
     appendRunVersion = false,
@@ -1263,311 +1221,456 @@ export function Workspace() {
   }, [run.status, run.endedAt, run.startedAt, run.finalText, run.diff, run.fileChanges, run.error]);
 
   return (
-    <div className="grid h-full grid-cols-[minmax(320px,380px)_minmax(560px,1fr)_minmax(340px,400px)] gap-4 overflow-hidden p-4">
-      <Card className="flex min-w-0 flex-col overflow-hidden">
-        <CardHeader>
-          <div className="min-w-0">
-            <CardTitle>ワークスペース管理</CardTitle>
-            <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
-              ワークを選びます。変更は自動保存されます。
-            </p>
-          </div>
-          <ClipboardList className="h-4 w-4 shrink-0 text-[var(--color-fg-muted)]" />
-        </CardHeader>
-        <CardBody className="flex-1 space-y-4 overflow-y-auto">
-          <section className="space-y-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={resetManagedRequest}>
-                新規
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                disabled={!selectedManagedRequestId}
-                onClick={() => void deleteSelectedManagedRequest()}
-              >
-                削除
-              </Button>
-            </div>
-            {selectedManagedRequest && (
-              <div className="rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 p-2 text-xs text-[var(--color-fg-muted)]">
-                編集中: <span className="font-semibold text-[var(--color-fg)]">{selectedManagedRequest.title}</span>
+    <StrandShell breadcrumb={["work", "workspace"]} mainStyle={{ display: "flex", overflow: "hidden" }}>
+      <div
+        className="workspace"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "grid",
+          gridTemplateColumns: "minmax(320px,380px) minmax(560px,1fr) minmax(340px,400px)",
+          gap: 0,
+          background: "var(--paper)",
+          overflow: "hidden",
+        }}
+      >
+        <style>{"@keyframes ws-spin{to{transform:rotate(360deg)}}.workspace .spin{animation:ws-spin 0.8s linear infinite}"}</style>
+
+        {/* LEFT — workspace management */}
+        <aside
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            borderRight: "1px solid var(--border)",
+            background: "var(--paper)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 8,
+              background: "var(--paper-2)",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div className="mono" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--ink)", textTransform: "uppercase" }}>
+                ワークスペース管理
               </div>
-            )}
-            <div>
-              <Label>ワークスペース名</Label>
-              <Input
-                value={requestTitle}
-                placeholder="例: ログイン画面レビュー"
-                onChange={(event) => setRequestTitle(event.target.value)}
+              <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                ワークを選びます。変更は自動保存されます。
+              </div>
+            </div>
+            <ClipboardList style={{ width: 16, height: 16, flexShrink: 0, color: "var(--ink-3)" }} />
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 16 }}>
+            <section
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+                background: "var(--surface-2)",
+                padding: 12,
+              }}
+            >
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn variant="outline" size="sm" onClick={resetManagedRequest} style={{ flex: 1, justifyContent: "center" }}>
+                  新規
+                </Btn>
+                <Btn
+                  variant="outline"
+                  size="sm"
+                  disabled={!selectedManagedRequestId}
+                  onClick={() => void deleteSelectedManagedRequest()}
+                  style={{ flex: 1, justifyContent: "center", color: selectedManagedRequestId ? "var(--danger)" : "var(--ink-3)" }}
+                >
+                  削除
+                </Btn>
+              </div>
+              {selectedManagedRequest && (
+                <div style={{ borderRadius: 3, border: "1px solid var(--accent)", background: "var(--accent-soft)", padding: 8, fontSize: 11, color: "var(--ink-3)" }}>
+                  編集中: <span style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedManagedRequest.title}</span>
+                </div>
+              )}
+              <Field label="ワークスペース名">
+                <input
+                  value={requestTitle}
+                  placeholder="例: ログイン画面レビュー"
+                  onChange={(event) => setRequestTitle(event.target.value)}
+                  style={inputStyle()}
+                />
+              </Field>
+              <Field label="状態">
+                <select
+                  value={requestStatus}
+                  onChange={(event) => setRequestStatus(event.target.value as ManagedRequestStatus)}
+                  className="mono"
+                  style={selectStyle()}
+                >
+                  <option value="draft">下書き</option>
+                  <option value="running">実行中</option>
+                  <option value="completed">完了</option>
+                  <option value="paused">保留</option>
+                </select>
+              </Field>
+              <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 8, fontSize: 11, color: "var(--ink-3)" }}>
+                入力・設定・実行結果は自動保存されます。
+              </div>
+              {saveMessage && (
+                <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 8, fontSize: 11, color: "var(--ink-3)" }}>
+                  {saveMessage}
+                </div>
+              )}
+            </section>
+
+            <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>ワークスペース一覧</div>
+                <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>
+                  {filteredWorkspaces.length}/{managedRequests.length}
+                </span>
+              </div>
+              <input
+                value={workspaceQuery}
+                placeholder="名前・状態・依頼内容で検索"
+                onChange={(event) => setWorkspaceQuery(event.target.value)}
+                style={inputStyle()}
               />
-            </div>
-            <div>
-              <Label>状態</Label>
-              <Select
-                value={requestStatus}
-                onChange={(event) => setRequestStatus(event.target.value as ManagedRequestStatus)}
-              >
-                <option value="draft">下書き</option>
-                <option value="running">実行中</option>
-                <option value="completed">完了</option>
-                <option value="paused">保留</option>
-              </Select>
-            </div>
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs text-[var(--color-fg-muted)]">
-              入力・設定・実行結果は自動保存されます。
-            </div>
-            {saveMessage && (
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs text-[var(--color-fg-muted)]">
-                {saveMessage}
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold">ワークスペース一覧</div>
-              <span className="text-[10px] text-[var(--color-fg-subtle)]">
-                {filteredWorkspaces.length}/{managedRequests.length}
-              </span>
-            </div>
-            <Input
-              value={workspaceQuery}
-              placeholder="名前・状態・依頼内容で検索"
-              onChange={(event) => setWorkspaceQuery(event.target.value)}
-            />
-            <div className="space-y-2 overflow-y-auto">
-              {managedRequests.length === 0 && (
-                <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs text-[var(--color-fg-subtle)]">
-                  ワークスペースはまだありません。
-                </div>
-              )}
-              {managedRequests.length > 0 && filteredWorkspaces.length === 0 && (
-                <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs text-[var(--color-fg-subtle)]">
-                  条件に一致するワークスペースはありません。
-                </div>
-              )}
-              {filteredWorkspaces.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => loadManagedRequest(item)}
-                  className={clsx(
-                    "w-full rounded-md border p-3 text-left transition-colors",
-                    selectedManagedRequestId === item.id
-                      ? "border-[var(--color-accent)] bg-[var(--color-surface-3)]"
-                      : "border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)]",
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 truncate text-sm font-semibold">{item.title}</div>
-                    <span className="shrink-0 rounded border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] text-[var(--color-fg-muted)]">
-                      {STATUS_LABEL[item.status] ?? item.status}
-                    </span>
-                  </div>
-                  <div className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                    {item.request.source_text || "依頼内容なし"}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-[var(--color-fg-subtle)]">
-                    <span>{item.versions?.length ?? 0} versions</span>
-                    <span>{new Date(item.updated_at).toLocaleString("ja-JP")}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        </CardBody>
-      </Card>
-
-      <Card className="flex min-w-0 flex-col overflow-hidden">
-        <CardHeader>
-          <div className="min-w-0">
-            <CardTitle>コンテンツ</CardTitle>
-            <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
-              {workMode === "history"
-                ? "ワーク全体のサブワーク履歴とエージェントログ"
-                : contentMode === "edit"
-                  ? `${selectedSubWork?.label ?? "サブワーク"} · 作成・編集`
-                  : `${selectedSubWork?.label ?? "サブワーク"} · ${activeExecutionEnabledAgents.length}人のAIチーム · ${formatDuration(activeRunState.startedAt, activeRunState.endedAt)}`}
-            </p>
-          </div>
-          {workMode === "subwork" && contentMode === "progress" ? (
-            <Activity className="h-4 w-4 shrink-0 text-[var(--color-fg-muted)]" />
-          ) : (
-            <Users className="h-4 w-4 shrink-0 text-[var(--color-fg-muted)]" />
-          )}
-        </CardHeader>
-        <CardBody className="flex-1 overflow-y-auto">
-          <div className="sticky top-0 z-10 mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-[var(--color-fg)]">サブワーク</div>
-              <div className="text-[10px] text-[var(--color-fg-subtle)]">
-                {subWorks.length}件
-              </div>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {subWorks.map((subWork) => (
-                <button
-                  key={subWork.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedVersionId(subWork.id);
-                    setWorkMode("subwork");
-                    setContentMode("edit");
-                  }}
-                  className={clsx(
-                    "min-w-44 rounded-md border px-3 py-2 text-left text-xs transition-colors",
-                    workMode === "subwork" && selectedSubWork?.id === subWork.id
-                      ? "border-[var(--color-accent)] bg-[var(--color-surface-3)]"
-                      : "border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-strong)]",
-                  )}
-                >
-                  <div className="font-semibold text-[var(--color-fg)]">{subWork.label}</div>
-                  <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
-                    {subWorkStatusLabel(subWork.status)}
-                    {subWork.createdAt
-                      ? ` · ${new Date(subWork.createdAt).toLocaleString("ja-JP")}`
-                      : ""}
-                  </div>
-                  {subWork.parentId && (
-                    <div className="mt-1 text-[10px] text-sky-300">レビューから作成</div>
-                  )}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setWorkMode("history")}
-                className={clsx(
-                  "min-w-44 rounded-md border px-3 py-2 text-left text-xs transition-colors",
-                  workMode === "history"
-                    ? "border-[var(--color-accent)] bg-[var(--color-surface-3)]"
-                    : "border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-strong)]",
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }}>
+                {managedRequests.length === 0 && (
+                  <EmptyState title="ワークスペースはまだありません。" />
                 )}
-              >
-                <div className="font-semibold text-[var(--color-fg)]">履歴</div>
-                <div className="mt-1 text-[10px] text-[var(--color-fg-subtle)]">
-                  サブワーク概要 / エージェントログ
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {workMode === "subwork" && (
-            <div className="mb-4 grid grid-cols-2 gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-xs">
-              {[
-                ["edit", "作成・編集"],
-                ["progress", progressTabLabel],
-              ].map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setContentMode(mode as ContentMode)}
-                  className={clsx(
-                    "rounded px-2 py-2 font-semibold transition-colors",
-                    contentMode === mode
-                      ? "bg-[var(--color-accent)] text-white"
-                      : "text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-fg)]",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {workMode === "subwork" && contentMode === "edit" && (
-            <div className="space-y-4">
-              <div>
-                <Label>1. 何をしたいですか？</Label>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {REQUEST_PRESETS.map((item) => (
+                {managedRequests.length > 0 && filteredWorkspaces.length === 0 && (
+                  <EmptyState title="条件に一致するワークスペースはありません。" />
+                )}
+                {filteredWorkspaces.map((item) => {
+                  const sel = selectedManagedRequestId === item.id;
+                  return (
                     <button
                       key={item.id}
                       type="button"
-                      disabled={!activeCanEdit}
-                      onClick={() => activeCanEdit && selectPreset(item.id)}
-                      className={clsx(
-                        "rounded-md border p-3 text-left transition-colors",
-                        presetId === item.id
-                          ? "border-[var(--color-accent)] bg-[var(--color-surface-3)]"
-                          : "border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)]",
-                        !activeCanEdit && "cursor-default opacity-60",
-                      )}
+                      onClick={() => loadManagedRequest(item)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: 12,
+                        borderRadius: 3,
+                        border: "1px solid var(--border)",
+                        borderLeft: sel ? "2px solid var(--accent)" : "1px solid var(--border)",
+                        background: sel ? "var(--surface)" : "var(--surface-2)",
+                      }}
                     >
-                      <div className="text-sm font-semibold">{item.label}</div>
-                      <div className="mt-1 text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                        {item.description}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.title}
+                        </div>
+                        <Pill tone={statusTone(item.status)}>{STATUS_LABEL[item.status] ?? item.status}</Pill>
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 8,
+                          fontSize: 11,
+                          lineHeight: 1.5,
+                          color: "var(--ink-3)",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {item.request.source_text || "依頼内容なし"}
+                      </div>
+                      <div className="mono" style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 10, color: "var(--ink-4)" }}>
+                        <span>{item.versions?.length ?? 0} versions</span>
+                        <span>{new Date(item.updated_at).toLocaleString("ja-JP")}</span>
                       </div>
                     </button>
-                  ))}
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+        </aside>
+
+        {/* CENTER — content */}
+        <main
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            borderRight: "1px solid var(--border)",
+            background: "var(--paper)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 8,
+              background: "var(--paper-2)",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div className="mono" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--ink)", textTransform: "uppercase" }}>
+                コンテンツ
+              </div>
+              <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                {workMode === "history"
+                  ? "ワーク全体のサブワーク履歴とエージェントログ"
+                  : contentMode === "edit"
+                    ? `${selectedSubWork?.label ?? "サブワーク"} · 作成・編集`
+                    : `${selectedSubWork?.label ?? "サブワーク"} · ${activeExecutionEnabledAgents.length}人のAIチーム · ${formatDuration(activeRunState.startedAt, activeRunState.endedAt)}`}
+              </div>
+            </div>
+            {workMode === "subwork" && contentMode === "progress" ? (
+              <Activity style={{ width: 16, height: 16, flexShrink: 0, color: "var(--ink-3)" }} />
+            ) : (
+              <Users style={{ width: 16, height: 16, flexShrink: 0, color: "var(--ink-3)" }} />
+            )}
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+            <div
+              style={{
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                marginBottom: 16,
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                padding: 8,
+              }}
+            >
+              <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>サブワーク</div>
+                <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>
+                  {subWorks.length}件
                 </div>
               </div>
-
-              <div>
-                <Label>2. 元になる内容を貼ってください</Label>
-                <Textarea
-                  rows={10}
-                  value={activeRequest.source_text}
-                  placeholder="文章、相談内容、要件、エラー内容、コードの説明などを貼ってください。"
-                  className="font-sans"
-                  readOnly={!activeCanEdit}
-                  onChange={(event) =>
-                    activeCanEdit && updateRequest({ source_text: event.target.value })
-                  }
-                />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
-                  <Label>3. どんな結果がほしいですか？</Label>
-                  {activeCanEdit ? (
-                    <Select
-                      value={request.objective || preset.defaultObjective}
-                      onChange={(event) => updateRequest({ objective: event.target.value })}
+              <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                {subWorks.map((subWork) => {
+                  const sel = workMode === "subwork" && selectedSubWork?.id === subWork.id;
+                  return (
+                    <button
+                      key={subWork.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedVersionId(subWork.id);
+                        setWorkMode("subwork");
+                        setContentMode("edit");
+                      }}
+                      style={{
+                        minWidth: 176,
+                        borderRadius: 3,
+                        border: "1px solid var(--border)",
+                        borderLeft: sel ? "2px solid var(--accent)" : "1px solid var(--border)",
+                        background: sel ? "var(--surface-2)" : "var(--surface)",
+                        padding: "8px 12px",
+                        textAlign: "left",
+                        fontSize: 11,
+                      }}
                     >
-                      <option value={preset.defaultObjective}>
-                        {preset.defaultObjective || "AIチームに任せる"}
-                      </option>
-                      {preset.resultOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Input value={activeRequest.objective || "AIチームに任せる"} readOnly />
-                  )}
-                </div>
-                <div>
-                  <Label>補足. 誰に向けた内容ですか？</Label>
-                  <Input
-                    value={activeRequest.global_instruction}
-                    placeholder="例: 初心者向け、開発者向け、顧客向け"
+                      <div style={{ fontWeight: 600, color: "var(--ink)" }}>{subWork.label}</div>
+                      <div className="mono" style={{ marginTop: 4, fontSize: 10, color: "var(--ink-4)" }}>
+                        {subWorkStatusLabel(subWork.status)}
+                        {subWork.createdAt
+                          ? ` · ${new Date(subWork.createdAt).toLocaleString("ja-JP")}`
+                          : ""}
+                      </div>
+                      {subWork.parentId && (
+                        <div style={{ marginTop: 4, fontSize: 10, color: "var(--info)" }}>レビューから作成</div>
+                      )}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setWorkMode("history")}
+                  style={{
+                    minWidth: 176,
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    borderLeft: workMode === "history" ? "2px solid var(--accent)" : "1px solid var(--border)",
+                    background: workMode === "history" ? "var(--surface-2)" : "var(--surface)",
+                    padding: "8px 12px",
+                    textAlign: "left",
+                    fontSize: 11,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>履歴</div>
+                  <div className="mono" style={{ marginTop: 4, fontSize: 10, color: "var(--ink-4)" }}>
+                    サブワーク概要 / エージェントログ
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {workMode === "subwork" && (
+              <div
+                role="tablist"
+                style={{
+                  marginBottom: 16,
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 4,
+                  borderRadius: 3,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  padding: 4,
+                }}
+              >
+                {([
+                  ["edit", "作成・編集"],
+                  ["progress", progressTabLabel],
+                ] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setContentMode(mode as ContentMode)}
+                    className="mono"
+                    style={{
+                      borderRadius: 3,
+                      padding: "8px 8px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      letterSpacing: "0.04em",
+                      background: contentMode === mode ? "var(--accent)" : "transparent",
+                      color: contentMode === mode ? "var(--accent-ink)" : "var(--ink-2)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {workMode === "subwork" && contentMode === "edit" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <Field label="1. 何をしたいですか？">
+                  <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+                    {REQUEST_PRESETS.map((item) => {
+                      const sel = presetId === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={!activeCanEdit}
+                          onClick={() => activeCanEdit && selectPreset(item.id)}
+                          style={{
+                            borderRadius: 3,
+                            border: "1px solid var(--border)",
+                            borderLeft: sel ? "2px solid var(--accent)" : "1px solid var(--border)",
+                            background: sel ? "var(--surface)" : "var(--surface-2)",
+                            padding: 12,
+                            textAlign: "left",
+                            cursor: activeCanEdit ? "pointer" : "default",
+                            opacity: activeCanEdit ? 1 : 0.6,
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{item.label}</div>
+                          <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.5, color: "var(--ink-3)" }}>
+                            {item.description}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+
+                <Field label="2. 元になる内容を貼ってください">
+                  <textarea
+                    rows={10}
+                    value={activeRequest.source_text}
+                    placeholder="文章、相談内容、要件、エラー内容、コードの説明などを貼ってください。"
                     readOnly={!activeCanEdit}
                     onChange={(event) =>
-                      activeCanEdit && updateRequest({ global_instruction: event.target.value })
+                      activeCanEdit && updateRequest({ source_text: event.target.value })
                     }
+                    style={textareaStyle(!activeCanEdit)}
                   />
+                </Field>
+
+                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+                  <Field label="3. どんな結果がほしいですか？">
+                    {activeCanEdit ? (
+                      <select
+                        value={request.objective || preset.defaultObjective}
+                        onChange={(event) => updateRequest({ objective: event.target.value })}
+                        style={selectStyle()}
+                      >
+                        <option value={preset.defaultObjective}>
+                          {preset.defaultObjective || "AIチームに任せる"}
+                        </option>
+                        {preset.resultOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input value={activeRequest.objective || "AIチームに任せる"} readOnly style={inputStyle(true)} />
+                    )}
+                  </Field>
+                  <Field label="補足. 誰に向けた内容ですか？">
+                    <input
+                      value={activeRequest.global_instruction}
+                      placeholder="例: 初心者向け、開発者向け、顧客向け"
+                      readOnly={!activeCanEdit}
+                      onChange={(event) =>
+                        activeCanEdit && updateRequest({ global_instruction: event.target.value })
+                      }
+                      style={inputStyle(!activeCanEdit)}
+                    />
+                  </Field>
                 </div>
-              </div>
 
-              <KnowledgePicker
-                selected={activeRequest.knowledge_context ?? []}
-                disabled={!activeCanEdit}
-                onChange={(knowledge_context) => activeCanEdit && updateRequest({ knowledge_context })}
-              />
+                <KnowledgeResources
+                  selected={activeRequest.knowledge_context ?? []}
+                  disabled={!activeCanEdit}
+                  onChange={(knowledge_context) => activeCanEdit && updateRequest({ knowledge_context })}
+                />
 
-              <div className="grid gap-3">
-                <div>
-                  <Label>4. 結果</Label>
-                  <div className="min-h-24 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-sm leading-relaxed text-[var(--color-fg-muted)]">
+                <Field label="4. 結果">
+                  <div
+                    style={{
+                      minHeight: 96,
+                      borderRadius: 3,
+                      border: "1px solid var(--border)",
+                      background: "var(--surface-2)",
+                      padding: 12,
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                      color: "var(--ink-3)",
+                    }}
+                  >
                     {activeError ? (
-                      <pre className="whitespace-pre-wrap rounded-md border border-red-500/40 bg-red-500/10 p-3 font-sans text-red-200">
+                      <pre
+                        style={{
+                          whiteSpace: "pre-wrap",
+                          borderRadius: 3,
+                          border: "1px solid var(--danger)",
+                          background: "var(--danger-bg)",
+                          padding: 12,
+                          fontFamily: "var(--strand-font-sans)",
+                          color: "var(--danger)",
+                          margin: 0,
+                        }}
+                      >
                         {activeError}
                       </pre>
                     ) : activeResult ? (
-                      <pre className="whitespace-pre-wrap font-sans">
+                      <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", margin: 0 }}>
                         {activeResult}
                       </pre>
                     ) : (
@@ -1575,774 +1678,1184 @@ export function Workspace() {
                     )}
                   </div>
                   {(activeDiff || activeFileChanges) && (
-                    <details className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                      <summary className="cursor-pointer text-xs text-[var(--color-fg-muted)]">
+                    <details style={{ marginTop: 8, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 11, color: "var(--ink-3)" }}>
                         diff / file changes
                       </summary>
-                      <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-[var(--color-fg-muted)]">
+                      <pre className="mono" style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 11, color: "var(--ink-3)", margin: 0 }}>
                         {activeFileChanges || activeDiff}
                       </pre>
                     </details>
                   )}
-                </div>
-              </div>
+                </Field>
 
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-                <div className="grid gap-2 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                  <div>
-                    <Label>{activeCanEdit ? "このサブワークで実行するチーム" : "このサブワークで実行したチーム"}</Label>
-                    {activeCanEdit ? (
-                      <Select
-                        value={selectedTeamTemplateId}
-                        onChange={(event) => applyTeamTemplate(event.target.value)}
-                      >
-                        <option value="">ワーク内チームを使う（下に内訳表示）</option>
-                        {templates.map((template) => (
-                          <option key={template.id} value={template.id}>
-                            {teamLabel(template)}
-                          </option>
-                        ))}
-                      </Select>
-                    ) : (
-                      <Input value="保存済みチーム構成" readOnly />
-                    )}
-                  </div>
-                  <div>
-                    <Label>作業モード</Label>
-                    <Select
-                      value={activeRequest.workflow_mode}
-                      disabled={!activeCanEdit}
-                      onChange={(event) =>
-                        updateRequest({ workflow_mode: event.target.value as "writing" | "coding" })
-                      }
-                    >
-                      <option value="writing">writing</option>
-                      <option value="coding">coding</option>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>進め方</Label>
-                    <Select
-                      value={activeRequest.orchestration_mode}
-                      disabled={!activeCanEdit}
-                      onChange={(event) =>
-                        updateRequest({
-                          orchestration_mode: event.target.value as typeof request.orchestration_mode,
-                        })
-                      }
-                    >
-                      <option value="role_based">role_based</option>
-                      <option value="dependency_graph">dependency_graph</option>
-                      <option value="sequential">sequential</option>
-                    </Select>
-                  </div>
-                </div>
-                <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-semibold text-[var(--color-fg)]">
-                        {activeExecutionTeamName}
-                      </div>
-                      <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
-                        {activeExecutionTeamSource}
-                      </div>
-                    </div>
-                    <div className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-fg-muted)]">
-                      {activeExecutionEnabledAgents.length}/{activeExecutionAgents.length}人が有効
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-[var(--color-fg-muted)] md:grid-cols-2">
-                    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1.5">
-                      ロール: {activeExecutionRoleSummary}
-                    </div>
-                    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1.5">
-                      プロバイダー: {activeExecutionProviderSummary}
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {activeExecutionPreviewAgents.length > 0 ? (
-                      activeExecutionPreviewAgents.map((agent) => (
-                        <span
-                          key={agent.id}
-                          className={clsx(
-                            "rounded-md border px-2 py-1 text-xs",
-                            agent.enabled === false
-                              ? "border-[var(--color-border)] text-[var(--color-fg-subtle)]"
-                              : "border-indigo-500/40 bg-indigo-500/10 text-indigo-200",
-                          )}
-                          title={`${agent.name} / ${ROLE_LABEL[agent.org_role]} / ${PROVIDER_LABEL[agent.provider]}`}
+                <div style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+                  <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)" }}>
+                    <Field label={activeCanEdit ? "このサブワークで実行するチーム" : "このサブワークで実行したチーム"}>
+                      {activeCanEdit ? (
+                        <select
+                          value={selectedTeamTemplateId}
+                          onChange={(event) => applyTeamTemplate(event.target.value)}
+                          style={selectStyle()}
                         >
-                          {agent.name || agent.id} · {ROLE_LABEL[agent.org_role]}
-                          {agent.enabled === false ? " · 無効" : ""}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-[var(--color-fg-muted)]">
-                        エージェントが設定されていません。
-                      </span>
-                    )}
-                    {activeExecutionHiddenAgentCount > 0 && (
-                      <span className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-fg-muted)]">
-                        +{activeExecutionHiddenAgentCount}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="mt-3 flex w-full items-center justify-between rounded-md border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-3)]"
-                  onClick={() => setCodingOpen((open) => !open)}
-                >
-                  コーディング用コンテキスト
-                  <ChevronDown
-                    className={clsx("h-4 w-4 transition-transform", codingOpen && "rotate-180")}
-                  />
-                </button>
-                {(codingOpen || activeRequest.workflow_mode === "coding") && (
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <div>
-                      <Label>working_directory</Label>
-                      <Input
-                        value={activeRequest.code_context.working_directory}
-                        placeholder="/path/to/repo"
-                        readOnly={!activeCanEdit}
-                        onChange={(event) =>
-                          activeCanEdit && updateCodeContext({ working_directory: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>test_command</Label>
-                      <Input
-                        value={activeRequest.code_context.test_command}
-                        placeholder="npm run build"
-                        readOnly={!activeCanEdit}
-                        onChange={(event) =>
-                          activeCanEdit && updateCodeContext({ test_command: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>tech_stack</Label>
-                      <Input
-                        value={activeRequest.code_context.tech_stack}
-                        placeholder="React / TypeScript / FastAPI"
-                        readOnly={!activeCanEdit}
-                        onChange={(event) =>
-                          activeCanEdit && updateCodeContext({ tech_stack: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>target_paths</Label>
-                      <Textarea
-                        rows={3}
-                        className="font-mono"
-                        value={codeContextToText(activeRequest.code_context.target_paths)}
-                        placeholder="app/web/src/screens/Workspace.tsx"
-                        readOnly={!activeCanEdit}
-                        onChange={(event) =>
-                          activeCanEdit &&
-                          updateCodeContext({ target_paths: textToCodeContextItems(event.target.value) })
-                        }
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label>acceptance_criteria</Label>
-                      <Textarea
-                        rows={3}
-                        value={activeRequest.code_context.acceptance_criteria}
-                        placeholder="完了条件、UI要件、避けたい変更"
-                        className="font-sans"
-                        readOnly={!activeCanEdit}
-                        onChange={(event) =>
-                          activeCanEdit && updateCodeContext({ acceptance_criteria: event.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-2)]"
-                onClick={() => setDetailsOpen((open) => !open)}
-              >
-                追加で伝えたいこと
-                <ChevronDown
-                  className={clsx("h-4 w-4 transition-transform", detailsOpen && "rotate-180")}
-                />
-              </button>
-              {detailsOpen && (
-                <div className="space-y-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-                  <Label>AIチームへの追加指示</Label>
-                  <Textarea
-                    rows={4}
-                    value={activeRequest.global_instruction}
-                    placeholder="口調、制約、必ず見てほしい観点など"
-                    className="font-sans"
-                    readOnly={!activeCanEdit}
-                    onChange={(event) =>
-                      activeCanEdit && updateRequest({ global_instruction: event.target.value })
-                    }
-                  />
-                </div>
-              )}
-
-              {activeResult && !activeError && (
-                <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
-                  <div className="space-y-3">
-                    <div>
-                      <Label>{reviewLabel}</Label>
-                      {activeReviewText && (
-                        <div className="mb-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                          前回レビュー: {activeReviewText}
-                        </div>
+                          <option value="">ワーク内チームを使う（下に内訳表示）</option>
+                          {templates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {teamLabel(template)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input value="保存済みチーム構成" readOnly style={inputStyle(true)} />
                       )}
-                      <Textarea
-                        rows={5}
-                        className="font-sans"
-                        value={feedbackText}
-                        placeholder="例: まことみけんの意見交換が見られない。ちゃんと会話して"
-                        onChange={(event) => setFeedbackText(event.target.value)}
-                      />
-                    </div>
-                    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-                      <Label>レビューを実行するチーム</Label>
-                      <Select
-                        value={selectedTeamTemplateId}
-                        disabled={run.status === "running"}
-                        onChange={(event) => applyTeamTemplate(event.target.value)}
+                    </Field>
+                    <Field label="作業モード">
+                      <select
+                        value={activeRequest.workflow_mode}
+                        disabled={!activeCanEdit}
+                        onChange={(event) =>
+                          updateRequest({ workflow_mode: event.target.value as "writing" | "coding" })
+                        }
+                        style={selectStyle(!activeCanEdit)}
                       >
-                        <option value="">ワーク内チームを使う（下に内訳表示）</option>
-                        {templates.map((template) => (
-                          <option key={template.id} value={template.id}>
-                            {teamLabel(template)}
-                          </option>
-                        ))}
-                      </Select>
-                      <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-semibold text-[var(--color-fg)]">
-                              {currentTeamName}
-                            </div>
-                            <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
-                              {currentTeamSource}
-                            </div>
-                          </div>
-                          <div className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-fg-muted)]">
-                            {currentTeamEnabledAgents.length}/{currentTeamAgents.length}人が有効
-                          </div>
+                        <option value="writing">writing</option>
+                        <option value="coding">coding</option>
+                      </select>
+                    </Field>
+                    <Field label="進め方">
+                      <select
+                        value={activeRequest.orchestration_mode}
+                        disabled={!activeCanEdit}
+                        onChange={(event) =>
+                          updateRequest({
+                            orchestration_mode: event.target.value as typeof request.orchestration_mode,
+                          })
+                        }
+                        style={selectStyle(!activeCanEdit)}
+                      >
+                        <option value="role_based">role_based</option>
+                        <option value="dependency_graph">dependency_graph</option>
+                        <option value="sequential">sequential</option>
+                      </select>
+                    </Field>
+                  </div>
+                  <div style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 12 }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                          {activeExecutionTeamName}
                         </div>
-                        <div className="mt-3 grid gap-2 text-xs text-[var(--color-fg-muted)] md:grid-cols-2">
-                          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1.5">
-                            ロール: {currentTeamRoleSummary}
-                          </div>
-                          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1.5">
-                            プロバイダー: {currentTeamProviderSummary}
-                          </div>
+                        <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                          {activeExecutionTeamSource}
                         </div>
                       </div>
+                      <div className="mono" style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "4px 8px", fontSize: 11, color: "var(--ink-3)" }}>
+                        {activeExecutionEnabledAgents.length}/{activeExecutionAgents.length}人が有効
+                      </div>
                     </div>
-                  </div>
-                  <Button
-                    variant="primary"
-                    className="w-full"
-                    disabled={run.status === "running" || !feedbackText.trim()}
-                    onClick={() => void restartDiscussionWithFeedback()}
-                  >
-                    <Play className="h-4 w-4" />
-                    レビューを反映して議論
-                  </Button>
-                  {nextLinkedSubWorks.length > 0 && (
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="text-[var(--color-fg-subtle)]">次のサブワーク:</span>
-                      {nextLinkedSubWorks.map((child) => (
-                        <button
-                          key={child.id}
-                          type="button"
-                          className="rounded border border-[var(--color-border)] px-2 py-1 text-sky-300 hover:border-sky-500/40"
-                          onClick={() => {
-                            setSelectedVersionId(child.id);
-                            setWorkMode("subwork");
-                            setContentMode("edit");
-                          }}
-                        >
-                          {child.label}
-                        </button>
-                      ))}
+                    <div style={{ marginTop: 12, display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", fontSize: 11, color: "var(--ink-3)" }}>
+                      <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: "6px 8px" }}>
+                        ロール: {activeExecutionRoleSummary}
+                      </div>
+                      <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: "6px 8px" }}>
+                        プロバイダー: {activeExecutionProviderSummary}
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
-              {!activeResult && activeCanEdit && (
-                <div className="grid gap-2 border-t border-[var(--color-border)] pt-4">
-                  {run.status === "running" ? (
-                    <Button variant="danger" onClick={stopRun}>
-                      <Square className="h-4 w-4" />
-                      停止する
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      disabled={!canStart}
-                      onClick={() => void runCurrentWork()}
-                    >
-                      <Play className="h-4 w-4" />
-                      このサブワークを実行
-                    </Button>
-                  )}
-                </div>
-              )}
-              {activeCanEdit && (
-                <div className="text-xs text-[var(--color-fg-muted)]">
-                  変更は自動保存されます。
-                </div>
-              )}
-              {!activeCanEdit && (
-                <div className="text-xs text-[var(--color-fg-muted)]">
-                  過去のサブワークを表示中です。内容は編集できません。必要ならレビューから次のサブワークを作成できます。
-                </div>
-              )}
-              {!canStart && <div className="text-xs text-amber-300">{missingReason}</div>}
-            </div>
-          )}
-
-          {workMode === "subwork" && contentMode === "progress" && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[var(--color-fg)]">
-                    {selectedSubWork?.label ?? "サブワーク"} の議論ログ
-                  </div>
-                  <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
-                    エージェント発言、イベント、議論結果を保存用に書き出します。
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadSubwork(selectedSubWork, "json")}
-                    disabled={!selectedSubWork}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    JSON
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadSubwork(selectedSubWork, "md")}
-                    disabled={!selectedSubWork}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Markdown
-                  </Button>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-                {displayedProgressSteps.map((step) => (
-                  <div
-                    key={step.id}
-                    className={clsx(
-                      "flex min-h-10 items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm",
-                      step.state === "done" &&
-                        "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-                      step.state === "active" &&
-                        "border-sky-500/40 bg-sky-500/10 text-sky-200",
-                      step.state === "failed" && "border-red-500/40 bg-red-500/10 text-red-200",
-                      step.state === "waiting" &&
-                        "border-[var(--color-border)] bg-[var(--color-surface-2)] text-[var(--color-fg-muted)]",
-                    )}
-                  >
-                    <span className="min-w-0 truncate">{step.label}</span>
-                    {step.state === "active" && (
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-sky-200" />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold">{agentCardsLabel}</h3>
-                <ProviderHealthBar
-                  className="mb-2"
-                  providers={activeExecutionEnabledAgents.map((agent) => agent.provider)}
-                  compact
-                />
-                <AgentProgressCards
-                  agents={activeExecutionEnabledAgents}
-                  turns={activeRunTurns}
-                  events={activeRunEvents}
-                />
-              </div>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold">{progressHeaderLabel}</h3>
-                <Conversation
-                  agents={activeExecutionEnabledAgents}
-                  turns={activeRunTurns}
-                  events={activeRunEvents}
-                />
-              </div>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold">ライブメモ</h3>
-                <div className="space-y-2">
-                  {displayedLiveNotes.map((note, index) => (
-                    <div
-                      key={`${note}-${index}`}
-                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-sm leading-relaxed text-[var(--color-fg-muted)]"
-                    >
-                      {note}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
-                <h3 className="mb-2 text-sm font-semibold">{outputPanelLabel}</h3>
-                {activeOutputText ? (
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--color-fg)]">
-                    {activeOutputText}
-                  </pre>
-                ) : (
-                  <div className="text-sm text-[var(--color-fg-muted)]">
-                    {emptyOutputMessage}
-                  </div>
-                )}
-              </div>
-              <Button variant="ghost" className="w-full" onClick={resetRun}>
-                <RefreshCcw className="h-4 w-4" />
-                実行結果をリセット
-              </Button>
-            </div>
-          )}
-
-          {workMode === "history" && (
-            <div className="space-y-3">
-              <section className="grid gap-2 lg:grid-cols-[1fr_auto]">
-                <div className="grid grid-cols-3 gap-2">
-                  <Info label="現在のWS" value={activeRequestTitle} />
-                  <Info label="サブワーク" value={`${subWorks.length}件`} />
-                  <Info label="履歴化済み結果" value={`${versionSubWorks.length}件`} />
-                </div>
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                  <span className="px-1 text-xs font-semibold text-[var(--color-fg-muted)]">
-                    一括ダウンロード
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadAllSubworks("json")}
-                    disabled={subWorks.length === 0}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    JSON
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadAllSubworks("md")}
-                    disabled={subWorks.length === 0}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Markdown
-                  </Button>
-                </div>
-              </section>
-              {subWorks.length === 0 ? (
-                <div className="rounded-md border border-dashed border-[var(--color-border)] p-4 text-sm text-[var(--color-fg-subtle)]">
-                  サブワークはまだありません。実行後に自動で初回ワークとして残ります。
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {subWorks.map((subWork) => {
-                    const historyAgents =
-                      subWork.version?.request.agents.filter((agent) => agent.enabled !== false) ??
-                      enabledAgents;
-                    const historyTurns = subWork.isEditable
-                      ? run.turns
-                      : subWork.version?.agent_turns ?? [];
-                    const historyEvents = subWork.isEditable
-                      ? run.events
-                      : subWork.version?.stream_events ?? [];
-                    return (
-                      <section
-                        key={subWork.id}
-                        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-[var(--color-fg)]">
-                              {subWork.label}
-                            </div>
-                            <div className="mt-1 text-xs text-[var(--color-fg-subtle)]">
-                              {subWorkStatusLabel(subWork.status)}
-                              {subWork.createdAt
-                                ? ` · ${new Date(subWork.createdAt).toLocaleString("ja-JP")}`
-                                : ""}
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => downloadSubwork(subWork, "json")}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              JSON
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => downloadSubwork(subWork, "md")}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              Markdown
-                            </Button>
-                            {subWork.version && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => restoreVersionRequest(subWork.version!)}
-                              >
-                                依頼に戻す
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedVersionId(subWork.id);
-                                setWorkMode("subwork");
-                                setContentMode("edit");
+                    <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {activeExecutionPreviewAgents.length > 0 ? (
+                        activeExecutionPreviewAgents.map((agent) => {
+                          const disabledAgent = agent.enabled === false;
+                          return (
+                            <span
+                              key={agent.id}
+                              title={`${agent.name} / ${ROLE_LABEL[agent.org_role]} / ${PROVIDER_LABEL[agent.provider]}`}
+                              style={{
+                                borderRadius: 3,
+                                border: disabledAgent ? "1px solid var(--border)" : "1px solid var(--agent)",
+                                background: disabledAgent ? "transparent" : "var(--agent-bg)",
+                                color: disabledAgent ? "var(--ink-4)" : "var(--agent-deep)",
+                                padding: "4px 8px",
+                                fontSize: 11,
                               }}
                             >
-                              このサブワークを開く
-                            </Button>
+                              {agent.name || agent.id} · {ROLE_LABEL[agent.org_role]}
+                              {disabledAgent ? " · 無効" : ""}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                          エージェントが設定されていません。
+                        </span>
+                      )}
+                      {activeExecutionHiddenAgentCount > 0 && (
+                        <span style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "4px 8px", fontSize: 11, color: "var(--ink-3)" }}>
+                          +{activeExecutionHiddenAgentCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      width: "100%",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      borderRadius: 3,
+                      border: "1px solid var(--border)",
+                      background: "var(--surface)",
+                      padding: "8px 12px",
+                      fontSize: 13,
+                      color: "var(--ink-2)",
+                    }}
+                    onClick={() => setCodingOpen((open) => !open)}
+                  >
+                    コーディング用コンテキスト
+                    <ChevronDown
+                      style={{ width: 16, height: 16, transition: "transform 0.15s", transform: codingOpen ? "rotate(180deg)" : undefined }}
+                    />
+                  </button>
+                  {(codingOpen || activeRequest.workflow_mode === "coding") && (
+                    <div style={{ marginTop: 12, display: "grid", gap: 12, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+                      <Field label="working_directory">
+                        <input
+                          value={activeRequest.code_context.working_directory}
+                          placeholder="/path/to/repo"
+                          readOnly={!activeCanEdit}
+                          onChange={(event) =>
+                            activeCanEdit && updateCodeContext({ working_directory: event.target.value })
+                          }
+                          className="mono"
+                          style={{ ...inputStyle(!activeCanEdit), fontFamily: "var(--strand-font-mono)" }}
+                        />
+                      </Field>
+                      <Field label="test_command">
+                        <input
+                          value={activeRequest.code_context.test_command}
+                          placeholder="npm run build"
+                          readOnly={!activeCanEdit}
+                          onChange={(event) =>
+                            activeCanEdit && updateCodeContext({ test_command: event.target.value })
+                          }
+                          className="mono"
+                          style={{ ...inputStyle(!activeCanEdit), fontFamily: "var(--strand-font-mono)" }}
+                        />
+                      </Field>
+                      <Field label="tech_stack">
+                        <input
+                          value={activeRequest.code_context.tech_stack}
+                          placeholder="React / TypeScript / FastAPI"
+                          readOnly={!activeCanEdit}
+                          onChange={(event) =>
+                            activeCanEdit && updateCodeContext({ tech_stack: event.target.value })
+                          }
+                          style={inputStyle(!activeCanEdit)}
+                        />
+                      </Field>
+                      <Field label="target_paths">
+                        <textarea
+                          rows={3}
+                          value={codeContextToText(activeRequest.code_context.target_paths)}
+                          placeholder="app/web/src/screens/Workspace.tsx"
+                          readOnly={!activeCanEdit}
+                          onChange={(event) =>
+                            activeCanEdit &&
+                            updateCodeContext({ target_paths: textToCodeContextItems(event.target.value) })
+                          }
+                          className="mono"
+                          style={{ ...textareaStyle(!activeCanEdit), fontFamily: "var(--strand-font-mono)" }}
+                        />
+                      </Field>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <Field label="acceptance_criteria">
+                          <textarea
+                            rows={3}
+                            value={activeRequest.code_context.acceptance_criteria}
+                            placeholder="完了条件、UI要件、避けたい変更"
+                            readOnly={!activeCanEdit}
+                            onChange={(event) =>
+                              activeCanEdit && updateCodeContext({ acceptance_criteria: event.target.value })
+                            }
+                            style={textareaStyle(!activeCanEdit)}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  style={{
+                    display: "flex",
+                    width: "100%",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface)",
+                    padding: "8px 12px",
+                    fontSize: 13,
+                    color: "var(--ink-2)",
+                  }}
+                  onClick={() => setDetailsOpen((open) => !open)}
+                >
+                  追加で伝えたいこと
+                  <ChevronDown
+                    style={{ width: 16, height: 16, transition: "transform 0.15s", transform: detailsOpen ? "rotate(180deg)" : undefined }}
+                  />
+                </button>
+                {detailsOpen && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+                    <Field label="AIチームへの追加指示">
+                      <textarea
+                        rows={4}
+                        value={activeRequest.global_instruction}
+                        placeholder="口調、制約、必ず見てほしい観点など"
+                        readOnly={!activeCanEdit}
+                        onChange={(event) =>
+                          activeCanEdit && updateRequest({ global_instruction: event.target.value })
+                        }
+                        style={textareaStyle(!activeCanEdit)}
+                      />
+                    </Field>
+                  </div>
+                )}
+
+                {activeResult && !activeError && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <Field label={reviewLabel}>
+                        {activeReviewText && (
+                          <div style={{ marginBottom: 8, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8, fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)" }}>
+                            前回レビュー: {activeReviewText}
                           </div>
-                        </div>
-                        <div className="mt-3 grid gap-2 text-xs text-[var(--color-fg-muted)] md:grid-cols-3">
-                          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5">
-                            エージェント: {historyAgents.length}人
-                          </div>
-                          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5">
-                            出力: {historyTurns.length}件
-                          </div>
-                          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5">
-                            ログ: {historyEvents.length}件
-                          </div>
-                        </div>
-                        {subWork.version?.flow_json && (
-                          <details className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                            <summary className="cursor-pointer text-xs font-semibold">
-                              flow_json
-                            </summary>
-                            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                              {JSON.stringify(subWork.version.flow_json, null, 2)}
-                            </pre>
-                          </details>
                         )}
-                        <div className="mt-3 grid gap-3">
-                          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                            <h3 className="mb-2 text-xs font-semibold text-[var(--color-fg)]">インプット概要</h3>
-                            <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                              {subWork.input || "入力はありません。"}
-                            </pre>
-                          </div>
-                          {subWork.reviewFeedback && (
-                            <div className="rounded-md border border-sky-500/30 bg-sky-500/10 p-3">
-                              <h3 className="mb-2 text-xs font-semibold text-sky-100">ユーザーレビュー</h3>
-                              <div className="mb-2 text-[10px] text-sky-200/80">
-                                {FEEDBACK_LABEL[subWork.reviewFeedback.kind]} ·{" "}
-                                {new Date(subWork.reviewFeedback.created_at).toLocaleString("ja-JP")}
+                        <textarea
+                          rows={5}
+                          value={feedbackText}
+                          placeholder="例: まことみけんの意見交換が見られない。ちゃんと会話して"
+                          onChange={(event) => setFeedbackText(event.target.value)}
+                          style={textareaStyle()}
+                        />
+                      </Field>
+                      <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+                        <Field label="レビューを実行するチーム">
+                          <select
+                            value={selectedTeamTemplateId}
+                            disabled={run.status === "running"}
+                            onChange={(event) => applyTeamTemplate(event.target.value)}
+                            style={selectStyle(run.status === "running")}
+                          >
+                            <option value="">ワーク内チームを使う（下に内訳表示）</option>
+                            {templates.map((template) => (
+                              <option key={template.id} value={template.id}>
+                                {teamLabel(template)}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <div style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 12 }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                                {currentTeamName}
                               </div>
-                              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-sky-100">
-                                {subWork.reviewFeedback.comment || "レビュー本文はありません。"}
-                              </pre>
+                              <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                                {currentTeamSource}
+                              </div>
                             </div>
-                          )}
-                          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                            <h3 className="mb-2 text-xs font-semibold text-[var(--color-fg)]">結果概要</h3>
-                            {subWork.error ? (
-                              <pre className="whitespace-pre-wrap rounded-md border border-red-500/40 bg-red-500/10 p-3 font-sans text-xs leading-relaxed text-red-200">
-                                {subWork.error}
-                              </pre>
-                            ) : (
-                              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                                {subWork.result || "このサブワークに結果はまだありません。"}
-                              </pre>
-                            )}
+                            <div className="mono" style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "4px 8px", fontSize: 11, color: "var(--ink-3)" }}>
+                              {currentTeamEnabledAgents.length}/{currentTeamAgents.length}人が有効
+                            </div>
+                          </div>
+                          <div style={{ marginTop: 12, display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", fontSize: 11, color: "var(--ink-3)" }}>
+                            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: "6px 8px" }}>
+                              ロール: {currentTeamRoleSummary}
+                            </div>
+                            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: "6px 8px" }}>
+                              プロバイダー: {currentTeamProviderSummary}
+                            </div>
                           </div>
                         </div>
-                        {(subWork.diff || subWork.fileChanges) && (
-                          <details className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                            <summary className="cursor-pointer text-xs font-semibold">
-                              diff / file changes
-                            </summary>
-                            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--color-fg-muted)]">
-                              {subWork.fileChanges || subWork.diff}
-                            </pre>
-                          </details>
+                      </div>
+                    </div>
+                    <Btn
+                      variant="solid"
+                      tone="accent"
+                      disabled={run.status === "running" || !feedbackText.trim()}
+                      onClick={() => void restartDiscussionWithFeedback()}
+                      style={{ width: "100%", justifyContent: "center" }}
+                    >
+                      <Play style={{ width: 14, height: 14 }} />
+                      レビューを反映して議論
+                    </Btn>
+                    {nextLinkedSubWorks.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 11 }}>
+                        <span style={{ color: "var(--ink-4)" }}>次のサブワーク:</span>
+                        {nextLinkedSubWorks.map((child) => (
+                          <button
+                            key={child.id}
+                            type="button"
+                            style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "4px 8px", color: "var(--info)" }}
+                            onClick={() => {
+                              setSelectedVersionId(child.id);
+                              setWorkMode("subwork");
+                              setContentMode("edit");
+                            }}
+                          >
+                            {child.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!activeResult && activeCanEdit && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                    {run.status === "running" ? (
+                      <Btn
+                        variant="solid"
+                        onClick={stopRun}
+                        style={{ justifyContent: "center", background: "var(--danger)", borderColor: "var(--danger)", color: "white" }}
+                      >
+                        <Square style={{ width: 14, height: 14 }} />
+                        停止する
+                      </Btn>
+                    ) : (
+                      <Btn
+                        variant="solid"
+                        tone="accent"
+                        disabled={!canStart}
+                        onClick={() => void runCurrentWork()}
+                        style={{ justifyContent: "center", opacity: canStart ? 1 : 0.5 }}
+                      >
+                        <Play style={{ width: 14, height: 14 }} />
+                        このサブワークを実行
+                      </Btn>
+                    )}
+                  </div>
+                )}
+                {activeCanEdit && (
+                  <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                    変更は自動保存されます。
+                  </div>
+                )}
+                {!activeCanEdit && (
+                  <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                    過去のサブワークを表示中です。内容は編集できません。必要ならレビューから次のサブワークを作成できます。
+                  </div>
+                )}
+                {!canStart && <div style={{ fontSize: 11, color: "var(--warn)" }}>{missingReason}</div>}
+              </div>
+            )}
+
+            {workMode === "subwork" && contentMode === "progress" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                      {selectedSubWork?.label ?? "サブワーク"} の議論ログ
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                      エージェント発言、イベント、議論結果を保存用に書き出します。
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <Btn
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadSubwork(selectedSubWork, "json")}
+                      disabled={!selectedSubWork}
+                    >
+                      <Download style={{ width: 14, height: 14 }} />
+                      JSON
+                    </Btn>
+                    <Btn
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadSubwork(selectedSubWork, "md")}
+                      disabled={!selectedSubWork}
+                    >
+                      <Download style={{ width: 14, height: 14 }} />
+                      Markdown
+                    </Btn>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+                  {displayedProgressSteps.map((step) => {
+                    const palette =
+                      step.state === "done"
+                        ? { fg: "var(--ok)", bg: "var(--ok-bg)", bd: "var(--ok)" }
+                        : step.state === "active"
+                          ? { fg: "var(--info)", bg: "var(--info-bg)", bd: "var(--info)" }
+                          : step.state === "failed"
+                            ? { fg: "var(--danger)", bg: "var(--danger-bg)", bd: "var(--danger)" }
+                            : { fg: "var(--ink-3)", bg: "var(--surface-2)", bd: "var(--border)" };
+                    return (
+                      <div
+                        key={step.id}
+                        style={{
+                          display: "flex",
+                          minHeight: 40,
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          borderRadius: 3,
+                          border: `1px solid ${palette.bd}`,
+                          background: palette.bg,
+                          color: palette.fg,
+                          padding: "8px 12px",
+                          fontSize: 12,
+                        }}
+                      >
+                        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{step.label}</span>
+                        {step.state === "active" && (
+                          <Loader2 style={{ width: 16, height: 16, flexShrink: 0, color: "var(--info)" }} className="spin" />
                         )}
-                        <details className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                          <summary className="cursor-pointer text-xs font-semibold">
-                            エージェントログ
-                          </summary>
-                          <div className="mt-3">
-                            <HistoryAgentLogs
-                              agents={historyAgents}
-                              turns={historyTurns}
-                              events={historyEvents}
-                            />
-                          </div>
-                        </details>
-                      </section>
+                      </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-          )}
-        </CardBody>
-      </Card>
-
-      <Card className="flex min-w-0 flex-col overflow-hidden">
-        <CardHeader>
-          <div className="min-w-0">
-            <CardTitle>ログ</CardTitle>
-            <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
-              会話ログ、イベント、JSONを確認します。
-            </p>
-          </div>
-          <Activity className="h-4 w-4 shrink-0 text-[var(--color-fg-muted)]" />
-        </CardHeader>
-        <CardBody className="flex-1 space-y-4 overflow-y-auto">
-          <section>
-            <div
-              role="tablist"
-              className="mb-3 grid grid-cols-3 gap-1 rounded-md bg-[var(--color-surface-2)] p-1"
-              style={{ fontSize: "var(--text-sm)" }}
-            >
-              {(["run", "output", "context"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  aria-selected={inspectorTab === tab}
-                  onClick={() => setInspectorTab(tab)}
-                  className={clsx(
-                    "rounded px-2 py-1.5 transition-colors",
-                    inspectorTab === tab
-                      ? "bg-[var(--color-surface-3)] text-[var(--color-fg)]"
-                      : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]",
-                  )}
-                >
-                  {tab === "run" ? "Run" : tab === "output" ? "Output" : "Context"}
-                </button>
-              ))}
-            </div>
-            <div
-              className="min-h-72 overflow-y-auto pb-2"
-              style={{ fontSize: "var(--text-body)" }}
-            >
-              {inspectorTab === "run" && (
-                <div className="space-y-3">
-                  <Info
-                    label="現在のサブワーク"
-                    value={
-                      selectedSubWork
-                        ? `${selectedSubWork.label} / ${subWorkStatusLabel(selectedSubWork.status)}`
-                        : "未選択"
-                    }
-                  />
-                  <Info label="AIチーム" value={`${activeExecutionEnabledAgents.length}人が有効`} />
-                  <Info label="ターン数" value={`${activeRunTurns.length}件`} />
-                  {activeRunState.error && <Info label="エラー" value={activeRunState.error} />}
-                  <div className="border-t border-[var(--color-border)] pt-3">
-                    <div
-                      className="mb-2 font-semibold text-[var(--color-fg)]"
-                      style={{ fontSize: "var(--text-sm)" }}
-                    >
-                      会話
-                    </div>
-                    <Conversation
-                      agents={activeExecutionEnabledAgents}
-                      turns={activeRunTurns}
-                      events={activeRunEvents}
+                <div>
+                  <h3 style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{agentCardsLabel}</h3>
+                  <div style={{ marginBottom: 8 }}>
+                    <ProviderHealthStrip
+                      providers={activeExecutionEnabledAgents.map((agent) => agent.provider)}
+                      compact
                     />
                   </div>
+                  <AgentProgressCards
+                    agents={activeExecutionEnabledAgents}
+                    turns={activeRunTurns}
+                    events={activeRunEvents}
+                  />
                 </div>
-              )}
-              {inspectorTab === "output" && (
-                <div className="space-y-3">
+                <div>
+                  <h3 style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{progressHeaderLabel}</h3>
+                  <Conversation
+                    agents={activeExecutionEnabledAgents}
+                    turns={activeRunTurns}
+                    events={activeRunEvents}
+                  />
+                </div>
+                <div>
+                  <h3 style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>ライブメモ</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {displayedLiveNotes.map((note, index) => (
+                      <div
+                        key={`${note}-${index}`}
+                        style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, fontSize: 12, lineHeight: 1.6, color: "var(--ink-3)" }}
+                      >
+                        {note}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 16 }}>
+                  <h3 style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{outputPanelLabel}</h3>
                   {activeOutputText ? (
-                    <Info label="最新の実行結果" value={activeOutputText} />
+                    <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 12, lineHeight: 1.6, color: "var(--ink)", margin: 0 }}>
+                      {activeOutputText}
+                    </pre>
                   ) : (
-                    <Empty
-                      dense
-                      title="まだ結果はありません"
-                      description="実行が完了するとここに最新の出力が表示されます。"
-                    />
+                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                      {emptyOutputMessage}
+                    </div>
                   )}
-                  {activeDiff && (
+                </div>
+                <Btn variant="ghost" onClick={resetRun} style={{ width: "100%", justifyContent: "center" }}>
+                  <RefreshCcw style={{ width: 14, height: 14 }} />
+                  実行結果をリセット
+                </Btn>
+              </div>
+            )}
+
+            {workMode === "history" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <section style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr auto" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                    <Info label="現在のWS" value={activeRequestTitle} />
+                    <Info label="サブワーク" value={`${subWorks.length}件`} />
+                    <Info label="履歴化済み結果" value={`${versionSubWorks.length}件`} />
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}>
+                    <span style={{ padding: "0 4px", fontSize: 11, fontWeight: 600, color: "var(--ink-3)" }}>
+                      一括ダウンロード
+                    </span>
+                    <Btn
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadAllSubworks("json")}
+                      disabled={subWorks.length === 0}
+                    >
+                      <Download style={{ width: 14, height: 14 }} />
+                      JSON
+                    </Btn>
+                    <Btn
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadAllSubworks("md")}
+                      disabled={subWorks.length === 0}
+                    >
+                      <Download style={{ width: 14, height: 14 }} />
+                      Markdown
+                    </Btn>
+                  </div>
+                </section>
+                {subWorks.length === 0 ? (
+                  <EmptyState title="サブワークはまだありません。実行後に自動で初回ワークとして残ります。" />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {subWorks.map((subWork) => {
+                      const historyAgents =
+                        subWork.version?.request.agents.filter((agent) => agent.enabled !== false) ??
+                        enabledAgents;
+                      const historyTurns = subWork.isEditable
+                        ? run.turns
+                        : subWork.version?.agent_turns ?? [];
+                      const historyEvents = subWork.isEditable
+                        ? run.events
+                        : subWork.version?.stream_events ?? [];
+                      return (
+                        <section
+                          key={subWork.id}
+                          style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}
+                        >
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                                {subWork.label}
+                              </div>
+                              <div className="mono" style={{ marginTop: 4, fontSize: 10, color: "var(--ink-4)" }}>
+                                {subWorkStatusLabel(subWork.status)}
+                                {subWork.createdAt
+                                  ? ` · ${new Date(subWork.createdAt).toLocaleString("ja-JP")}`
+                                  : ""}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                              <Btn
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadSubwork(subWork, "json")}
+                              >
+                                <Download style={{ width: 14, height: 14 }} />
+                                JSON
+                              </Btn>
+                              <Btn
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadSubwork(subWork, "md")}
+                              >
+                                <Download style={{ width: 14, height: 14 }} />
+                                Markdown
+                              </Btn>
+                              {subWork.version && (
+                                <Btn
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => restoreVersionRequest(subWork.version!)}
+                                >
+                                  依頼に戻す
+                                </Btn>
+                              )}
+                              <Btn
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedVersionId(subWork.id);
+                                  setWorkMode("subwork");
+                                  setContentMode("edit");
+                                }}
+                              >
+                                このサブワークを開く
+                              </Btn>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: 12, display: "grid", gap: 8, gridTemplateColumns: "repeat(3, 1fr)", fontSize: 11, color: "var(--ink-3)" }}>
+                            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: "6px 8px" }}>
+                              エージェント: {historyAgents.length}人
+                            </div>
+                            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: "6px 8px" }}>
+                              出力: {historyTurns.length}件
+                            </div>
+                            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: "6px 8px" }}>
+                              ログ: {historyEvents.length}件
+                            </div>
+                          </div>
+                          {subWork.version?.flow_json && (
+                            <details style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 12 }}>
+                              <summary style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>
+                                flow_json
+                              </summary>
+                              <pre className="mono" style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)", margin: 0 }}>
+                                {JSON.stringify(subWork.version.flow_json, null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                          <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+                            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 12 }}>
+                              <h3 style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>インプット概要</h3>
+                              <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)", margin: 0 }}>
+                                {subWork.input || "入力はありません。"}
+                              </pre>
+                            </div>
+                            {subWork.reviewFeedback && (
+                              <div style={{ borderRadius: 3, border: "1px solid var(--info)", background: "var(--info-bg)", padding: 12 }}>
+                                <h3 style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "var(--info)" }}>ユーザーレビュー</h3>
+                                <div style={{ marginBottom: 8, fontSize: 10, color: "var(--info)" }}>
+                                  {FEEDBACK_LABEL[subWork.reviewFeedback.kind]} ·{" "}
+                                  {new Date(subWork.reviewFeedback.created_at).toLocaleString("ja-JP")}
+                                </div>
+                                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 11, lineHeight: 1.6, color: "var(--info)", margin: 0 }}>
+                                  {subWork.reviewFeedback.comment || "レビュー本文はありません。"}
+                                </pre>
+                              </div>
+                            )}
+                            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 12 }}>
+                              <h3 style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>結果概要</h3>
+                              {subWork.error ? (
+                                <pre style={{ whiteSpace: "pre-wrap", borderRadius: 3, border: "1px solid var(--danger)", background: "var(--danger-bg)", padding: 12, fontFamily: "var(--strand-font-sans)", fontSize: 11, lineHeight: 1.6, color: "var(--danger)", margin: 0 }}>
+                                  {subWork.error}
+                                </pre>
+                              ) : (
+                                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)", margin: 0 }}>
+                                  {subWork.result || "このサブワークに結果はまだありません。"}
+                                </pre>
+                              )}
+                            </div>
+                          </div>
+                          {(subWork.diff || subWork.fileChanges) && (
+                            <details style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 12 }}>
+                              <summary style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>
+                                diff / file changes
+                              </summary>
+                              <pre className="mono" style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)", margin: 0 }}>
+                                {subWork.fileChanges || subWork.diff}
+                              </pre>
+                            </details>
+                          )}
+                          <details style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 12 }}>
+                            <summary style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>
+                              エージェントログ
+                            </summary>
+                            <div style={{ marginTop: 12 }}>
+                              <HistoryAgentLogs
+                                agents={historyAgents}
+                                turns={historyTurns}
+                                events={historyEvents}
+                              />
+                            </div>
+                          </details>
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* RIGHT — logs inspector */}
+        <aside
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            background: "var(--paper)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 8,
+              background: "var(--paper-2)",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div className="mono" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--ink)", textTransform: "uppercase" }}>
+                ログ
+              </div>
+              <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>
+                会話ログ、イベント、JSONを確認します。
+              </div>
+            </div>
+            <Activity style={{ width: 16, height: 16, flexShrink: 0, color: "var(--ink-3)" }} />
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+            <section>
+              <div
+                role="tablist"
+                style={{
+                  marginBottom: 12,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 4,
+                  borderRadius: 3,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  padding: 4,
+                }}
+              >
+                {(["run", "output", "context"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={inspectorTab === tab}
+                    onClick={() => setInspectorTab(tab)}
+                    className="mono"
+                    style={{
+                      borderRadius: 3,
+                      padding: "7px 8px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      letterSpacing: "0.04em",
+                      background: inspectorTab === tab ? "var(--accent)" : "transparent",
+                      color: inspectorTab === tab ? "var(--accent-ink)" : "var(--ink-2)",
+                    }}
+                  >
+                    {tab === "run" ? "Run" : tab === "output" ? "Output" : "Context"}
+                  </button>
+                ))}
+              </div>
+              <div style={{ minHeight: 288, overflowY: "auto", paddingBottom: 8 }}>
+                {inspectorTab === "run" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <Info
-                      label="変更点"
-                      value={activeDiff}
-                      icon={<FileDiff className="h-3.5 w-3.5" />}
+                      label="現在のサブワーク"
+                      value={
+                        selectedSubWork
+                          ? `${selectedSubWork.label} / ${subWorkStatusLabel(selectedSubWork.status)}`
+                          : "未選択"
+                      }
                     />
-                  )}
-                  {activeFileChanges && (
-                    <Info
-                      label="ファイル変更"
-                      value={activeFileChanges}
-                      icon={<FileDiff className="h-3.5 w-3.5" />}
-                    />
-                  )}
-                  <Info label="依頼内容" value={requestPreview || "未設定"} />
+                    <Info label="AIチーム" value={`${activeExecutionEnabledAgents.length}人が有効`} />
+                    <Info label="ターン数" value={`${activeRunTurns.length}件`} />
+                    {activeRunState.error && <Info label="エラー" value={activeRunState.error} />}
+                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                      <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>
+                        会話
+                      </div>
+                      <Conversation
+                        agents={activeExecutionEnabledAgents}
+                        turns={activeRunTurns}
+                        events={activeRunEvents}
+                      />
+                    </div>
+                  </div>
+                )}
+                {inspectorTab === "output" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {activeOutputText ? (
+                      <Info label="最新の実行結果" value={activeOutputText} />
+                    ) : (
+                      <EmptyState
+                        title="まだ結果はありません"
+                        description="実行が完了するとここに最新の出力が表示されます。"
+                      />
+                    )}
+                    {activeDiff && (
+                      <Info
+                        label="変更点"
+                        value={activeDiff}
+                        icon={<FileDiff style={{ width: 14, height: 14 }} />}
+                      />
+                    )}
+                    {activeFileChanges && (
+                      <Info
+                        label="ファイル変更"
+                        value={activeFileChanges}
+                        icon={<FileDiff style={{ width: 14, height: 14 }} />}
+                      />
+                    )}
+                    <Info label="依頼内容" value={requestPreview || "未設定"} />
+                  </div>
+                )}
+                {inspectorTab === "context" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <details
+                      style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}
+                      open
+                    >
+                      <summary style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>
+                        payload (RefineRequest)
+                      </summary>
+                      <pre
+                        className="mono"
+                        style={{ marginTop: 8, maxHeight: 288, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 10, lineHeight: 1.5, color: "var(--ink-3)", margin: 0 }}
+                      >
+                        {JSON.stringify(request, null, 2)}
+                      </pre>
+                    </details>
+                    <details style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--ink)" }}>
+                        raw events ({activeRunEvents.length})
+                      </summary>
+                      <pre
+                        className="mono"
+                        style={{ marginTop: 8, maxHeight: 288, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 10, lineHeight: 1.5, color: "var(--ink-3)", margin: 0 }}
+                      >
+                        {activeRunEvents.length
+                          ? JSON.stringify(activeRunEvents, null, 2)
+                          : "ログはまだありません。"}
+                      </pre>
+                    </details>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        </aside>
+      </div>
+    </StrandShell>
+  );
+}
+
+// ---------- Inline strand Provider Health strip (replaces ProviderHealthBar) ----------
+function ProviderHealthStrip({ providers, compact = false }: { providers: ProviderKind[]; compact?: boolean }) {
+  const uniqueProviders = useMemo(() => Array.from(new Set(providers)).sort(), [providers]);
+  const [results, setResults] = useState<ProviderHealth[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
+
+  const refresh = useMemo(
+    () => async () => {
+      if (uniqueProviders.length === 0) {
+        setResults([]);
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const res = await api.getProvidersHealth(uniqueProviders);
+        setResults(res.providers);
+        setLastCheckedAt(Date.now());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [uniqueProviders],
+  );
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  if (uniqueProviders.length === 0) return null;
+  const dead = results.filter((r) => !r.alive);
+  const alive = results.length - dead.length;
+
+  return (
+    <Panel
+      title={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Dot tone={dead.length === 0 ? "ok" : "warn"} />
+          Provider Health
+          <span style={{ color: "var(--ink-3)", textTransform: "none", letterSpacing: 0 }}>
+            {alive}/{results.length} alive
+          </span>
+        </span>
+      }
+      action={
+        <Btn variant="ghost" size="sm" onClick={() => void refresh()} disabled={loading}>
+          <RefreshCcw style={{ width: 12, height: 12 }} className={loading ? "spin" : undefined} />
+          {loading ? "確認中" : "再チェック"}
+        </Btn>
+      }
+      padded={false}
+    >
+      <div style={{ padding: compact ? 8 : 10, display: "flex", flexDirection: "column", gap: 6 }}>
+        {error && <InlineAlert tone="danger">{error}</InlineAlert>}
+        {lastCheckedAt && !error && (
+          <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>
+            last check: {new Date(lastCheckedAt).toLocaleTimeString()}
+          </div>
+        )}
+        {results.map((row) => {
+          const label = PROVIDER_LABEL[row.provider] ?? row.provider;
+          return (
+            <div
+              key={row.provider}
+              style={{
+                borderRadius: 3,
+                border: `1px solid ${row.alive ? "var(--border)" : "var(--warn)"}`,
+                background: row.alive ? "var(--surface-2)" : "var(--warn-bg)",
+                padding: "6px 8px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Dot tone={row.alive ? "ok" : "danger"} size={8} />
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--ink)" }}>{label}</span>
+                {row.endpoint && (
+                  <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{row.endpoint}</span>
+                )}
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: 10, color: row.alive ? "var(--ink-3)" : "var(--warn)" }}>{row.detail}</span>
+              </div>
+              {!row.alive && row.start_command && (
+                <div
+                  className="mono"
+                  style={{
+                    marginTop: 6,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 6,
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    background: "var(--paper)",
+                    padding: "6px 8px",
+                    fontSize: 10,
+                    color: "var(--ink)",
+                  }}
+                >
+                  <Icon name="terminal" size={11} color="var(--ink-3)" />
+                  <code style={{ wordBreak: "break-all", flex: 1 }}>{row.start_command}</code>
+                  <button
+                    type="button"
+                    style={{ fontSize: 10, color: "var(--ink-3)" }}
+                    onClick={() => {
+                      if (row.start_command) void navigator.clipboard.writeText(row.start_command);
+                    }}
+                  >
+                    copy
+                  </button>
                 </div>
               )}
-              {inspectorTab === "context" && (
-                <div className="space-y-3">
-                  <details
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2"
-                    open
-                  >
-                    <summary
-                      className="cursor-pointer font-semibold text-[var(--color-fg)]"
-                      style={{ fontSize: "var(--text-sm)" }}
-                    >
-                      payload (RefineRequest)
-                    </summary>
-                    <pre
-                      className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-[var(--color-fg-muted)]"
-                      style={{ fontSize: "var(--text-code)" }}
-                    >
-                      {JSON.stringify(request, null, 2)}
-                    </pre>
-                  </details>
-                  <details className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                    <summary
-                      className="cursor-pointer font-semibold text-[var(--color-fg)]"
-                      style={{ fontSize: "var(--text-sm)" }}
-                    >
-                      raw events ({activeRunEvents.length})
-                    </summary>
-                    <pre
-                      className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-[var(--color-fg-muted)]"
-                      style={{ fontSize: "var(--text-code)" }}
-                    >
-                      {activeRunEvents.length
-                        ? JSON.stringify(activeRunEvents, null, 2)
-                        : "ログはまだありません。"}
-                    </pre>
-                  </details>
+              {!row.alive && row.docs_url && (
+                <div style={{ marginTop: 4 }}>
+                  <a href={row.docs_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "var(--accent-deep)" }}>
+                    {row.docs_url}
+                  </a>
                 </div>
               )}
             </div>
-          </section>
-        </CardBody>
-      </Card>
-    </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+// ---------- Inline strand Knowledge resources (replaces KnowledgePicker) ----------
+const KNOWLEDGE_KIND_OPTIONS: KnowledgeKind[] = ["markdown", "text", "image", "figma", "mcp", "link", "note"];
+const knowledgeUid = () => Math.random().toString(36).slice(2, 10);
+const newKnowledgeDraft = (): KnowledgeResource => ({
+  id: `knowledge_${knowledgeUid()}`,
+  title: "",
+  kind: "markdown",
+  content: "",
+  source: "",
+  content_type: "text/plain",
+  tags: [],
+});
+
+function KnowledgeResources({
+  selected,
+  onChange,
+  disabled = false,
+}: {
+  selected: KnowledgeResource[];
+  onChange: (items: KnowledgeResource[]) => void;
+  disabled?: boolean;
+}) {
+  const knowledge = useApp((state) => state.knowledge);
+  const loadKnowledge = useApp((state) => state.loadKnowledge);
+  const saveKnowledge = useApp((state) => state.saveKnowledge);
+  const deleteKnowledge = useApp((state) => state.deleteKnowledge);
+  const [path, setPath] = useState("");
+  const [status, setStatus] = useState("");
+  const [draft, setDraft] = useState<KnowledgeResource>(newKnowledgeDraft);
+
+  useEffect(() => {
+    void loadKnowledge();
+  }, [loadKnowledge]);
+
+  const selectedIds = useMemo(() => new Set(selected.map((item) => item.id)), [selected]);
+
+  const toggle = (item: KnowledgeResource) => {
+    if (disabled) return;
+    onChange(selectedIds.has(item.id) ? selected.filter((entry) => entry.id !== item.id) : [...selected, item]);
+  };
+
+  const importLocal = async () => {
+    if (!path.trim()) return;
+    try {
+      const item = await api.importLocalKnowledge(path.trim());
+      await loadKnowledge();
+      onChange(selectedIds.has(item.id) ? selected : [...selected, item]);
+      setPath("");
+      setStatus(`${item.title} を取り込みました。`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const saveManual = async () => {
+    if (!draft.title.trim()) {
+      setStatus("title を入力してください。");
+      return;
+    }
+    try {
+      const item = await saveKnowledge({
+        ...draft,
+        id: draft.id.trim() || `knowledge_${knowledgeUid()}`,
+        title: draft.title.trim(),
+      });
+      onChange(selectedIds.has(item.id) ? selected : [...selected, item]);
+      setDraft(newKnowledgeDraft());
+      setStatus(`${item.title} を保存して添付しました。`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const remove = async (id: string) => {
+    await deleteKnowledge(id);
+    onChange(selected.filter((item) => item.id !== id));
+  };
+
+  return (
+    <Panel
+      title={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Icon name="inbox" size={12} color="var(--accent-deep)" />
+          学習用リソース
+        </span>
+      }
+      action={<Pill tone="neutral">{selected.length} selected</Pill>}
+      padded={false}
+    >
+      <div style={{ padding: 12, opacity: disabled ? 0.6 : 1 }}>
+        <div style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 10 }}>
+          MD、画像、Figma/FIG、MCPメモをこのワークのコンテキストとして添付します。
+        </div>
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", alignItems: "start" }}>
+          {/* Existing resources + import-local */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) auto" }}>
+              <input
+                value={path}
+                placeholder="/path/to/README.md / image.png / mcp.json"
+                disabled={disabled}
+                onChange={(event) => setPath(event.target.value)}
+                className="mono"
+                style={{ ...inputStyle(disabled), fontFamily: "var(--strand-font-mono)" }}
+              />
+              <Btn variant="outline" size="sm" icon="plus" disabled={disabled || !path.trim()} onClick={() => void importLocal()}>
+                取込
+              </Btn>
+            </div>
+            <div
+              style={{
+                maxHeight: 200,
+                overflowY: "auto",
+                borderRadius: 3,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                padding: 6,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              {knowledge.length === 0 && (
+                <div style={{ padding: 12, textAlign: "center", fontSize: 11, color: "var(--ink-3)" }}>
+                  まだリソースがありません。ローカルファイルを取り込むか、右側でメモを作成してください。
+                </div>
+              )}
+              {knowledge.map((item) => {
+                const sel = selectedIds.has(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 3,
+                      border: sel ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      background: sel ? "var(--accent-soft)" : "var(--surface-2)",
+                      padding: "6px 8px",
+                    }}
+                  >
+                    <button type="button" disabled={disabled} onClick={() => toggle(item)} style={{ flex: 1, minWidth: 0, textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
+                      <Dot tone={sel ? "accent" : "neutral"} size={6} />
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.title}
+                      </span>
+                      <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{item.kind}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => void remove(item.id)}
+                      style={{ width: 22, height: 22, display: "grid", placeItems: "center", color: "var(--ink-3)", borderRadius: 3, border: "1px solid var(--border)" }}
+                    >
+                      <X style={{ width: 12, height: 12 }} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick memo */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) 120px" }}>
+              <Field label="title">
+                <input
+                  value={draft.title}
+                  placeholder="例: 社内コーディング規約"
+                  disabled={disabled}
+                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                  style={inputStyle(disabled)}
+                />
+              </Field>
+              <Field label="kind">
+                <select
+                  value={draft.kind}
+                  disabled={disabled}
+                  onChange={(event) => setDraft((current) => ({ ...current, kind: event.target.value as KnowledgeKind }))}
+                  className="mono"
+                  style={selectStyle(disabled)}
+                >
+                  {KNOWLEDGE_KIND_OPTIONS.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {kind}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <textarea
+              rows={5}
+              value={draft.content}
+              placeholder="MD本文、MCPメモ、Figma URL、補足メモなど"
+              disabled={disabled}
+              onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
+              style={textareaStyle(disabled)}
+            />
+            <Btn variant="outline" size="sm" icon="plus" disabled={disabled || !draft.title.trim()} onClick={() => void saveManual()}>
+              保存して添付
+            </Btn>
+          </div>
+        </div>
+        {status && <div style={{ marginTop: 8, fontSize: 11, color: "var(--ink-3)" }}>{status}</div>}
+      </div>
+    </Panel>
   );
 }
 
@@ -2359,7 +2872,7 @@ function Conversation({
 }) {
   if (agents.length === 0) {
     return (
-      <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-sm text-[var(--color-fg-muted)]">
+      <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, fontSize: 12, color: "var(--ink-3)" }}>
         AIチームが選ばれていません。
       </div>
     );
@@ -2374,68 +2887,73 @@ function Conversation({
   }));
 
   return (
-    <div className={clsx("grid gap-3", compact ? "grid-cols-1 xl:grid-cols-2" : "grid-cols-1")}>
+    <div
+      style={{
+        display: "grid",
+        gap: 12,
+        gridTemplateColumns: compact ? "repeat(auto-fit, minmax(260px, 1fr))" : "1fr",
+      }}
+    >
       {groupedTurns.map((group) => (
         <div
           key={group.agentId}
-          className={clsx(
-            "rounded-lg border border-[var(--color-border)] p-3",
-            compact ? "bg-[var(--color-surface)]" : "bg-[var(--color-surface-2)]",
-          )}
+          style={{
+            borderRadius: 4,
+            border: "1px solid var(--border)",
+            background: compact ? "var(--surface)" : "var(--surface-2)",
+            padding: 12,
+          }}
         >
-          <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <MessageSquareText className="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-[var(--color-fg)]">
+          <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
+            <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 8 }}>
+              <MessageSquareText style={{ width: 16, height: 16, flexShrink: 0, color: "var(--accent)" }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {group.agentName}
                 </div>
-                <div className="text-[10px] text-[var(--color-fg-subtle)]">
+                <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>
                   {group.turns.length > 0 ? `${group.turns.length} messages` : "待機中"}
                 </div>
               </div>
             </div>
-            <div className="shrink-0 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+            <div className="mono" style={{ flexShrink: 0, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
               {group.orgRole}
             </div>
           </div>
-          <div className="mb-3">
+          <div style={{ marginBottom: 12 }}>
             <AgentStatusBadge status={group.status} />
           </div>
-          <div className="space-y-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {group.turns.length === 0 && (
-              <div className="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm text-[var(--color-fg-subtle)]">
+              <div style={{ borderRadius: 3, border: "1px dashed var(--border-2)", background: "var(--surface)", padding: 12, fontSize: 12, color: "var(--ink-3)" }}>
                 このエージェントの出力はまだありません。
               </div>
             )}
             {group.turns.map((turn, index) => (
               <div
                 key={`${turn.agent_id}-${index}`}
-                className={clsx(
-                  "rounded-md border border-[var(--color-border)] p-3",
-                  compact ? "bg-[var(--color-surface-2)]" : "bg-[var(--color-surface)]",
-                )}
+                style={{ borderRadius: 3, border: "1px solid var(--border)", background: compact ? "var(--surface-2)" : "var(--surface)", padding: 12 }}
               >
-                <div className="mb-2 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+                <div className="mono" style={{ marginBottom: 8, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
                   message {index + 1}
                 </div>
                 {turn.error && (
-                  <div className="mb-2 rounded border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300">
+                  <div style={{ marginBottom: 8, borderRadius: 3, border: "1px solid var(--danger)", background: "var(--danger-bg)", padding: 8, fontSize: 11, color: "var(--danger)" }}>
                     {turn.error}
                   </div>
                 )}
                 {turn.research_results && turn.research_results.length > 0 && (
                   <ResearchResultsList results={turn.research_results} />
                 )}
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--color-fg-muted)]">
+                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 12, lineHeight: 1.6, color: "var(--ink-3)", margin: 0 }}>
                   {turn.output || "出力はありません。"}
                 </pre>
                 {turn.file_changes && (
-                  <details className="mt-3 rounded border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                    <summary className="cursor-pointer text-xs text-[var(--color-fg-muted)]">
+                  <details style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 11, color: "var(--ink-3)" }}>
                       file changes
                     </summary>
-                    <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-[var(--color-fg-muted)]">
+                    <pre className="mono" style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 11, color: "var(--ink-3)", margin: 0 }}>
                       {turn.file_changes}
                     </pre>
                   </details>
@@ -2460,14 +2978,14 @@ function HistoryAgentLogs({
 }) {
   if (agents.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-sm text-[var(--color-fg-subtle)]">
+      <div style={{ borderRadius: 3, border: "1px dashed var(--border-2)", background: "var(--surface-2)", padding: 12, fontSize: 12, color: "var(--ink-3)" }}>
         エージェントがありません。
       </div>
     );
   }
 
   return (
-    <div className="grid gap-2 xl:grid-cols-2">
+    <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
       {agents.map((agent) => {
         const agentTurns = turns.filter((turn) => turn.agent_id === agent.id);
         const agentEvents = events.filter((event) => {
@@ -2479,27 +2997,27 @@ function HistoryAgentLogs({
         return (
           <div
             key={agent.id}
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3"
+            style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-[var(--color-fg)]">
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {agent.name}
                 </div>
-                <div className="mt-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+                <div className="mono" style={{ marginTop: 4, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
                   {ROLE_LABEL[agent.org_role]} · {PROVIDER_LABEL[agent.provider]}
                 </div>
               </div>
-              <div className="rounded border border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-fg-muted)]">
+              <div className="mono" style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "4px 8px", fontSize: 10, color: "var(--ink-3)" }}>
                 {agentTurns.length} turns
               </div>
             </div>
-            <div className="mt-3 text-xs leading-relaxed text-[var(--color-fg-muted)]">
+            <div style={{ marginTop: 12, fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)" }}>
               {latestTurn ? (
                 latestTurn.error ? (
-                  <div className="text-red-300">{latestTurn.error}</div>
+                  <div style={{ color: "var(--danger)" }}>{latestTurn.error}</div>
                 ) : (
-                  <pre className="whitespace-pre-wrap font-sans">
+                  <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", margin: 0 }}>
                     {latestTurn.output || "出力はありません。"}
                   </pre>
                 )
@@ -2511,11 +3029,11 @@ function HistoryAgentLogs({
               <ResearchResultsList results={latestTurn.research_results} />
             )}
             {agentEvents.length > 0 && (
-              <details className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
-                <summary className="cursor-pointer text-[10px] font-semibold text-[var(--color-fg-muted)]">
+              <details style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 8 }}>
+                <summary style={{ cursor: "pointer", fontSize: 10, fontWeight: 600, color: "var(--ink-3)" }}>
                   raw events
                 </summary>
-                <pre className="mt-2 whitespace-pre-wrap font-mono text-[10px] text-[var(--color-fg-subtle)]">
+                <pre className="mono" style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 10, color: "var(--ink-4)", margin: 0 }}>
                   {JSON.stringify(agentEvents, null, 2)}
                 </pre>
               </details>
@@ -2538,7 +3056,7 @@ function AgentProgressCards({
 }) {
   if (agents.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-[var(--color-border)] p-4 text-sm text-[var(--color-fg-subtle)]">
+      <div style={{ borderRadius: 3, border: "1px dashed var(--border-2)", background: "var(--surface-2)", padding: 16, fontSize: 12, color: "var(--ink-3)" }}>
         エージェントが選ばれていません。
       </div>
     );
@@ -2552,44 +3070,45 @@ function AgentProgressCards({
   }
 
   return (
-    <div className="grid gap-3 xl:grid-cols-2">
+    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
       {agents.map((agent) => {
         const agentTurns = turns.filter((turn) => turn.agent_id === agent.id);
         const latestTurn = agentTurns[agentTurns.length - 1];
         const status = getAgentStatus(agent.id, turns, events);
         const workDescription = getAgentWorkDescription(agent, status, latestTurn);
         const phaseEvent = latestPhaseByAgent.get(agent.id);
+        const running = status === "running";
         return (
           <div
             key={agent.id}
-            className={clsx(
-              "rounded-md border p-3",
-              status === "running"
-                ? "border-sky-500/40 bg-sky-500/10"
-                : "border-[var(--color-border)] bg-[var(--color-surface-2)]",
-            )}
+            style={{
+              borderRadius: 3,
+              border: running ? "1px solid var(--info)" : "1px solid var(--border)",
+              background: running ? "var(--info-bg)" : "var(--surface-2)",
+              padding: 12,
+            }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-[var(--color-fg)]">
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {agent.name}
                 </div>
-                <div className="mt-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+                <div className="mono" style={{ marginTop: 4, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
                   {ROLE_LABEL[agent.org_role]} · {PROVIDER_LABEL[agent.provider]}
                 </div>
               </div>
               <AgentStatusBadge status={status} />
             </div>
 
-            <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs leading-relaxed text-[var(--color-fg-muted)]">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="font-semibold text-[var(--color-fg)]">現在の作業</span>
+            <div style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 8, fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)" }}>
+              <div style={{ marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontWeight: 600, color: "var(--ink)" }}>現在の作業</span>
                 {phaseEvent && <PhaseBadge phase={phaseEvent.phase} />}
               </div>
               {phaseEvent ? (
-                <div className="space-y-0.5">
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <div>{describePhase(phaseEvent)}</div>
-                  <div className="text-[10px] text-[var(--color-fg-subtle)]">
+                  <div style={{ fontSize: 10, color: "var(--ink-4)" }}>
                     {workDescription}
                   </div>
                 </div>
@@ -2598,27 +3117,27 @@ function AgentProgressCards({
               )}
             </div>
 
-            <div className="mt-3 grid gap-2 text-xs text-[var(--color-fg-muted)] md:grid-cols-2">
-              <div className="rounded-md border border-[var(--color-border)] px-2 py-1.5">
+            <div style={{ marginTop: 12, display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", fontSize: 11, color: "var(--ink-3)" }}>
+              <div style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "6px 8px" }}>
                 出力: {agentTurns.length}件
               </div>
-              <div className="rounded-md border border-[var(--color-border)] px-2 py-1.5">
+              <div style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "6px 8px" }}>
                 依存: {agent.depends_on.length > 0 ? agent.depends_on.join(", ") : "なし"}
               </div>
             </div>
 
             {agent.skills.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {agent.skills.slice(0, 5).map((skill) => (
                   <span
                     key={skill}
-                    className="rounded border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] text-[var(--color-fg-subtle)]"
+                    style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "2px 6px", fontSize: 10, color: "var(--ink-4)" }}
                   >
                     {skill}
                   </span>
                 ))}
                 {agent.skills.length > 5 && (
-                  <span className="rounded border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] text-[var(--color-fg-subtle)]">
+                  <span style={{ borderRadius: 3, border: "1px solid var(--border)", padding: "2px 6px", fontSize: 10, color: "var(--ink-4)" }}>
                     +{agent.skills.length - 5}
                   </span>
                 )}
@@ -2626,14 +3145,14 @@ function AgentProgressCards({
             )}
 
             {latestTurn && (
-              <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
-                <div className="mb-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+              <div style={{ marginTop: 12, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 8 }}>
+                <div className="mono" style={{ marginBottom: 4, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
                   latest output
                 </div>
                 {latestTurn.error ? (
-                  <div className="text-xs text-red-300">{latestTurn.error}</div>
+                  <div style={{ fontSize: 11, color: "var(--danger)" }}>{latestTurn.error}</div>
                 ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg-muted)]">
+                  <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)", margin: 0 }}>
                     {latestTurn.output || "出力はありません。"}
                   </pre>
                 )}
@@ -2701,21 +3220,21 @@ function ResearchResultsList({
   compact?: boolean;
 }) {
   return (
-    <div className={clsx("space-y-2", compact ? "mt-2" : "mb-3 mt-2")}>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-sky-200">
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: compact ? 8 : 8, marginBottom: compact ? 0 : 12 }}>
+      <div className="mono" style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--info)" }}>
         research results
       </div>
       {results.map((item, index) => (
         <div
           key={`${item.url}-${index}`}
-          className="rounded-md border border-sky-500/25 bg-sky-500/10 p-2 text-xs text-sky-100"
+          style={{ borderRadius: 3, border: "1px solid var(--info)", background: "var(--info-bg)", padding: 8, fontSize: 11, color: "var(--info)" }}
         >
-          <div className="font-semibold">{item.title || item.url}</div>
-          <div className="mt-1 break-all text-[10px] text-sky-200/80">{item.url}</div>
+          <div style={{ fontWeight: 600 }}>{item.title || item.url}</div>
+          <div className="mono" style={{ marginTop: 4, wordBreak: "break-all", fontSize: 10, color: "var(--info)" }}>{item.url}</div>
           {item.snippet && (
-            <div className="mt-2 leading-relaxed text-sky-100/80">{item.snippet}</div>
+            <div style={{ marginTop: 8, lineHeight: 1.6, color: "var(--info)" }}>{item.snippet}</div>
           )}
-          {item.error && <div className="mt-2 text-red-300">{item.error}</div>}
+          {item.error && <div style={{ marginTop: 8, color: "var(--danger)" }}>{item.error}</div>}
         </div>
       ))}
     </div>
@@ -2732,16 +3251,25 @@ const PHASE_LABEL: Record<string, string> = {
 };
 
 function PhaseBadge({ phase }: { phase: string }) {
-  const tone =
+  const palette =
     phase === "provider_failed"
-      ? "border-red-500/40 bg-red-500/10 text-red-200"
+      ? { fg: "var(--danger)", bg: "var(--danger-bg)", bd: "var(--danger)" }
       : phase === "provider_completed"
-        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-        : "border-sky-500/40 bg-sky-500/10 text-sky-200";
+        ? { fg: "var(--ok)", bg: "var(--ok-bg)", bd: "var(--ok)" }
+        : { fg: "var(--info)", bg: "var(--info-bg)", bd: "var(--info)" };
   return (
     <span
-      className={clsx("inline-flex rounded-full border px-1.5 py-0.5", tone)}
-      style={{ fontSize: "var(--text-xs)" }}
+      className="mono"
+      style={{
+        display: "inline-flex",
+        borderRadius: 99,
+        border: `1px solid ${palette.bd}`,
+        background: palette.bg,
+        color: palette.fg,
+        padding: "2px 6px",
+        fontSize: 9,
+        letterSpacing: "0.04em",
+      }}
     >
       {PHASE_LABEL[phase] ?? phase}
     </span>
@@ -2776,20 +3304,9 @@ function AgentStatusBadge({ status }: { status: AgentRunStatus }) {
         : status === "error"
           ? "エラー"
           : "待機中";
-  return (
-    <span
-      className={clsx(
-        "inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
-        status === "running" && "border-sky-500/40 bg-sky-500/10 text-sky-200",
-        status === "completed" && "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
-        status === "error" && "border-red-500/40 bg-red-500/10 text-red-200",
-        status === "waiting" &&
-          "border-[var(--color-border)] bg-[var(--color-surface-2)] text-[var(--color-fg-subtle)]",
-      )}
-    >
-      {label}
-    </span>
-  );
+  const tone: "ok" | "info" | "danger" | "neutral" =
+    status === "running" ? "ok" : status === "completed" ? "info" : status === "error" ? "danger" : "neutral";
+  return <Pill tone={tone}>{label}</Pill>;
 }
 
 function buildFeedbackContinuationSource({
@@ -2820,12 +3337,12 @@ function buildFeedbackContinuationSource({
 
 function Info({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) {
   return (
-    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-      <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+    <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+      <div className="mono" style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
         {icon}
         {label}
       </div>
-      <div className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-fg)]">
+      <div style={{ whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6, color: "var(--ink)" }}>
         {value}
       </div>
     </div>

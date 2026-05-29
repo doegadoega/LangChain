@@ -1,5 +1,6 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
-import clsx from "clsx";
+// STRAND — Coding / Execution. Request list | center form+source | status panel.
+// Presentation migrated to the strand design system; behavior preserved verbatim.
+import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
   Code2,
@@ -16,16 +17,14 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { Button } from "../components/ui/Button";
-import { Card, CardBody, CardHeader, CardTitle } from "../components/ui/Card";
+import { StrandShell } from "../components/strand/Chrome";
+import { Btn, Dot, Icon, Panel, Pill } from "../components/strand/primitives";
+import { inputStyle, selectStyle, textareaStyle } from "../components/strand/formStyles";
+import { EmptyState, Field, InlineAlert } from "../components/refine/primitives";
+import { statusTone, teamLabel, truncateText } from "../lib/refine";
+import { buildBaseVersion, isDuplicateVersion } from "../lib/versions";
 import { ResizeHandle } from "../components/ui/ResizeHandle";
-import { KnowledgePicker } from "../components/KnowledgePicker";
-import { ProviderHealthBar } from "../components/ProviderHealthBar";
 import { useToast } from "../components/ui/Toast";
-import { Empty } from "../components/ui/Empty";
-import { Alert } from "../components/ui/Alert";
-import { Skeleton } from "../components/ui/Skeleton";
-import { Input, Label, Select, Textarea } from "../components/ui/Field";
 import { api } from "../api/client";
 import { PROVIDER_LABEL, ROLE_LABEL, formatDuration } from "../lib/format";
 import { useApp } from "../state/store";
@@ -34,12 +33,15 @@ import type {
   ChatAttachment,
   ChatSession,
   CodingWorktreeState,
+  KnowledgeKind,
+  KnowledgeResource,
   ManagedRequest,
   ManagedRequestStatus,
+  ProviderHealth,
+  ProviderKind,
   RefineRequest,
   SourceTreeItem,
   StreamEvent,
-  Template,
   TurnResult,
   WorkspaceVersion,
 } from "../types";
@@ -600,439 +602,976 @@ export function Coding() {
   };
 
   return (
-    <div
-      className="grid h-full overflow-hidden bg-[var(--color-bg)]"
-      style={{
-        gridTemplateColumns: `${layout.requestList}px 6px minmax(560px,1fr) 6px ${layout.statusPanel}px`,
-      }}
-    >
-      <aside className="flex min-w-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="border-b border-[var(--color-border)] p-3">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <div className="font-semibold" style={{ fontSize: "var(--text-sm)" }}>Coding</div>
-              <div className="text-[var(--color-fg-muted)]" style={{ fontSize: "var(--text-xs)" }}>
-                実装依頼とソースを管理します。
-              </div>
-            </div>
-            <Button size="sm" variant="outline" onClick={newRequest}>
-              新規
-            </Button>
-          </div>
-          <div role="tablist" className="inline-flex w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-0.5">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={leftTab === "requests"}
-              onClick={() => setLeftTab("requests")}
-              className={clsx(
-                "flex-1 rounded px-2 py-1 transition-colors",
-                leftTab === "requests"
-                  ? "bg-[var(--color-surface-3)] text-[var(--color-fg)]"
-                  : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]",
-              )}
-              style={{ fontSize: "var(--text-sm)" }}
-            >
-              依頼一覧
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={leftTab === "tree"}
-              onClick={() => setLeftTab("tree")}
-              className={clsx(
-                "flex-1 rounded px-2 py-1 transition-colors",
-                leftTab === "tree"
-                  ? "bg-[var(--color-surface-3)] text-[var(--color-fg)]"
-                  : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]",
-              )}
-              style={{ fontSize: "var(--text-sm)" }}
-            >
-              ソース
-            </button>
-          </div>
-        </div>
-
-        {leftTab === "requests" ? (
-          <>
-            <div className="border-b border-[var(--color-border)] p-3">
-              <Button size="sm" variant="danger" className="w-full" disabled={!activeId} onClick={() => void removeActive()}>
-                選択中の依頼を削除
-              </Button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {codingRequests.length === 0 ? (
-                <Empty dense title="コーディング依頼はまだありません" description="右上の「新規」から作成してください。" />
-              ) : (
-                <div className="space-y-1">
-                  {codingRequests.map((item) => (
-                    <button
-                      key={item.id}
-                      className={clsx(
-                        "w-full rounded-md border p-2 text-left transition-colors",
-                        activeId === item.id
-                          ? "border-[var(--color-accent)] bg-[var(--color-surface-3)]"
-                          : "border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)]",
-                      )}
-                      onClick={() => selectRecord(item)}
-                    >
-                      <div className="truncate font-semibold" style={{ fontSize: "var(--text-sm)" }}>{item.title}</div>
-                      <div
-                        className="mt-1 flex items-center justify-between text-[var(--color-fg-subtle)]"
-                        style={{ fontSize: "var(--text-xs)" }}
-                      >
-                        <span>{STATUS_LABEL[item.status]}</span>
-                        <span>{new Date(item.updated_at).toLocaleString("ja-JP")}</span>
-                      </div>
-                      <div
-                        className="mt-1 truncate text-[var(--color-fg-muted)]"
-                        style={{ fontSize: "var(--text-xs)" }}
-                      >
-                        {item.request.code_context.working_directory || "working_directory 未設定"}
-                      </div>
-                    </button>
-                  ))}
+    <StrandShell breadcrumb={["overview", "execution"]} mainStyle={{ display: "flex", overflow: "hidden" }}>
+      <div
+        className="coding"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "grid",
+          gridTemplateColumns: `${layout.requestList}px 6px minmax(560px,1fr) 6px ${layout.statusPanel}px`,
+          background: "var(--paper)",
+          overflow: "hidden",
+        }}
+      >
+        <style>{"@keyframes coding-spin{to{transform:rotate(360deg)}}.coding .spin{animation:coding-spin 0.8s linear infinite}"}</style>
+        {/* LEFT — request list / source tabs */}
+        <aside
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            borderRight: "1px solid var(--border)",
+            background: "var(--paper)",
+          }}
+        >
+          <div style={{ borderBottom: "1px solid var(--border)", padding: 12 }}>
+            <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="mono" style={{ fontSize: 10, color: "var(--ink-3)", letterSpacing: "0.12em" }}>
+                  EXECUTION · CODING
                 </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="border-b border-[var(--color-border)] p-3">
-              <Label>作業ディレクトリ</Label>
-              <div className="space-y-2">
-                <Input
-                  value={draft.code_context.working_directory}
-                  placeholder="/path/to/repo"
-                  onChange={(event) => updateCodeContext({ working_directory: event.target.value })}
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <Button size="sm" variant="outline" onClick={() => void pickDirectory()}>
-                    フォルダを選択
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => void loadTree()}>
-                    読込
-                  </Button>
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>依頼とソース</div>
               </div>
-              {sourceError && <Alert kind="error" className="mt-2">{sourceError}</Alert>}
-              {(displayedVersionControl || versionMessage) && (
-                <VersionControlSummary state={displayedVersionControl} message={versionMessage} />
-              )}
+              <Btn variant="outline" size="sm" icon="plus" onClick={newRequest}>
+                新規
+              </Btn>
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {draft.code_context.working_directory && treeByPath[draft.code_context.working_directory] ? (
-                <SourceTree
-                  root={draft.code_context.working_directory}
-                  treeByPath={treeByPath}
-                  openDirs={openDirs}
-                  activeFile={sourcePath}
-                  onToggleDir={(path) => void toggleDir(path)}
-                  onOpenFile={(path) => void openFile(path)}
-                />
-              ) : (
-                <Empty
-                  dense
-                  title="ソース一覧はまだ読み込まれていません"
-                  description="作業ディレクトリを入力して「読込」を押してください。"
-                />
-              )}
-            </div>
-          </>
-        )}
-      </aside>
-      <ResizeHandle
-        axis="x"
-        label="依頼一覧の幅を調整"
-        onPointerDown={(event) => beginResize("requestList", event)}
-        onAdjust={(delta) => adjustResize("requestList", delta)}
-      />
-
-      <main className="flex min-w-0 flex-col overflow-hidden">
-        <section className="flex min-w-0 flex-col overflow-hidden">
-          <div className="border-b border-[var(--color-border)] p-3">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div>
-                <Label>コーディング依頼名</Label>
-                <Input value={title} placeholder="例: TODOリスト実装" onChange={(event) => setTitle(event.target.value)} />
-              </div>
-              <div>
-                <Label>実行チーム</Label>
-                <Select
-                  value={selectedTeamTemplateId}
-                  onChange={(event) => applyTemplate(event.target.value)}
+            <div
+              role="tablist"
+              style={{
+                display: "flex",
+                border: "1px solid var(--border)",
+                borderRadius: 3,
+                background: "var(--surface)",
+                overflow: "hidden",
+              }}
+            >
+              {(["requests", "tree"] as const).map((tab, i) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={leftTab === tab}
+                  onClick={() => setLeftTab(tab)}
+                  className="mono"
+                  style={{
+                    flex: 1,
+                    padding: "5px 8px",
+                    fontSize: 11,
+                    letterSpacing: "0.04em",
+                    background: leftTab === tab ? "var(--ink)" : "transparent",
+                    color: leftTab === tab ? "var(--paper)" : "var(--ink-2)",
+                    borderRight: i === 0 ? "1px solid var(--border)" : "none",
+                  }}
                 >
-                  <option value="">現在のエージェント構成</option>
-                  <optgroup label="Built-in">
-                    {selectableBuiltInTeams.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {teamLabel(template)}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Custom">
-                    {selectableCustomTeams.length === 0 && (
-                      <option value="__no_custom_team__" disabled>
-                        Customチームはまだありません
-                      </option>
-                    )}
-                    {selectableCustomTeams.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {teamLabel(template)}
-                      </option>
-                    ))}
-                  </optgroup>
-                </Select>
-              </div>
+                  {tab === "requests" ? "依頼一覧" : "ソース"}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div
-            className="grid min-h-0 flex-1 overflow-hidden"
-            style={{ gridTemplateRows: `${layout.formPane}px 6px minmax(220px,1fr)` }}
-          >
-            <div className="overflow-y-auto border-b border-[var(--color-border)] p-3">
-              <div className="grid gap-3 xl:grid-cols-2">
-                <div>
-                  <Label>依頼内容</Label>
-                  <Textarea
-                    rows={8}
-                    className="font-sans"
-                    value={draft.source_text}
-                    placeholder="何を作る・直すかを書いてください"
-                    onChange={(event) => updateDraft({ source_text: event.target.value })}
+          {leftTab === "requests" ? (
+            <>
+              <div style={{ borderBottom: "1px solid var(--border)", padding: 12 }}>
+                <Btn
+                  variant="outline"
+                  size="sm"
+                  icon="x"
+                  disabled={!activeId}
+                  onClick={() => void removeActive()}
+                  style={{ width: "100%", justifyContent: "center", color: activeId ? "var(--danger)" : "var(--ink-3)" }}
+                >
+                  選択中の依頼を削除
+                </Btn>
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+                {codingRequests.length === 0 ? (
+                  <EmptyState
+                    title="コーディング依頼はまだありません"
+                    description="右上の「新規」から作成してください。"
+                  />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {codingRequests.map((item) => {
+                      const sel = activeId === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => selectRecord(item)}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: 10,
+                            borderRadius: 3,
+                            border: "1px solid var(--border)",
+                            borderLeft: sel ? "2px solid var(--accent)" : "1px solid var(--border)",
+                            background: sel ? "var(--surface)" : "var(--surface-2)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                fontSize: 12,
+                                fontWeight: sel ? 600 : 500,
+                                color: "var(--ink)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.title}
+                            </span>
+                            <Pill tone={statusTone(item.status)}>{STATUS_LABEL[item.status]}</Pill>
+                          </div>
+                          <div
+                            className="mono"
+                            style={{
+                              marginTop: 6,
+                              fontSize: 10,
+                              color: "var(--ink-3)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.request.code_context.working_directory || "working_directory 未設定"}
+                          </div>
+                          <div className="mono" style={{ marginTop: 2, fontSize: 10, color: "var(--ink-4)" }}>
+                            {new Date(item.updated_at).toLocaleString("ja-JP")}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ borderBottom: "1px solid var(--border)", padding: 12 }}>
+                <WorkspaceControl
+                  value={draft.code_context.working_directory}
+                  onChange={(working_directory) => updateCodeContext({ working_directory })}
+                  onPick={() => void pickDirectory()}
+                  onLoad={() => void loadTree()}
+                />
+                {sourceError && <InlineAlert tone="danger" spaced>{sourceError}</InlineAlert>}
+                {(displayedVersionControl || versionMessage) && (
+                  <VersionControlSummary state={displayedVersionControl} message={versionMessage} />
+                )}
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+                {draft.code_context.working_directory && treeByPath[draft.code_context.working_directory] ? (
+                  <SourceTree
+                    root={draft.code_context.working_directory}
+                    treeByPath={treeByPath}
+                    openDirs={openDirs}
+                    activeFile={sourcePath}
+                    onToggleDir={(path) => void toggleDir(path)}
+                    onOpenFile={(path) => void openFile(path)}
+                  />
+                ) : (
+                  <EmptyState
+                    title="ソース一覧はまだ読み込まれていません"
+                    description="作業ディレクトリを入力して「読込」を押してください。"
+                  />
+                )}
+              </div>
+            </>
+          )}
+        </aside>
+        <ResizeHandle
+          axis="x"
+          label="依頼一覧の幅を調整"
+          onPointerDown={(event) => beginResize("requestList", event)}
+          onAdjust={(delta) => adjustResize("requestList", delta)}
+        />
+
+        {/* CENTER — request form + source preview */}
+        <main style={{ display: "flex", minWidth: 0, flexDirection: "column", overflow: "hidden" }}>
+          <section style={{ display: "flex", minWidth: 0, flexDirection: "column", overflow: "hidden", flex: 1 }}>
+            <div
+              style={{
+                display: "grid",
+                minHeight: 0,
+                flex: 1,
+                overflow: "hidden",
+                gridTemplateRows: `${layout.formPane}px 6px minmax(220px,1fr)`,
+              }}
+            >
+              <div style={{ overflowY: "auto", borderBottom: "1px solid var(--border)", padding: 16 }}>
+                {/* Workspace row — full width, required to run (FIX A) */}
+                <div
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 4,
+                    background: "var(--surface-2)",
+                    padding: 12,
+                    marginBottom: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Icon name="doc" size={13} color="var(--accent-deep)" />
+                    <span className="mono" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--ink)" }}>
+                      ワークスペース
+                    </span>
+                    <Pill tone={draft.code_context.working_directory.trim() ? "ok" : "warn"}>
+                      {draft.code_context.working_directory.trim() ? "ready" : "required"}
+                    </Pill>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ fontSize: 11, color: "var(--ink-3)" }}>実行には working_directory が必要です。</span>
+                  </div>
+                  <WorkspaceControl
+                    value={draft.code_context.working_directory}
+                    onChange={(working_directory) => updateCodeContext({ working_directory })}
+                    onPick={() => void pickDirectory()}
+                    onLoad={() => void loadTree()}
+                  />
+                  {(displayedVersionControl || versionMessage) && (
+                    <VersionControlSummary state={displayedVersionControl} message={versionMessage} />
+                  )}
+                </div>
+
+                {/* Name + team row */}
+                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", marginBottom: 14 }}>
+                  <Field label="コーディング依頼名">
+                    <input
+                      value={title}
+                      placeholder="例: TODOリスト実装"
+                      onChange={(event) => setTitle(event.target.value)}
+                      style={inputStyle()}
+                    />
+                  </Field>
+                  <Field label="実行チーム">
+                    <select
+                      value={selectedTeamTemplateId}
+                      onChange={(event) => applyTemplate(event.target.value)}
+                      className="mono"
+                      style={selectStyle()}
+                    >
+                      <option value="">現在のエージェント構成</option>
+                      <optgroup label="Built-in">
+                        {selectableBuiltInTeams.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {teamLabel(template)}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Custom">
+                        {selectableCustomTeams.length === 0 && (
+                          <option value="__no_custom_team__" disabled>
+                            Customチームはまだありません
+                          </option>
+                        )}
+                        {selectableCustomTeams.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {teamLabel(template)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </Field>
+                </div>
+
+                {/* Balanced two-column body (FIX B) */}
+                <div style={{ display: "grid", gap: 14, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", alignItems: "start" }}>
+                  <Field label="依頼内容" required>
+                    <textarea
+                      rows={14}
+                      value={draft.source_text}
+                      placeholder="何を作る・直すかを書いてください"
+                      onChange={(event) => updateDraft({ source_text: event.target.value })}
+                      style={textareaStyle()}
+                    />
+                  </Field>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <Field label="対象ファイル">
+                      <textarea
+                        rows={4}
+                        value={draft.code_context.target_paths.join("\n")}
+                        placeholder="クリックしたソースは自動で追加されます"
+                        onChange={(event) =>
+                          updateCodeContext({
+                            target_paths: event.target.value
+                              .split(/\r?\n|,/)
+                              .map((item) => item.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                        className="mono"
+                        style={{ ...textareaStyle(), fontFamily: "var(--strand-font-mono)" }}
+                      />
+                    </Field>
+                    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+                      <Field label="テストコマンド">
+                        <input
+                          value={draft.code_context.test_command}
+                          placeholder="npm run build"
+                          onChange={(event) => updateCodeContext({ test_command: event.target.value })}
+                          className="mono"
+                          style={{ ...inputStyle(), fontFamily: "var(--strand-font-mono)" }}
+                        />
+                      </Field>
+                      <Field label="技術スタック">
+                        <input
+                          value={draft.code_context.tech_stack}
+                          placeholder="Swift / React / FastAPI"
+                          onChange={(event) => updateCodeContext({ tech_stack: event.target.value })}
+                          style={inputStyle()}
+                        />
+                      </Field>
+                    </div>
+                    <Field label="受け入れ条件">
+                      <textarea
+                        rows={4}
+                        value={draft.code_context.acceptance_criteria}
+                        placeholder="完了条件、避けたい変更、確認観点"
+                        onChange={(event) => updateCodeContext({ acceptance_criteria: event.target.value })}
+                        style={textareaStyle()}
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Run / save / reset */}
+                <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+                  {run.status === "running" ? (
+                    <Btn
+                      variant="solid"
+                      onClick={stopRun}
+                      style={{ flex: 1, justifyContent: "center", background: "var(--danger)", borderColor: "var(--danger)", color: "white" }}
+                    >
+                      <Square style={{ width: 14, height: 14 }} />
+                      停止
+                    </Btn>
+                  ) : (
+                    <Btn
+                      variant="solid"
+                      tone="accent"
+                      disabled={!canRun}
+                      onClick={() => void runCoding()}
+                      style={{ flex: 1, justifyContent: "center", opacity: canRun ? 1 : 0.5 }}
+                    >
+                      <Play style={{ width: 14, height: 14 }} />
+                      この依頼を実行
+                    </Btn>
+                  )}
+                  <Btn variant="outline" onClick={() => void saveDraft()}>
+                    保存
+                  </Btn>
+                  <Btn variant="outline" onClick={resetRun} style={{ width: 36, padding: 0, justifyContent: "center" }}>
+                    <RefreshCcw style={{ width: 14, height: 14 }} />
+                  </Btn>
+                </div>
+
+                {/* Knowledge picker (inline strand) */}
+                <div style={{ marginTop: 14 }}>
+                  <KnowledgeResources
+                    selected={draft.knowledge_context ?? []}
+                    onChange={(knowledge_context) => updateDraft({ knowledge_context })}
                   />
                 </div>
-                <div className="space-y-3">
-                  <div>
-                    <Label>対象ファイル</Label>
-                    <Textarea
-                      rows={3}
-                      value={draft.code_context.target_paths.join("\n")}
-                      placeholder="クリックしたソースは自動で追加されます"
-                      onChange={(event) =>
-                        updateCodeContext({
-                          target_paths: event.target.value
-                            .split(/\r?\n|,/)
-                            .map((item) => item.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-3 xl:grid-cols-2">
+
+                {/* Feature addition */}
+                <div
+                  style={{
+                    marginTop: 14,
+                    border: "1px solid var(--border)",
+                    borderRadius: 4,
+                    background: "var(--surface-2)",
+                    padding: 12,
+                  }}
+                >
+                  <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div>
-                      <Label>テストコマンド</Label>
-                      <Input
-                        value={draft.code_context.test_command}
-                        placeholder="npm run build"
-                        onChange={(event) => updateCodeContext({ test_command: event.target.value })}
-                      />
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>追加機能</div>
+                      <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
+                        選択中の依頼と直近結果を前提に、続きの実装を走らせます。
+                      </div>
                     </div>
-                    <div>
-                      <Label>技術スタック</Label>
-                      <Input
-                        value={draft.code_context.tech_stack}
-                        placeholder="Swift / React / FastAPI"
-                        onChange={(event) => updateCodeContext({ tech_stack: event.target.value })}
-                      />
-                    </div>
+                    <Pill tone="neutral">{selectedRecord?.versions?.length ?? 0} history</Pill>
                   </div>
-                  <div>
-                    <Label>受け入れ条件</Label>
-                    <Textarea
-                      rows={3}
-                      className="font-sans"
-                      value={draft.code_context.acceptance_criteria}
-                      placeholder="完了条件、避けたい変更、確認観点"
-                      onChange={(event) => updateCodeContext({ acceptance_criteria: event.target.value })}
-                    />
+                  <textarea
+                    rows={3}
+                    value={featureRequest}
+                    placeholder="例: TODOに期限と完了フィルタを追加する"
+                    onChange={(event) => setFeatureRequest(event.target.value)}
+                    style={textareaStyle()}
+                  />
+                  <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                    <Btn
+                      variant="outline"
+                      disabled={!activeId || !featureRequest.trim() || run.status === "running" || !canRun}
+                      onClick={() => void runFeatureAddition()}
+                      style={{ flex: 1, justifyContent: "center" }}
+                    >
+                      <Play style={{ width: 14, height: 14 }} />
+                      追加機能として実行
+                    </Btn>
+                    <Btn variant="ghost" disabled={!featureRequest} onClick={() => setFeatureRequest("")}>
+                      クリア
+                    </Btn>
                   </div>
                 </div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                {run.status === "running" ? (
-                  <Button variant="danger" className="flex-1" onClick={stopRun}>
-                    <Square className="h-4 w-4" />
-                    停止
-                  </Button>
-                ) : (
-                  <Button className="flex-1" disabled={!canRun} onClick={() => void runCoding()}>
-                    <Play className="h-4 w-4" />
-                    この依頼を実行
-                  </Button>
+                {saveMessage && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: "var(--ink-3)" }}>{saveMessage}</div>
                 )}
-                <Button variant="outline" onClick={() => void saveDraft()}>
-                  保存
-                </Button>
-                <Button variant="ghost" onClick={resetRun}>
-                  <RefreshCcw className="h-4 w-4" />
-                </Button>
               </div>
-              <div className="mt-3">
-                <KnowledgePicker
-                  selected={draft.knowledge_context ?? []}
-                  onChange={(knowledge_context) => updateDraft({ knowledge_context })}
-                />
-              </div>
-              <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-xs font-semibold text-[var(--color-fg)]">追加機能</div>
-                    <div className="text-[11px] text-[var(--color-fg-muted)]">
-                      選択中の依頼と直近結果を前提に、続きの実装を走らせます。
-                    </div>
-                  </div>
-                  <span className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-fg-muted)]">
-                    {selectedRecord?.versions?.length ?? 0} history
+              <ResizeHandle
+                axis="y"
+                label="依頼フォームとソース表示の高さを調整"
+                onPointerDown={(event) => beginResize("formPane", event)}
+                onAdjust={(delta) => adjustResize("formPane", delta)}
+              />
+
+              {/* Source preview */}
+              <div style={{ display: "flex", minHeight: 0, flexDirection: "column", overflow: "hidden" }}>
+                <div
+                  className="mono"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    borderBottom: "1px solid var(--border)",
+                    background: "var(--surface-2)",
+                    padding: "8px 12px",
+                    fontSize: 11,
+                    color: "var(--ink-2)",
+                  }}
+                >
+                  <FileCode2 style={{ width: 14, height: 14 }} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {sourcePath || "ソースコード"}
                   </span>
                 </div>
-                <Textarea
-                  rows={3}
-                  className="font-sans"
-                  value={featureRequest}
-                  placeholder="例: TODOに期限と完了フィルタを追加する"
-                  onChange={(event) => setFeatureRequest(event.target.value)}
-                />
-                <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={!activeId || !featureRequest.trim() || run.status === "running" || !canRun}
-                    onClick={() => void runFeatureAddition()}
-                  >
-                    <Play className="h-4 w-4" />
-                    追加機能として実行
-                  </Button>
-                  <Button variant="ghost" disabled={!featureRequest} onClick={() => setFeatureRequest("")}>
-                    クリア
-                  </Button>
+                <div style={{ flex: 1, overflow: "auto", background: "var(--paper)", padding: 14 }}>
+                  {sourceError ? (
+                    <InlineAlert tone="danger" spaced>{sourceError}</InlineAlert>
+                  ) : sourceText ? (
+                    <pre
+                      className="mono"
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        fontSize: 11,
+                        lineHeight: 1.6,
+                        color: "var(--ink)",
+                        margin: 0,
+                      }}
+                    >
+                      {sourceText}
+                    </pre>
+                  ) : (
+                    <div style={{ display: "grid", placeItems: "center", height: "100%", fontSize: 12, color: "var(--ink-3)" }}>
+                      左のソース一覧からファイルを選んでください。
+                    </div>
+                  )}
                 </div>
               </div>
-              {saveMessage && <div className="mt-2 text-xs text-[var(--color-fg-muted)]">{saveMessage}</div>}
             </div>
-            <ResizeHandle
-              axis="y"
-              label="依頼フォームとソース表示の高さを調整"
-              onPointerDown={(event) => beginResize("formPane", event)}
-              onAdjust={(delta) => adjustResize("formPane", delta)}
-            />
+          </section>
+        </main>
+        <ResizeHandle
+          axis="x"
+          label="作業状況の幅を調整"
+          onPointerDown={(event) => beginResize("statusPanel", event)}
+          onAdjust={(delta) => adjustResize("statusPanel", delta)}
+        />
 
-            <div className="flex min-h-0 flex-col overflow-hidden">
-              <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-fg-muted)]">
-                <FileCode2 className="h-4 w-4" />
-                <span className="truncate">{sourcePath || "ソースコード"}</span>
+        {/* RIGHT — status panel */}
+        <aside
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flexDirection: "column",
+            borderLeft: "1px solid var(--border)",
+            background: "var(--paper)",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 8,
+              background: "var(--paper-2)",
+            }}
+          >
+            <div>
+              <div className="mono" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--ink)", textTransform: "uppercase" }}>
+                作業状況
               </div>
-              <div className="flex-1 overflow-auto bg-[var(--color-bg)] p-4">
-                {sourceError ? (
-                  <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
-                    {sourceError}
-                  </div>
-                ) : sourceText ? (
-                  <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--color-fg)]">
-                    {sourceText}
-                  </pre>
-                ) : (
-                  <div className="grid h-full place-items-center text-sm text-[var(--color-fg-subtle)]">
-                    左のソース一覧からファイルを選んでください。
-                  </div>
-                )}
+              <div className="mono" style={{ marginTop: 4, fontSize: 10, color: "var(--ink-3)" }}>
+                {run.status} · {formatDuration(run.startedAt, run.endedAt)}
               </div>
             </div>
+            {run.status === "running" && <Loader2 style={{ width: 16, height: 16, color: "var(--ok)" }} className="spin" />}
           </div>
-        </section>
-      </main>
-      <ResizeHandle
-        axis="x"
-        label="作業状況の幅を調整"
-        onPointerDown={(event) => beginResize("statusPanel", event)}
-        onAdjust={(delta) => adjustResize("statusPanel", delta)}
-      />
-
-      <aside className="flex min-w-0 flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)]">
-        <CardHeader>
-          <div>
-            <CardTitle>作業状況</CardTitle>
-            <div className="mt-1 text-xs text-[var(--color-fg-muted)]">
-              {run.status} · {formatDuration(run.startedAt, run.endedAt)}
+          <div style={{ borderBottom: "1px solid var(--border)", padding: "12px 14px" }}>
+            <div className="mono" style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, color: "var(--ink-3)" }}>
+              <span>{completedTurnCount}/{totalTurnCount} turns</span>
+              <span>{progressPercent}%</span>
             </div>
-          </div>
-          {run.status === "running" && <Loader2 className="h-4 w-4 animate-spin text-sky-300" />}
-        </CardHeader>
-        <div className="border-b border-[var(--color-border)] px-3 pb-3">
-          <div className="mb-2 flex items-center justify-between text-xs text-[var(--color-fg-muted)]">
-            <span>{completedTurnCount}/{totalTurnCount} turns</span>
-            <span>{progressPercent}%</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-[var(--color-surface-3)]">
-            <div className="h-full rounded-full bg-[var(--color-accent)] transition-all" style={{ width: `${progressPercent}%` }} />
-          </div>
-          <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-xs text-[var(--color-fg-muted)]">
-            {displayedError
-              ? `停止: ${displayedError}`
-              : run.status === "completed"
-                ? "完了しました。"
-                : activeTurnEvent
-                  ? `現在: ${activeTurnEvent.agent_name} が実行中`
-                  : "実行待ちです。"}
-          </div>
-        </div>
-        <div className="grid grid-cols-4 gap-1 border-b border-[var(--color-border)] p-2 text-xs">
-          {(["agents", "diff", "logs", "chat"] as ResultTab[]).map((tab) => (
-            <button
-              key={tab}
-              className={clsx(
-                "rounded px-2 py-2 font-semibold",
-                resultTab === tab
-                  ? "bg-[var(--color-accent)] text-white"
-                  : "text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-2)]",
-              )}
-              onClick={() => setResultTab(tab)}
+            <div style={{ height: 6, overflow: "hidden", borderRadius: 99, background: "var(--surface-sunk)" }}>
+              <div style={{ height: "100%", borderRadius: 99, background: "var(--accent)", width: `${progressPercent}%`, transition: "width 0.2s" }} />
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                borderRadius: 3,
+                border: "1px solid var(--border)",
+                background: "var(--surface-2)",
+                padding: 8,
+                fontSize: 11,
+                color: "var(--ink-2)",
+              }}
             >
-              {tab === "agents" ? "Agents" : tab === "diff" ? "Code" : tab === "logs" ? "Logs" : "CEO"}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1 overflow-y-auto p-3">
-          {displayedError && (
-            <div className="mb-3 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs leading-relaxed text-red-200">
-              {displayedError}
+              {displayedError
+                ? `停止: ${displayedError}`
+                : run.status === "completed"
+                  ? "完了しました。"
+                  : activeTurnEvent
+                    ? `現在: ${activeTurnEvent.agent_name} が実行中`
+                    : "実行待ちです。"}
             </div>
-          )}
-          {resultTab === "agents" && (
-            <div className="space-y-3">
-              <ProviderHealthBar providers={draft.agents.map((a) => a.provider)} />
-              <AgentWorkList agents={draft.agents} turns={displayedTurns} events={displayedEvents} />
-            </div>
-          )}
-          {resultTab === "diff" && (
-            <div className="space-y-3">
-              <Info label="最終出力" value={displayedFinal || "まだ結果はありません。"} icon={<ListChecks className="h-4 w-4" />} />
-              <Info label="diff / file changes" value={displayedDiff || "まだファイル変更はありません。"} icon={<Code2 className="h-4 w-4" />} mono />
-            </div>
-          )}
-          {resultTab === "logs" && (
-            <div className="space-y-3">
-              <RunLogView events={displayedEvents} turns={displayedTurns} error={displayedError} />
-              <ServerLogPanel />
-            </div>
-          )}
-          {resultTab === "chat" && (
-            <CodingCEOChat
-              agent={ceoAgent}
-              session={ceoChatSession}
-              message={chatMessage}
-              status={chatStatus}
-              sending={chatSending}
-              imageAttachments={chatImageAttachments}
-              onMessageChange={setChatMessage}
-              onImageAttachmentsChange={setChatImageAttachments}
-              onStatusChange={setChatStatus}
-              onSend={() => void sendCEOChat()}
-            />
-          )}
-        </div>
-      </aside>
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 4,
+              borderBottom: "1px solid var(--border)",
+              padding: 8,
+            }}
+          >
+            {(["agents", "diff", "logs", "chat"] as ResultTab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setResultTab(tab)}
+                className="mono"
+                style={{
+                  borderRadius: 3,
+                  padding: "7px 8px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                  background: resultTab === tab ? "var(--accent)" : "transparent",
+                  color: resultTab === tab ? "var(--accent-ink)" : "var(--ink-2)",
+                }}
+              >
+                {tab === "agents" ? "Agents" : tab === "diff" ? "Code" : tab === "logs" ? "Logs" : "CEO"}
+              </button>
+            ))}
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+            {displayedError && <InlineAlert tone="danger" spaced>{displayedError}</InlineAlert>}
+            {resultTab === "agents" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <ProviderHealthStrip providers={draft.agents.map((a) => a.provider)} />
+                <AgentWorkList agents={draft.agents} turns={displayedTurns} events={displayedEvents} />
+              </div>
+            )}
+            {resultTab === "diff" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <Info label="最終出力" value={displayedFinal || "まだ結果はありません。"} icon={<ListChecks style={{ width: 14, height: 14 }} />} />
+                <Info label="diff / file changes" value={displayedDiff || "まだファイル変更はありません。"} icon={<Code2 style={{ width: 14, height: 14 }} />} mono />
+              </div>
+            )}
+            {resultTab === "logs" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <RunLogView events={displayedEvents} turns={displayedTurns} error={displayedError} />
+                <ServerLogPanel />
+              </div>
+            )}
+            {resultTab === "chat" && (
+              <CodingCEOChat
+                agent={ceoAgent}
+                session={ceoChatSession}
+                message={chatMessage}
+                status={chatStatus}
+                sending={chatSending}
+                imageAttachments={chatImageAttachments}
+                onMessageChange={setChatMessage}
+                onImageAttachmentsChange={setChatImageAttachments}
+                onStatusChange={setChatStatus}
+                onSend={() => void sendCEOChat()}
+              />
+            )}
+          </div>
+        </aside>
+      </div>
+    </StrandShell>
+  );
+}
+
+// ---------- Workspace control (shared by main form + source tab) ----------
+function WorkspaceControl({
+  value,
+  onChange,
+  onPick,
+  onLoad,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onPick: () => void;
+  onLoad: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <Field label="作業ディレクトリ" required>
+        <input
+          value={value}
+          placeholder="/path/to/repo"
+          onChange={(event) => onChange(event.target.value)}
+          className="mono"
+          style={{ ...inputStyle(), fontFamily: "var(--strand-font-mono)" }}
+        />
+      </Field>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn variant="outline" size="sm" icon="doc" onClick={onPick} style={{ flex: 1, justifyContent: "center" }}>
+          フォルダを選択
+        </Btn>
+        <Btn variant="outline" size="sm" icon="arrow" onClick={onLoad} style={{ flex: 1, justifyContent: "center" }}>
+          読込
+        </Btn>
+      </div>
     </div>
+  );
+}
+
+// ---------- Small inline strand helpers ----------
+
+// ---------- Inline strand Provider Health strip (replaces ProviderHealthBar) ----------
+function ProviderHealthStrip({ providers }: { providers: ProviderKind[] }) {
+  const uniqueProviders = useMemo(() => Array.from(new Set(providers)).sort(), [providers]);
+  const [results, setResults] = useState<ProviderHealth[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
+
+  const refresh = useMemo(
+    () => async () => {
+      if (uniqueProviders.length === 0) {
+        setResults([]);
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const res = await api.getProvidersHealth(uniqueProviders);
+        setResults(res.providers);
+        setLastCheckedAt(Date.now());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [uniqueProviders],
+  );
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  if (uniqueProviders.length === 0) return null;
+  const dead = results.filter((r) => !r.alive);
+  const alive = results.length - dead.length;
+
+  return (
+    <Panel
+      title={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Dot tone={dead.length === 0 ? "ok" : "warn"} />
+          Provider Health
+          <span style={{ color: "var(--ink-3)", textTransform: "none", letterSpacing: 0 }}>
+            {alive}/{results.length} alive
+          </span>
+        </span>
+      }
+      action={
+        <Btn variant="ghost" size="sm" onClick={() => void refresh()} disabled={loading}>
+          <RefreshCcw style={{ width: 12, height: 12 }} className={loading ? "spin" : undefined} />
+          {loading ? "確認中" : "再チェック"}
+        </Btn>
+      }
+      padded={false}
+    >
+      <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+        {error && <InlineAlert tone="danger" spaced>{error}</InlineAlert>}
+        {lastCheckedAt && !error && (
+          <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>
+            last check: {new Date(lastCheckedAt).toLocaleTimeString()}
+          </div>
+        )}
+        {results.map((row) => {
+          const label = PROVIDER_LABEL[row.provider] ?? row.provider;
+          return (
+            <div
+              key={row.provider}
+              style={{
+                borderRadius: 3,
+                border: `1px solid ${row.alive ? "var(--border)" : "var(--warn)"}`,
+                background: row.alive ? "var(--surface-2)" : "var(--warn-bg)",
+                padding: "6px 8px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Dot tone={row.alive ? "ok" : "danger"} size={8} />
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--ink)" }}>{label}</span>
+                {row.endpoint && (
+                  <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{row.endpoint}</span>
+                )}
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: 10, color: row.alive ? "var(--ink-3)" : "var(--warn)" }}>{row.detail}</span>
+              </div>
+              {!row.alive && row.start_command && (
+                <div
+                  className="mono"
+                  style={{
+                    marginTop: 6,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 6,
+                    borderRadius: 3,
+                    border: "1px solid var(--border)",
+                    background: "var(--paper)",
+                    padding: "6px 8px",
+                    fontSize: 10,
+                    color: "var(--ink)",
+                  }}
+                >
+                  <Icon name="terminal" size={11} color="var(--ink-3)" />
+                  <code style={{ wordBreak: "break-all", flex: 1 }}>{row.start_command}</code>
+                  <button
+                    type="button"
+                    style={{ fontSize: 10, color: "var(--ink-3)" }}
+                    onClick={() => {
+                      if (row.start_command) void navigator.clipboard.writeText(row.start_command);
+                    }}
+                  >
+                    copy
+                  </button>
+                </div>
+              )}
+              {!row.alive && row.docs_url && (
+                <div style={{ marginTop: 4 }}>
+                  <a href={row.docs_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "var(--accent-deep)" }}>
+                    {row.docs_url}
+                  </a>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+// ---------- Inline strand Knowledge resources (replaces KnowledgePicker) ----------
+const KNOWLEDGE_KIND_OPTIONS: KnowledgeKind[] = ["markdown", "text", "image", "figma", "mcp", "link", "note"];
+const knowledgeUid = () => Math.random().toString(36).slice(2, 10);
+const newKnowledgeDraft = (): KnowledgeResource => ({
+  id: `knowledge_${knowledgeUid()}`,
+  title: "",
+  kind: "markdown",
+  content: "",
+  source: "",
+  content_type: "text/plain",
+  tags: [],
+});
+
+function KnowledgeResources({
+  selected,
+  onChange,
+}: {
+  selected: KnowledgeResource[];
+  onChange: (items: KnowledgeResource[]) => void;
+}) {
+  const knowledge = useApp((state) => state.knowledge);
+  const loadKnowledge = useApp((state) => state.loadKnowledge);
+  const saveKnowledge = useApp((state) => state.saveKnowledge);
+  const deleteKnowledge = useApp((state) => state.deleteKnowledge);
+  const [path, setPath] = useState("");
+  const [status, setStatus] = useState("");
+  const [draft, setDraft] = useState<KnowledgeResource>(newKnowledgeDraft);
+
+  useEffect(() => {
+    void loadKnowledge();
+  }, [loadKnowledge]);
+
+  const selectedIds = useMemo(() => new Set(selected.map((item) => item.id)), [selected]);
+
+  const toggle = (item: KnowledgeResource) => {
+    onChange(selectedIds.has(item.id) ? selected.filter((entry) => entry.id !== item.id) : [...selected, item]);
+  };
+
+  const importLocal = async () => {
+    if (!path.trim()) return;
+    try {
+      const item = await api.importLocalKnowledge(path.trim());
+      await loadKnowledge();
+      onChange(selectedIds.has(item.id) ? selected : [...selected, item]);
+      setPath("");
+      setStatus(`${item.title} を取り込みました。`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const saveManual = async () => {
+    if (!draft.title.trim()) {
+      setStatus("title を入力してください。");
+      return;
+    }
+    try {
+      const item = await saveKnowledge({
+        ...draft,
+        id: draft.id.trim() || `knowledge_${knowledgeUid()}`,
+        title: draft.title.trim(),
+      });
+      onChange(selectedIds.has(item.id) ? selected : [...selected, item]);
+      setDraft(newKnowledgeDraft());
+      setStatus(`${item.title} を保存して添付しました。`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const remove = async (id: string) => {
+    await deleteKnowledge(id);
+    onChange(selected.filter((item) => item.id !== id));
+  };
+
+  return (
+    <Panel
+      title={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Icon name="inbox" size={12} color="var(--accent-deep)" />
+          学習用リソース
+        </span>
+      }
+      action={<Pill tone="neutral">{selected.length} selected</Pill>}
+      padded={false}
+    >
+      <div style={{ padding: 12 }}>
+        <div style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 10 }}>
+          MD、画像、Figma/FIG、MCPメモをこのワークのコンテキストとして添付します。
+        </div>
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", alignItems: "start" }}>
+          {/* Existing resources + import-local */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) auto" }}>
+              <input
+                value={path}
+                placeholder="/path/to/README.md / image.png / mcp.json"
+                onChange={(event) => setPath(event.target.value)}
+                className="mono"
+                style={{ ...inputStyle(), fontFamily: "var(--strand-font-mono)" }}
+              />
+              <Btn variant="outline" size="sm" icon="plus" disabled={!path.trim()} onClick={() => void importLocal()}>
+                取込
+              </Btn>
+            </div>
+            <div
+              style={{
+                maxHeight: 200,
+                overflowY: "auto",
+                borderRadius: 3,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                padding: 6,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              {knowledge.length === 0 && (
+                <div style={{ padding: 12, textAlign: "center", fontSize: 11, color: "var(--ink-3)" }}>
+                  まだリソースがありません。ローカルファイルを取り込むか、右側でメモを作成してください。
+                </div>
+              )}
+              {knowledge.map((item) => {
+                const sel = selectedIds.has(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 3,
+                      border: sel ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      background: sel ? "var(--accent-soft)" : "var(--surface-2)",
+                      padding: "6px 8px",
+                    }}
+                  >
+                    <button type="button" onClick={() => toggle(item)} style={{ flex: 1, minWidth: 0, textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
+                      <Dot tone={sel ? "accent" : "neutral"} size={6} />
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.title}
+                      </span>
+                      <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{item.kind}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void remove(item.id)}
+                      style={{ width: 22, height: 22, display: "grid", placeItems: "center", color: "var(--ink-3)", borderRadius: 3, border: "1px solid var(--border)" }}
+                    >
+                      <X style={{ width: 12, height: 12 }} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick memo */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0,1fr) 120px" }}>
+              <Field label="title">
+                <input
+                  value={draft.title}
+                  placeholder="例: 社内コーディング規約"
+                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                  style={inputStyle()}
+                />
+              </Field>
+              <Field label="kind">
+                <select
+                  value={draft.kind}
+                  onChange={(event) => setDraft((current) => ({ ...current, kind: event.target.value as KnowledgeKind }))}
+                  className="mono"
+                  style={selectStyle()}
+                >
+                  {KNOWLEDGE_KIND_OPTIONS.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {kind}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <textarea
+              rows={5}
+              value={draft.content}
+              placeholder="MD本文、MCPメモ、Figma URL、補足メモなど"
+              onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
+              style={textareaStyle()}
+            />
+            <Btn variant="outline" size="sm" icon="plus" disabled={!draft.title.trim()} onClick={() => void saveManual()}>
+              保存して添付
+            </Btn>
+          </div>
+        </div>
+        {status && <div style={{ marginTop: 8, fontSize: 11, color: "var(--ink-3)" }}>{status}</div>}
+      </div>
+    </Panel>
   );
 }
 
@@ -1053,7 +1592,7 @@ function SourceTree({
 }) {
   const items = treeByPath[root] ?? [];
   return (
-    <div className="space-y-0.5 text-xs">
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {items.map((item) => (
         <SourceTreeNode
           key={item.path}
@@ -1078,17 +1617,28 @@ function VersionControlSummary({
   message: string;
 }) {
   return (
-    <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-[11px] text-[var(--color-fg-muted)]">
-      <div className="mb-1 font-semibold text-[var(--color-fg)]">Git / worktree</div>
-      {message && <div className="mb-1 text-sky-200">{message}</div>}
+    <div
+      className="mono"
+      style={{
+        marginTop: 8,
+        borderRadius: 3,
+        border: "1px solid var(--border)",
+        background: "var(--surface-2)",
+        padding: 8,
+        fontSize: 10,
+        color: "var(--ink-3)",
+      }}
+    >
+      <div style={{ marginBottom: 4, fontWeight: 600, color: "var(--ink)" }}>Git / worktree</div>
+      {message && <div style={{ marginBottom: 4, color: "var(--info)" }}>{message}</div>}
       {state ? (
-        <div className="space-y-1">
-          <div className="truncate">元repo: {state.source_working_directory}</div>
-          <div className="truncate">AI作業: {state.worktree_path}</div>
-          <div className="truncate">branch: {state.ai_branch}</div>
-          <div className="truncate">base: {state.base_branch} / {state.base_commit.slice(0, 10)}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>元repo: {state.source_working_directory}</div>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>AI作業: {state.worktree_path}</div>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>branch: {state.ai_branch}</div>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>base: {state.base_branch} / {state.base_commit.slice(0, 10)}</div>
           {state.user_dirty && (
-            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-1 text-amber-200">
+            <div style={{ borderRadius: 3, border: "1px solid var(--warn)", background: "var(--warn-bg)", color: "var(--warn)", padding: 4 }}>
               ユーザ変更 {state.user_changed_files.length}件
               {state.user_untracked_files.length ? ` / 未追跡 ${state.user_untracked_files.length}件` : ""}
             </div>
@@ -1120,28 +1670,41 @@ function SourceTreeNode({
 }) {
   const isDir = item.kind === "directory";
   const open = openDirs.has(item.path);
+  const isActive = activeFile === item.path;
   return (
     <div>
       <button
-        className={clsx(
-          "flex w-full items-center gap-1 rounded px-1.5 py-1 text-left hover:bg-[var(--color-surface-2)]",
-          activeFile === item.path && "bg-[var(--color-surface-3)] text-[var(--color-fg)]",
-        )}
-        style={{ paddingLeft: `${depth * 14 + 6}px` }}
+        style={{
+          display: "flex",
+          width: "100%",
+          alignItems: "center",
+          gap: 4,
+          borderRadius: 3,
+          padding: "5px 6px",
+          paddingLeft: depth * 14 + 6,
+          textAlign: "left",
+          fontSize: 11,
+          background: isActive ? "var(--surface)" : "transparent",
+          color: isActive ? "var(--ink)" : "var(--ink-2)",
+        }}
         onClick={() => (isDir ? onToggleDir(item.path) : onOpenFile(item.path))}
       >
         {isDir ? (
           <>
-            <ChevronRight className={clsx("h-3 w-3 transition-transform", open && "rotate-90")} />
-            {open ? <FolderOpen className="h-3.5 w-3.5 text-sky-300" /> : <Folder className="h-3.5 w-3.5 text-sky-300" />}
+            <ChevronRight style={{ width: 12, height: 12, transition: "transform 0.1s", transform: open ? "rotate(90deg)" : undefined }} />
+            {open ? (
+              <FolderOpen style={{ width: 14, height: 14, color: "var(--accent-deep)" }} />
+            ) : (
+              <Folder style={{ width: 14, height: 14, color: "var(--accent-deep)" }} />
+            )}
           </>
         ) : (
           <>
-            <span className="w-3" />
-            <FileCode2 className="h-3.5 w-3.5 text-[var(--color-fg-subtle)]" />
+            <span style={{ width: 12 }} />
+            <FileCode2 style={{ width: 14, height: 14, color: "var(--ink-3)" }} />
           </>
         )}
-        <span className="min-w-0 truncate">{item.name}</span>
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
       </button>
       {isDir && open && (treeByPath[item.path] ?? []).map((child) => (
         <SourceTreeNode
@@ -1170,7 +1733,7 @@ function AgentWorkList({
 }) {
   const enabled = agents.filter((agent) => agent.enabled !== false);
   return (
-    <div className="space-y-2">
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {enabled.map((agent) => {
         const latest = [...turns].reverse().find((turn) => turn.agent_id === agent.id);
         const agentEvents = events.filter(
@@ -1189,33 +1752,36 @@ function AgentWorkList({
             : latestStarted
               ? "実行中"
               : "待機中";
+        const statusToneValue = status === "エラー" ? "danger" : status === "完了" ? "info" : status === "実行中" ? "ok" : "neutral";
         return (
-          <div key={agent.id} className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{agent.name}</div>
-                <div className="mt-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+          <div key={agent.id} style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {agent.name}
+                </div>
+                <div className="mono" style={{ marginTop: 4, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
                   {ROLE_LABEL[agent.org_role]} · {PROVIDER_LABEL[agent.provider]}
                 </div>
               </div>
-              <span className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-fg-muted)]">
-                {status}
-              </span>
+              <Pill tone={statusToneValue}>{status}</Pill>
             </div>
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs text-[var(--color-fg-muted)]">
+            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 8, fontSize: 11, color: "var(--ink-2)" }}>
               {latest?.error ? (
-                <pre className="whitespace-pre-wrap text-red-300">{latest.error}</pre>
+                <pre style={{ whiteSpace: "pre-wrap", color: "var(--danger)", margin: 0 }}>{latest.error}</pre>
               ) : latest?.output ? (
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-sans leading-relaxed">{latest.output}</pre>
+                <pre style={{ maxHeight: 256, overflow: "auto", whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", lineHeight: 1.6, margin: 0 }}>
+                  {latest.output}
+                </pre>
               ) : (
                 "このエージェントの出力はまだありません。"
               )}
             </div>
-            <div className="mt-2 space-y-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[11px] text-[var(--color-fg-muted)]">
-              <div className="font-semibold text-[var(--color-fg)]">実行ログ</div>
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: 8, fontSize: 10, color: "var(--ink-3)" }}>
+              <div style={{ fontWeight: 600, color: "var(--ink)" }}>実行ログ</div>
               {agentEvents.length ? (
                 agentEvents.map((event, index) => (
-                  <div key={`${event.sequence ?? index}-${event.type}`} className="leading-relaxed">
+                  <div key={`${event.sequence ?? index}-${event.type}`} style={{ lineHeight: 1.5 }}>
                     {formatStreamEvent(event)}
                   </div>
                 ))
@@ -1262,42 +1828,55 @@ function ServerLogPanel() {
   }, [autoRefresh]);
 
   return (
-    <Card>
-      <CardBody className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs font-semibold text-[var(--color-fg)]">サーバーログ</div>
-          <div className="flex items-center gap-2 text-xs">
-            <label className="flex items-center gap-1 text-[var(--color-fg-muted)]">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(event) => setAutoRefresh(event.target.checked)}
-              />
-              自動更新
-            </label>
-            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
-              {loading ? "読込中" : "更新"}
-            </Button>
-          </div>
-        </div>
-        {path && (
-          <div className="text-[var(--color-fg-muted)]" style={{ fontSize: "var(--text-xs)" }}>{path}</div>
-        )}
-        {error && <Alert kind="error" title="ログ取得に失敗">{error}</Alert>}
+    <Panel
+      title="サーバーログ"
+      action={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--ink-3)", textTransform: "none", letterSpacing: 0 }}>
+            <input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />
+            自動更新
+          </label>
+          <Btn variant="ghost" size="sm" onClick={() => void load()} disabled={loading}>
+            {loading ? "読込中" : "更新"}
+          </Btn>
+        </span>
+      }
+      padded={false}
+    >
+      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        {path && <div className="mono" style={{ fontSize: 10, color: "var(--ink-3)" }}>{path}</div>}
+        {error && <InlineAlert tone="danger" spaced>{error}</InlineAlert>}
         {loading && !content ? (
-          <Skeleton variant="text" lines={6} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ height: 10, borderRadius: 2, background: "var(--surface-sunk)" }} />
+            ))}
+          </div>
         ) : content ? (
           <pre
-            className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 font-mono text-[var(--color-fg-muted)]"
-            style={{ fontSize: "var(--text-code)", lineHeight: "var(--text-code--line-height)" }}
+            className="mono"
+            style={{
+              maxHeight: 288,
+              overflow: "auto",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              borderRadius: 3,
+              border: "1px solid var(--border)",
+              background: "var(--surface-2)",
+              padding: 8,
+              fontSize: 10,
+              lineHeight: 1.5,
+              color: "var(--ink-3)",
+              margin: 0,
+            }}
           >
             {content}
           </pre>
         ) : (
-          <Empty title="ログはまだありません" description="実行を開始するとここに表示されます。" dense />
+          <EmptyState title="ログはまだありません" description="実行を開始するとここに表示されます。" />
         )}
-      </CardBody>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -1313,23 +1892,32 @@ function RunLogView({
   const completed = events.filter((event) => event.type === "turn_completed").length;
   const total = events.find((event) => event.type === "run_started")?.total_turns ?? turns.length;
   return (
-    <div className="space-y-3">
-      <Card>
-        <CardBody className="space-y-2">
-          <div className="text-xs font-semibold text-[var(--color-fg)]">時系列ログ</div>
-          <div className="grid grid-cols-2 gap-2 text-xs text-[var(--color-fg-muted)]">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <Panel title="時系列ログ" padded={false}>
+        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <InfoPill label="イベント" value={`${events.length}件`} />
             <InfoPill label="ターン" value={`${completed}/${Math.max(total, completed, 1)}`} />
           </div>
-          {error && (
-            <div className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-200">
-              {error}
-            </div>
-          )}
-          <div className="max-h-72 overflow-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2 text-xs text-[var(--color-fg-muted)]">
+          {error && <InlineAlert tone="danger" spaced>{error}</InlineAlert>}
+          <div
+            style={{
+              maxHeight: 288,
+              overflow: "auto",
+              borderRadius: 3,
+              border: "1px solid var(--border)",
+              background: "var(--surface-2)",
+              padding: 8,
+              fontSize: 11,
+              color: "var(--ink-3)",
+            }}
+          >
             {events.length ? (
               events.map((event, index) => (
-                <div key={`${event.sequence ?? index}-${event.type}`} className="border-b border-[var(--color-border)] py-1.5 last:border-b-0">
+                <div
+                  key={`${event.sequence ?? index}-${event.type}`}
+                  style={{ borderBottom: "1px solid var(--border)", padding: "6px 0" }}
+                >
                   {formatStreamEvent(event)}
                 </div>
               ))
@@ -1337,37 +1925,44 @@ function RunLogView({
               <div>{error || "ログはまだありません。"}</div>
             )}
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </Panel>
 
-      <Card>
-        <CardBody className="space-y-2">
-          <div className="text-xs font-semibold text-[var(--color-fg)]">エージェント出力ログ</div>
+      <Panel title="エージェント出力ログ" padded={false}>
+        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {turns.length ? (
             turns.map((turn, index) => (
-              <div key={`${turn.agent_id}-${index}`} className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-                <div className="mb-2 flex items-center justify-between gap-2 text-xs">
-                  <span className="font-semibold text-[var(--color-fg)]">{turn.agent_name}</span>
-                  <span className={clsx("rounded-full border px-2 py-0.5 text-[10px]", turn.error ? "border-red-500/40 text-red-200" : "border-[var(--color-border)] text-[var(--color-fg-muted)]")}>
-                    {turn.error ? "エラー" : "完了"}
-                  </span>
+              <div key={`${turn.agent_id}-${index}`} style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}>
+                <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
+                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>{turn.agent_name}</span>
+                  <Pill tone={turn.error ? "danger" : "neutral"}>{turn.error ? "エラー" : "完了"}</Pill>
                 </div>
-                <pre className={clsx("max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-relaxed", turn.error ? "text-red-200" : "text-[var(--color-fg-muted)]")}>
+                <pre
+                  style={{
+                    maxHeight: 320,
+                    overflow: "auto",
+                    whiteSpace: "pre-wrap",
+                    fontSize: 11,
+                    lineHeight: 1.6,
+                    color: turn.error ? "var(--danger)" : "var(--ink-3)",
+                    margin: 0,
+                  }}
+                >
                   {turn.error || turn.output || "出力はありません。"}
                 </pre>
               </div>
             ))
           ) : (
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-xs text-[var(--color-fg-muted)]">
+            <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, fontSize: 11, color: "var(--ink-3)" }}>
               エージェント出力はまだありません。
             </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </Panel>
 
-      <details className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-xs">
-        <summary className="cursor-pointer font-semibold text-[var(--color-fg)]">生JSON</summary>
-        <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[var(--color-fg-muted)]">
+      <details style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, fontSize: 11 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--ink)" }}>生JSON</summary>
+        <pre className="mono" style={{ marginTop: 8, maxHeight: 384, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 10, color: "var(--ink-3)" }}>
           {events.length ? JSON.stringify(events, null, 2) : "[]"}
         </pre>
       </details>
@@ -1400,67 +1995,82 @@ function CodingCEOChat({
 }) {
   if (!agent) {
     return (
-      <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-xs text-[var(--color-fg-muted)]">
+      <div style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12, fontSize: 11, color: "var(--ink-3)" }}>
         チャットできるエージェントがありません。実行チームに CEO か有効なエージェントを追加してください。
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-3">
-      <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-        <div className="flex items-start gap-2">
-          <MessageSquareMore className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-accent)]" />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">{agent.name}</div>
-            <div className="mt-1 text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">
+    <div style={{ display: "flex", minHeight: "100%", flexDirection: "column", gap: 12 }}>
+      <div style={{ borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 12 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <MessageSquareMore style={{ width: 16, height: 16, marginTop: 2, flexShrink: 0, color: "var(--accent-deep)" }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {agent.name}
+            </div>
+            <div className="mono" style={{ marginTop: 4, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
               {ROLE_LABEL[agent.org_role]} · {PROVIDER_LABEL[agent.provider]}
             </div>
-            <div className="mt-2 line-clamp-3 text-xs leading-relaxed text-[var(--color-fg-muted)]">
+            <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6, color: "var(--ink-2)" }}>
               {agent.persona || "この依頼の判断・方針相談を担当します。"}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="min-h-[260px] flex-1 space-y-3 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
+      <div
+        style={{
+          minHeight: 260,
+          flex: 1,
+          overflowY: "auto",
+          borderRadius: 4,
+          border: "1px solid var(--border)",
+          background: "var(--surface-2)",
+          padding: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
         {!session?.messages.length && (
-          <div className="grid h-full place-items-center text-center text-xs leading-relaxed text-[var(--color-fg-subtle)]">
+          <div style={{ display: "grid", placeItems: "center", height: "100%", textAlign: "center", fontSize: 11, lineHeight: 1.6, color: "var(--ink-3)" }}>
             CEOに方針確認、追加機能の切り方、エラー原因、次に何をすべきかを相談できます。
           </div>
         )}
         {session?.messages.map((item) => (
           <div
             key={item.id}
-            className={clsx(
-              "rounded-md border p-2",
-              item.role === "user"
-                ? "border-[var(--color-accent)]/50 bg-[var(--color-accent)]/10"
-                : "border-[var(--color-border)] bg-[var(--color-surface)]",
-            )}
+            style={{
+              borderRadius: 3,
+              border: item.role === "user" ? "1px solid var(--accent)" : "1px solid var(--border)",
+              background: item.role === "user" ? "var(--accent-soft)" : "var(--surface)",
+              padding: 8,
+            }}
           >
-            <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-[var(--color-fg-subtle)]">
+            <div className="mono" style={{ marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 9, color: "var(--ink-4)" }}>
               <span>{item.role === "user" ? "あなた" : item.agent_name ?? agent.name}</span>
               <span>{new Date(item.created_at).toLocaleString("ja-JP")}</span>
             </div>
-            <pre className="max-h-72 overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-[var(--color-fg)]">
+            <pre style={{ maxHeight: 288, overflow: "auto", whiteSpace: "pre-wrap", fontFamily: "var(--strand-font-sans)", fontSize: 11, lineHeight: 1.6, color: "var(--ink)", margin: 0 }}>
               {item.content}
             </pre>
             {item.attachments && item.attachments.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1 border-t border-[var(--color-border)] pt-2">
+              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
                 {item.attachments.map((attachment, index) => (
                   <span
                     key={`${item.id}-${attachment.title}-${index}`}
-                    className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] text-[var(--color-fg-muted)]"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4, borderRadius: 2, border: "1px solid var(--border)", padding: "2px 6px", fontSize: 9, color: "var(--ink-3)" }}
                   >
-                    <ImageIcon className="h-3 w-3" />
+                    <ImageIcon style={{ width: 12, height: 12 }} />
                     {attachment.title}
                   </span>
                 ))}
               </div>
             )}
             {item.error && (
-              <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+              <div style={{ marginTop: 8, borderRadius: 3, border: "1px solid var(--warn)", background: "var(--warn-bg)", padding: 8, fontSize: 10, color: "var(--warn)" }}>
                 {item.error}
               </div>
             )}
@@ -1468,10 +2078,9 @@ function CodingCEOChat({
         ))}
       </div>
 
-      <div className="space-y-2">
-        <Textarea
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <textarea
           rows={4}
-          className="font-sans"
           value={message}
           placeholder="CEOに相談したいことを書いてください。例: この追加機能はどう切るべき？ / 先に直すべき問題は？"
           onChange={(event) => onMessageChange(event.target.value)}
@@ -1487,17 +2096,31 @@ function CodingCEOChat({
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key === "Enter") onSend();
           }}
+          style={textareaStyle()}
         />
-        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-fg-muted)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-fg)]">
-              <ImageIcon className="h-4 w-4" />
+        <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <label
+              style={{
+                display: "inline-flex",
+                cursor: "pointer",
+                alignItems: "center",
+                gap: 8,
+                borderRadius: 3,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                padding: "5px 8px",
+                fontSize: 11,
+                color: "var(--ink-2)",
+              }}
+            >
+              <ImageIcon style={{ width: 14, height: 14 }} />
               画像を添付
               <input
                 type="file"
                 accept="image/*"
                 multiple
-                className="hidden"
+                style={{ display: "none" }}
                 onChange={(event) => {
                   const files = Array.from(event.target.files ?? []);
                   event.target.value = "";
@@ -1505,45 +2128,45 @@ function CodingCEOChat({
                 }}
               />
             </label>
-            <div className="text-[11px] text-[var(--color-fg-subtle)]">貼り付けでも追加できます。</div>
+            <div style={{ fontSize: 10, color: "var(--ink-4)" }}>貼り付けでも追加できます。</div>
           </div>
           {imageAttachments.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
               {imageAttachments.map((attachment, index) => (
                 <div
                   key={`${attachment.title}-${index}`}
-                  className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs"
+                  style={{ display: "flex", alignItems: "center", gap: 8, borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface)", padding: "5px 8px", fontSize: 11 }}
                 >
                   {attachment.content.startsWith("data:image/") ? (
                     <img
                       src={attachment.content}
                       alt={attachment.title}
-                      className="h-8 w-8 rounded border border-[var(--color-border)] object-cover"
+                      style={{ width: 32, height: 32, borderRadius: 3, border: "1px solid var(--border)", objectFit: "cover" }}
                     />
                   ) : (
-                    <ImageIcon className="h-4 w-4 text-[var(--color-fg-muted)]" />
+                    <ImageIcon style={{ width: 14, height: 14, color: "var(--ink-3)" }} />
                   )}
-                  <span className="max-w-36 truncate">{attachment.title}</span>
+                  <span style={{ maxWidth: 144, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink)" }}>
+                    {attachment.title}
+                  </span>
                   <button
                     type="button"
-                    onClick={() =>
-                      onImageAttachmentsChange((items) => items.filter((_, i) => i !== index))
-                    }
-                    className="rounded p-0.5 text-[var(--color-fg-muted)] hover:bg-red-500/20 hover:text-red-300"
+                    onClick={() => onImageAttachmentsChange((items) => items.filter((_, i) => i !== index))}
+                    style={{ borderRadius: 3, padding: 2, color: "var(--ink-3)" }}
                   >
-                    <X className="h-3 w-3" />
+                    <X style={{ width: 12, height: 12 }} />
                   </button>
                 </div>
               ))}
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 text-xs text-[var(--color-fg-muted)]">{status}</div>
-          <Button disabled={!message.trim()} loading={sending} onClick={onSend}>
-            {!sending && <Send className="h-4 w-4" />}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ minWidth: 0, fontSize: 11, color: "var(--ink-3)" }}>{status}</div>
+          <Btn variant="solid" tone="accent" disabled={!message.trim() || sending} onClick={onSend}>
+            {sending ? <Loader2 style={{ width: 14, height: 14 }} className="spin" /> : <Send style={{ width: 14, height: 14 }} />}
             送信
-          </Button>
+          </Btn>
         </div>
       </div>
     </div>
@@ -1552,9 +2175,9 @@ function CodingCEOChat({
 
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1">
-      <div className="text-[10px] uppercase tracking-widest text-[var(--color-fg-subtle)]">{label}</div>
-      <div className="mt-1 text-[var(--color-fg)]">{value}</div>
+    <div style={{ borderRadius: 3, border: "1px solid var(--border)", background: "var(--surface-2)", padding: "6px 8px" }}>
+      <div className="mono" style={{ fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>{label}</div>
+      <div style={{ marginTop: 4, fontSize: 11, color: "var(--ink)" }}>{value}</div>
     </div>
   );
 }
@@ -1567,26 +2190,26 @@ function Info({
 }: {
   label: string;
   value: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   mono?: boolean;
 }) {
   return (
-    <Card>
-      <CardBody className="space-y-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-fg)]">
-          {icon}
-          {label}
-        </div>
-        <pre
-          className={clsx(
-            "whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-fg-muted)]",
-            mono ? "font-mono" : "font-sans",
-          )}
-        >
-          {value}
-        </pre>
-      </CardBody>
-    </Card>
+    <Panel title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{icon}{label}</span>} padded={false}>
+      <pre
+        className={mono ? "mono" : undefined}
+        style={{
+          whiteSpace: "pre-wrap",
+          fontSize: 11,
+          lineHeight: 1.6,
+          color: "var(--ink-3)",
+          fontFamily: mono ? "var(--strand-font-mono)" : "var(--strand-font-sans)",
+          padding: 12,
+          margin: 0,
+        }}
+      >
+        {value}
+      </pre>
+    </Panel>
   );
 }
 
@@ -1597,14 +2220,8 @@ const STATUS_LABEL: Record<ManagedRequestStatus, string> = {
   paused: "停止/失敗",
 };
 
-const teamLabel = (template: Template) =>
-  `${template.locked || template.is_builtin ? "Built-in" : "Custom"} · ${template.name}`;
-
 const enabledAgentsCount = (agents: AgentConfig[]) =>
   agents.filter((agent) => agent.enabled !== false).length;
-
-const truncateText = (value: string, maxLength: number) =>
-  value.length > maxLength ? `${value.slice(0, maxLength)}\n...` : value;
 
 const codingChatSessionId = (requestId: string | undefined, agentId: string) => {
   const safeRequest = (requestId || "draft").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 32);
@@ -1717,32 +2334,20 @@ const buildCodingVersion = ({
 }): WorkspaceVersion => {
   const title = `実行 ${versionNo} · ${new Date(createdAt).toLocaleString("ja-JP")}`;
   return {
-    id: `code_ver_${Date.now().toString(36)}_${versionNo}`,
-    version_no: versionNo,
-    title,
-    created_at: createdAt,
-    request: clone(requestValue),
-    final_text: currentRun.finalText,
-    diff: currentRun.diff,
-    file_changes: currentRun.fileChanges,
-    error: currentRun.error,
-    agent_turns: currentRun.turns.length > 0 ? currentRun.turns : undefined,
-    stream_events: currentRun.events.length > 0 ? currentRun.events : undefined,
+    ...buildBaseVersion({
+      id: `code_ver_${Date.now().toString(36)}_${versionNo}`,
+      versionNo,
+      title,
+      createdAt,
+      request: clone(requestValue),
+      run: currentRun,
+    }),
     version_control: versionControl,
-    run_started_at: currentRun.startedAt ? new Date(currentRun.startedAt).toISOString() : undefined,
-    run_ended_at: currentRun.endedAt ? new Date(currentRun.endedAt).toISOString() : undefined,
   };
 };
 
 const isDuplicateCodingVersion = (latest: WorkspaceVersion | undefined, next: WorkspaceVersion) =>
-  Boolean(
-    latest &&
-      latest.run_started_at === next.run_started_at &&
-      latest.run_ended_at === next.run_ended_at &&
-      latest.final_text === next.final_text &&
-      latest.diff === next.diff &&
-      latest.file_changes === next.file_changes,
-  );
+  isDuplicateVersion(latest, next, true);
 
 const findActiveTurnEvent = (events: StreamEvent[]) => {
   for (const event of [...events].reverse()) {
