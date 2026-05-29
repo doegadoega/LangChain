@@ -44,6 +44,7 @@ from app.intake import (
 )
 from app.models import AgentConfig, KnowledgeContextItem, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
+from app.artifacts import Artifact
 from app.runs import AgentRun
 from app.providers import ProviderError, list_provider_models, resolve_provider
 from app.skills import SkillSource, SkillStore, SkillStoreError
@@ -1183,6 +1184,39 @@ def get_agent_run(
     if record is None:
         raise HTTPException(status_code=404, detail="Agent run not found")
     return AgentRun.model_validate(record)
+
+
+# -- Artifact store (read) --
+def _artifacts_by(field: str, value: str, store: FileStore) -> list[Artifact]:
+    records = [a for a in store.load_artifacts() if a.get(field) == value]
+    records.sort(key=lambda a: str(a.get("created_at", "")))
+    return [Artifact.model_validate(a) for a in records]
+
+
+@app.get("/api/runs/{run_id}/artifacts", response_model=list[Artifact])
+def list_run_artifacts(
+    run_id: str, store: FileStore = Depends(get_store)
+) -> list[Artifact]:
+    """Artifacts produced by a workflow run, in creation order."""
+    return _artifacts_by("workflow_run_id", _validate_record_id(run_id), store)
+
+
+@app.get("/api/tasks/{task_id}/artifacts", response_model=list[Artifact])
+def list_task_artifacts(
+    task_id: str, store: FileStore = Depends(get_store)
+) -> list[Artifact]:
+    """All artifacts for a task across its runs."""
+    return _artifacts_by("task_id", _validate_record_id(task_id), store)
+
+
+@app.get("/api/artifacts/{artifact_id}", response_model=Artifact)
+def get_artifact(
+    artifact_id: str, store: FileStore = Depends(get_store)
+) -> Artifact:
+    record = store.load_artifact(_validate_record_id(artifact_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return Artifact.model_validate(record)
 
 
 # -- Knowledge CRUD --
