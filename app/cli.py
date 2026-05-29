@@ -4,11 +4,14 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 from pydantic import ValidationError
 
+from app.intake import Task, TaskRequest, TaskRouter, TaskStatus
 from app.models import AgentConfig, CodeContext, OrchestrationMode, ProviderKind, RefineRequest, WorkflowMode
 from app.orchestrator import iter_refinement_events, run_refinement
+from app.store import FileStore
 
 
 def _read_request(config_path: Path) -> RefineRequest:
@@ -205,6 +208,59 @@ def _cmd_sample_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_task_request(args: argparse.Namespace) -> TaskRequest:
+    return TaskRequest(
+        description=args.description,
+        repository_path=getattr(args, "repo", None),
+        base_branch=getattr(args, "base_branch", None),
+        target_files=getattr(args, "target", None) or [],
+        workflow_id=getattr(args, "workflow", None),
+    )
+
+
+def _cmd_task(args: argparse.Namespace) -> int:
+    """Create and persist a task, attaching an inferred plan."""
+    try:
+        request = _build_task_request(args)
+    except ValidationError as exc:
+        print(f"[ERROR] invalid task: {exc}", file=sys.stderr)
+        return 2
+
+    task_id = f"task_{uuid4().hex[:12]}"
+    plan = TaskRouter().route(request, task_id=task_id)
+    task = Task(id=task_id, request=request, status=TaskStatus.PLANNED, plan=plan)
+    FileStore().save_task(task.model_dump())
+
+    print(f"task created: {task_id}")
+    print(json.dumps(plan.model_dump(), ensure_ascii=False, indent=2))
+    return 0
+
+
+def _cmd_plan(args: argparse.Namespace) -> int:
+    """Plan a stored task by id, or plan a free-form description statelessly."""
+    router = TaskRouter()
+    if args.task_id:
+        record = FileStore().load_task(args.task_id)
+        if record is None:
+            print(f"[ERROR] task not found: {args.task_id}", file=sys.stderr)
+            return 2
+        task = Task.model_validate(record)
+        plan = router.route(task.request, task_id=task.id)
+    elif args.description:
+        try:
+            request = _build_task_request(args)
+        except ValidationError as exc:
+            print(f"[ERROR] invalid task: {exc}", file=sys.stderr)
+            return 2
+        plan = router.route(request, task_id=f"plan_{uuid4().hex[:12]}")
+    else:
+        print("[ERROR] provide a task_id or --description", file=sys.stderr)
+        return 2
+
+    print(json.dumps(plan.model_dump(), ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="langchain-agent",
@@ -316,6 +372,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output path for sample config",
     )
     sample_parser.set_defaults(func=_cmd_sample_config)
+
+    task_parser = subparsers.add_parser(
+        "task", help="Submit a task; the system infers workflow/roles/artifacts"
+    )
+    task_parser.add_argument("description", help="What you want done, in plain language")
+    task_parser.add_argument("--repo", help="Repository path the task operates on")
+    task_parser.add_argument("--base-branch", dest="base_branch", help="Base git branch")
+    task_parser.add_argument(
+        "--target", action="append", help="Target file/path. Repeat for multiple."
+    )
+    task_parser.add_argument(
+        "--workflow", help="Force a specific workflow template id (skips inference)"
+    )
+    task_parser.set_defaults(func=_cmd_task)
+
+    plan_parser = subparsers.add_parser(
+        "plan", help="Show the inferred plan for a stored task or a description"
+    )
+    plan_parser.add_argument(
+        "task_id", nargs="?", help="Stored task id to (re)plan"
+    )
+    plan_parser.add_argument(
+        "--description", help="Plan a free-form description without saving a task"
+    )
+    plan_parser.add_argument("--repo", help="Repository path (with --description)")
+    plan_parser.add_argument("--base-branch", dest="base_branch", help="Base git branch")
+    plan_parser.add_argument("--target", action="append", help="Target file/path")
+    plan_parser.add_argument("--workflow", help="Force a specific workflow template id")
+    plan_parser.set_defaults(func=_cmd_plan)
     return parser
 
 

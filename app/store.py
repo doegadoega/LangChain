@@ -49,6 +49,10 @@ class FileStore:
     def _knowledge_dir(self) -> Path:
         return self._base / "knowledge"
 
+    @property
+    def _tasks_dir(self) -> Path:
+        return self._base / "tasks"
+
     def save_agent(self, data: dict[str, Any]) -> None:
         self._save(self._agents_dir, data["id"], data)
 
@@ -123,6 +127,18 @@ class FileStore:
 
     def delete_knowledge(self, knowledge_id: str) -> None:
         self._delete(self._knowledge_dir, knowledge_id)
+
+    def save_task(self, data: dict[str, Any]) -> None:
+        self._save(self._tasks_dir, data["id"], data)
+
+    def load_tasks(self) -> list[dict[str, Any]]:
+        return self._load_all(self._tasks_dir)
+
+    def load_task(self, task_id: str) -> dict[str, Any] | None:
+        return self._load_one(self._tasks_dir, task_id)
+
+    def delete_task(self, task_id: str) -> None:
+        self._delete(self._tasks_dir, task_id)
 
     def _save(self, directory: Path, record_id: str, data: dict[str, Any]) -> None:
         directory.mkdir(parents=True, exist_ok=True)

@@ -10,6 +10,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +34,14 @@ from app.logging_setup import (
 )
 
 configure_logging()
+from app.intake import (
+    Task,
+    TaskPlan,
+    TaskRequest,
+    TaskRouter,
+    TaskStatus,
+    list_workflow_definitions,
+)
 from app.models import AgentConfig, KnowledgeContextItem, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
 from app.providers import ProviderError, list_provider_models, resolve_provider
@@ -67,6 +76,14 @@ WORKTREE_BRANCH_PREFIX = "ai"
 
 def get_store() -> FileStore:
     return FileStore()
+
+
+def get_task_router() -> TaskRouter:
+    return TaskRouter()
+
+
+def _new_task_id() -> str:
+    return f"task_{uuid4().hex[:12]}"
 
 
 def _with_id(payload: JSONDict, record_id: str) -> JSONDict:
@@ -1023,6 +1040,109 @@ def update_request(request_id: str, request_record: JSONDict, store: FileStore =
 @app.delete("/api/requests/{request_id}", status_code=204)
 def delete_request(request_id: str, store: FileStore = Depends(get_store)):
     store.delete_request(_validate_record_id(request_id))
+
+
+# -- Task intake & planning --
+@app.get("/api/workflows/definitions")
+def get_workflow_definitions() -> JSONDict:
+    """List the built-in workflow templates the planner can select."""
+    return {"workflows": [wf.model_dump() for wf in list_workflow_definitions()]}
+
+
+@app.post("/api/tasks/plan", response_model=TaskPlan)
+def plan_task(
+    request: TaskRequest,
+    router: TaskRouter = Depends(get_task_router),
+) -> TaskPlan:
+    """Stateless planning: classify a request and return a TaskPlan without saving."""
+    return router.route(request, task_id=_new_task_id())
+
+
+@app.get("/api/tasks")
+def list_tasks(store: FileStore = Depends(get_store)) -> list[JSONDict]:
+    tasks = store.load_tasks()
+    return sorted(tasks, key=lambda t: str(t.get("updated_at", "")), reverse=True)
+
+
+@app.post("/api/tasks", status_code=201, response_model=Task)
+def create_task(
+    request: TaskRequest,
+    store: FileStore = Depends(get_store),
+    router: TaskRouter = Depends(get_task_router),
+) -> Task:
+    """Create a task and immediately attach an inferred plan (status: planned)."""
+    task_id = _new_task_id()
+    plan = router.route(request, task_id=task_id)
+    task = Task(id=task_id, request=request, status=TaskStatus.PLANNED, plan=plan)
+    store.save_task(task.model_dump())
+    return task
+
+
+@app.get("/api/tasks/{task_id}", response_model=Task)
+def get_task(task_id: str, store: FileStore = Depends(get_store)) -> Task:
+    record = store.load_task(_validate_record_id(task_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return Task.model_validate(record)
+
+
+@app.put("/api/tasks/{task_id}", response_model=Task)
+def update_task(
+    task_id: str,
+    request: TaskRequest,
+    store: FileStore = Depends(get_store),
+    router: TaskRouter = Depends(get_task_router),
+) -> Task:
+    """Replace a task's request and re-plan it (status: planned)."""
+    from datetime import datetime, timezone
+
+    safe_id = _validate_record_id(task_id)
+    record = store.load_task(safe_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    existing = Task.model_validate(record)
+    plan = router.route(request, task_id=safe_id)
+    updated = existing.model_copy(
+        update={
+            "request": request,
+            "plan": plan,
+            "status": TaskStatus.PLANNED,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    store.save_task(updated.model_dump())
+    return updated
+
+
+@app.post("/api/tasks/{task_id}/plan", response_model=Task)
+def replan_task(
+    task_id: str,
+    store: FileStore = Depends(get_store),
+    router: TaskRouter = Depends(get_task_router),
+) -> Task:
+    """Re-run planning for a stored task (e.g. after editing its request)."""
+    safe_id = _validate_record_id(task_id)
+    record = store.load_task(safe_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    from datetime import datetime, timezone
+
+    task = Task.model_validate(record)
+    plan = router.route(task.request, task_id=safe_id)
+    updated = task.model_copy(
+        update={
+            "plan": plan,
+            "status": TaskStatus.PLANNED,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    store.save_task(updated.model_dump())
+    return updated
+
+
+@app.delete("/api/tasks/{task_id}", status_code=204)
+def delete_task(task_id: str, store: FileStore = Depends(get_store)) -> None:
+    store.delete_task(_validate_record_id(task_id))
 
 
 # -- Knowledge CRUD --
