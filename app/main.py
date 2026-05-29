@@ -44,6 +44,7 @@ from app.intake import (
 )
 from app.models import AgentConfig, KnowledgeContextItem, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
+from app.runs import AgentRun
 from app.providers import ProviderError, list_provider_models, resolve_provider
 from app.skills import SkillSource, SkillStore, SkillStoreError
 from app.store import FileStore
@@ -1143,6 +1144,45 @@ def replan_task(
 @app.delete("/api/tasks/{task_id}", status_code=204)
 def delete_task(task_id: str, store: FileStore = Depends(get_store)) -> None:
     store.delete_task(_validate_record_id(task_id))
+
+
+# -- AgentRun ledger (read) --
+def _sorted_runs(records: list[JSONDict], *, newest_first: bool) -> list[JSONDict]:
+    return sorted(
+        records,
+        key=lambda r: str(r.get("started_at", "")),
+        reverse=newest_first,
+    )
+
+
+@app.get("/api/runs/{run_id}/agent-runs", response_model=list[AgentRun])
+def list_run_agent_runs(
+    run_id: str, store: FileStore = Depends(get_store)
+) -> list[AgentRun]:
+    """Agent runs that belong to a workflow run, in execution order."""
+    safe_id = _validate_record_id(run_id)
+    runs = [r for r in store.load_agent_runs() if r.get("workflow_run_id") == safe_id]
+    return [AgentRun.model_validate(r) for r in _sorted_runs(runs, newest_first=False)]
+
+
+@app.get("/api/agents/{agent_id}/runs", response_model=list[AgentRun])
+def list_agent_runs_for_agent(
+    agent_id: str, store: FileStore = Depends(get_store)
+) -> list[AgentRun]:
+    """All ledger entries for one agent, newest first."""
+    safe_id = _validate_record_id(agent_id)
+    runs = [r for r in store.load_agent_runs() if r.get("agent_id") == safe_id]
+    return [AgentRun.model_validate(r) for r in _sorted_runs(runs, newest_first=True)]
+
+
+@app.get("/api/agent-runs/{agent_run_id}", response_model=AgentRun)
+def get_agent_run(
+    agent_run_id: str, store: FileStore = Depends(get_store)
+) -> AgentRun:
+    record = store.load_agent_run(_validate_record_id(agent_run_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    return AgentRun.model_validate(record)
 
 
 # -- Knowledge CRUD --

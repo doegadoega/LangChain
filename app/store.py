@@ -53,6 +53,10 @@ class FileStore:
     def _tasks_dir(self) -> Path:
         return self._base / "tasks"
 
+    @property
+    def _agent_runs_dir(self) -> Path:
+        return self._base / "agent_runs"
+
     def save_agent(self, data: dict[str, Any]) -> None:
         self._save(self._agents_dir, data["id"], data)
 
@@ -139,6 +143,18 @@ class FileStore:
 
     def delete_task(self, task_id: str) -> None:
         self._delete(self._tasks_dir, task_id)
+
+    def save_agent_run(self, data: dict[str, Any]) -> None:
+        self._save(self._agent_runs_dir, data["id"], data)
+
+    def load_agent_runs(self) -> list[dict[str, Any]]:
+        return self._load_all(self._agent_runs_dir)
+
+    def load_agent_run(self, agent_run_id: str) -> dict[str, Any] | None:
+        return self._load_one(self._agent_runs_dir, agent_run_id)
+
+    def delete_agent_run(self, agent_run_id: str) -> None:
+        self._delete(self._agent_runs_dir, agent_run_id)
 
     def _save(self, directory: Path, record_id: str, data: dict[str, Any]) -> None:
         directory.mkdir(parents=True, exist_ok=True)
