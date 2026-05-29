@@ -61,6 +61,10 @@ class FileStore:
     def _artifacts_dir(self) -> Path:
         return self._base / "artifacts"
 
+    @property
+    def _workflow_runs_dir(self) -> Path:
+        return self._base / "workflow_runs"
+
     def save_agent(self, data: dict[str, Any]) -> None:
         self._save(self._agents_dir, data["id"], data)
 
@@ -171,6 +175,18 @@ class FileStore:
 
     def delete_artifact(self, artifact_id: str) -> None:
         self._delete(self._artifacts_dir, artifact_id)
+
+    def save_workflow_run(self, data: dict[str, Any]) -> None:
+        self._save(self._workflow_runs_dir, data["id"], data)
+
+    def load_workflow_runs(self) -> list[dict[str, Any]]:
+        return self._load_all(self._workflow_runs_dir)
+
+    def load_workflow_run(self, run_id: str) -> dict[str, Any] | None:
+        return self._load_one(self._workflow_runs_dir, run_id)
+
+    def delete_workflow_run(self, run_id: str) -> None:
+        self._delete(self._workflow_runs_dir, run_id)
 
     def _save(self, directory: Path, record_id: str, data: dict[str, Any]) -> None:
         directory.mkdir(parents=True, exist_ok=True)

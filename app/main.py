@@ -45,6 +45,7 @@ from app.intake import (
 from app.models import AgentConfig, KnowledgeContextItem, ProviderKind, RefineRequest, RefineResponse
 from app.orchestrator import iter_refinement_events, run_refinement
 from app.artifacts import Artifact
+from app.orchestration import RunOptions, WorkflowRun, WorkflowRunner
 from app.runs import AgentRun
 from app.providers import ProviderError, list_provider_models, resolve_provider
 from app.skills import SkillSource, SkillStore, SkillStoreError
@@ -1217,6 +1218,49 @@ def get_artifact(
     if record is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return Artifact.model_validate(record)
+
+
+# -- Workflow run (execute) --
+@app.post("/api/tasks/{task_id}/run", response_model=WorkflowRun)
+def run_task(
+    task_id: str,
+    options: RunOptions | None = None,
+    store: FileStore = Depends(get_store),
+    router: TaskRouter = Depends(get_task_router),
+) -> WorkflowRun:
+    """Execute a task's workflow end to end, recording agent runs + artifacts."""
+    safe_id = _validate_record_id(task_id)
+    record = store.load_task(safe_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task = Task.model_validate(record)
+    if task.plan is None:
+        task = task.model_copy(update={"plan": router.route(task.request, task_id=safe_id)})
+    try:
+        result = WorkflowRunner(store).run(task, options or RunOptions())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    saved = store.load_task(safe_id)
+    if saved is not None:
+        updated = Task.model_validate(saved).model_copy(
+            update={"status": TaskStatus.COMPLETED, "plan": task.plan}
+        )
+        store.save_task(updated.model_dump())
+    return result
+
+
+@app.get("/api/runs")
+def list_workflow_runs(store: FileStore = Depends(get_store)) -> list[JSONDict]:
+    runs = store.load_workflow_runs()
+    return sorted(runs, key=lambda r: str(r.get("created_at", "")), reverse=True)
+
+
+@app.get("/api/runs/{run_id}", response_model=WorkflowRun)
+def get_workflow_run(run_id: str, store: FileStore = Depends(get_store)) -> WorkflowRun:
+    record = store.load_workflow_run(_validate_record_id(run_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return WorkflowRun.model_validate(record)
 
 
 # -- Knowledge CRUD --

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from app.intake import Task, TaskRequest, TaskRouter, TaskStatus
 from app.models import AgentConfig, CodeContext, OrchestrationMode, ProviderKind, RefineRequest, WorkflowMode
+from app.orchestration import RunOptions, WorkflowRunner
 from app.orchestrator import iter_refinement_events, run_refinement
 from app.store import FileStore
 
@@ -261,6 +262,34 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_run_task(args: argparse.Namespace) -> int:
+    """Execute a stored task's workflow end to end (calls real providers)."""
+    store = FileStore()
+    record = store.load_task(args.task_id)
+    if record is None:
+        print(f"[ERROR] task not found: {args.task_id}", file=sys.stderr)
+        return 2
+    task = Task.model_validate(record)
+    if task.plan is None:
+        task = task.model_copy(update={"plan": TaskRouter().route(task.request, task_id=task.id)})
+
+    options = RunOptions(
+        provider=args.provider,
+        model=args.model,
+        rounds=args.rounds,
+        test_command=args.test_command,
+    )
+    run = WorkflowRunner(store).run(task, options)
+
+    print(f"run {run.id}: {run.status.value} ({run.workflow_id})")
+    for phase in run.phases:
+        print(
+            f"  - {phase.phase_id}: {phase.status.value} "
+            f"(agents={len(phase.agent_run_ids)}, artifacts={len(phase.artifact_ids)})"
+        )
+    return 0 if run.status.value == "completed" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="langchain-agent",
@@ -401,6 +430,22 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument("--target", action="append", help="Target file/path")
     plan_parser.add_argument("--workflow", help="Force a specific workflow template id")
     plan_parser.set_defaults(func=_cmd_plan)
+
+    run_task_parser = subparsers.add_parser(
+        "run-task", help="Execute a stored task's workflow (plan -> phases -> artifacts)"
+    )
+    run_task_parser.add_argument("task_id", help="Stored task id to run")
+    run_task_parser.add_argument(
+        "--provider",
+        default=None,
+        help="Provider for synthesized agents (default: env AGENT_OS_DEFAULT_PROVIDER or codex_cli)",
+    )
+    run_task_parser.add_argument("--model", help="Optional provider model")
+    run_task_parser.add_argument("--rounds", type=int, default=1)
+    run_task_parser.add_argument(
+        "--test-command", dest="test_command", help="Command run by verification phases"
+    )
+    run_task_parser.set_defaults(func=_cmd_run_task)
     return parser
 
 
