@@ -7,6 +7,9 @@ and predictable; it can later be swapped for an LLM classifier behind the same
 
 from __future__ import annotations
 
+import re
+import unicodedata
+
 from app.intake.models import ApprovalPolicy, TaskPlan, TaskRequest, TaskType
 from app.intake.workflows import (
     BUILTIN_WORKFLOWS,
@@ -14,6 +17,41 @@ from app.intake.workflows import (
     WorkflowDefinition,
     get_workflow,
 )
+
+
+_ASCII_HEAD = re.compile(r"[a-z0-9]")
+
+
+def _matches(keyword: str, haystack: str) -> bool:
+    """Membership test that respects word boundaries for ASCII keywords.
+
+    Substring `in` matching mis-classified ``prefix``/``fixture`` as bug_fix
+    (because of the ``fix`` keyword), ``preview`` as code_review (``review``),
+    ``terror`` as bug_fix (``error``), and ``print`` as a diff-review skill
+    (``pr``). This helper closes those holes while keeping English inflections
+    like ``fixed``/``errors``/``reviewing`` working.
+
+    Rules:
+      - Non-ASCII keywords (Japanese): substring membership, unchanged.
+      - ASCII keywords with len <= 2 (``pr``/``ci``/``qa``): strict both-sided
+        word boundary — match only when surrounded by non-alphanumerics.
+      - ASCII keywords with len >= 3: front-boundary + ``[a-z0-9]*`` suffix —
+        ``fix`` matches ``fix``/``fixed``/``fixing`` but not ``prefix``.
+    Residual: ``fixture``/``address``/``different`` still match their
+    prefix keyword. Mitigated by classifier ordering and accepted as a
+    documented trade-off (see review.md from run wr_828e340aaaac).
+    """
+    kw = keyword.strip().lower()
+    if not kw:
+        return False
+    if not _ASCII_HEAD.match(kw):
+        return kw in haystack
+    escaped = re.escape(kw)
+    if len(kw) <= 2:
+        pattern = rf"(?<![a-z0-9]){escaped}(?![a-z0-9])"
+    else:
+        pattern = rf"(?<![a-z0-9]){escaped}[a-z0-9]*"
+    return re.search(pattern, haystack) is not None
 
 # Ordered classification rules — first matching task type wins, so more specific
 # intents (bug fix, review) are checked before the broad feature-development case.
@@ -54,7 +92,7 @@ _CLASSIFICATION_RULES: list[tuple[TaskType, tuple[str, ...]]] = [
     (
         TaskType.FEATURE_DEVELOPMENT,
         ("実装", "追加", "作って", "作成", "画面", "機能", "feature", "implement",
-         "add ", "build", "create", "screen"),
+         "add", "build", "create", "screen"),
     ),
 ]
 
@@ -124,7 +162,7 @@ class TaskRouter:
     def classify(self, request: TaskRequest) -> TaskType:
         haystack = self._haystack(request)
         for task_type, keywords in _CLASSIFICATION_RULES:
-            if any(keyword in haystack for keyword in keywords):
+            if any(_matches(keyword, haystack) for keyword in keywords):
                 return task_type
         # Nothing matched: a request with a repo is most likely feature work,
         # otherwise treat it as research.
@@ -143,7 +181,7 @@ class TaskRouter:
         haystack = self._haystack(request)
         skills: list[str] = []
         for keyword, skill in _SKILL_HINTS.items():
-            if keyword in haystack and skill not in skills:
+            if _matches(keyword, haystack) and skill not in skills:
                 skills.append(skill)
         return skills
 
@@ -202,4 +240,6 @@ class TaskRouter:
     @staticmethod
     def _haystack(request: TaskRequest) -> str:
         parts = [request.title or "", request.description, *request.constraints]
-        return "\n".join(parts).lower()
+        # NFKC fold full-width ASCII (Ｐｙｔｈｏｎ -> python) and other
+        # compatibility variants before lowercasing for keyword matching.
+        return unicodedata.normalize("NFKC", "\n".join(parts)).lower()

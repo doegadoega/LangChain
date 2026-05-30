@@ -189,6 +189,55 @@ def test_every_mapped_workflow_exists():
         assert workflow_id in BUILTIN_WORKFLOWS
 
 
+# ---- bug fixes from claude's review (substring-match false positives) ----
+
+
+@pytest.mark.parametrize(
+    "description, not_type",
+    [
+        # `fix` no longer matches `prefix`
+        ("prefix を整理したい", TaskType.BUG_FIX),
+        # `review` no longer matches `preview`
+        ("preview the new screen", TaskType.CODE_REVIEW),
+        # `error` no longer matches `terror`
+        ("terror movie analysis", TaskType.BUG_FIX),
+        # `test` no longer matches `latest`
+        ("the latest version を試したい", TaskType.QA_VERIFICATION),
+    ],
+)
+def test_word_boundary_excludes_substring_false_positives(router, description, not_type):
+    assert router.classify(TaskRequest(description=description)) != not_type
+
+
+@pytest.mark.parametrize(
+    "description, expected",
+    [
+        # English inflections must still classify correctly
+        ("the bug is fixed but errors remain", TaskType.BUG_FIX),
+        ("reviewing the change", TaskType.CODE_REVIEW),
+        ("crashes on launch", TaskType.BUG_FIX),
+        ("implementing a new feature", TaskType.FEATURE_DEVELOPMENT),
+    ],
+)
+def test_inflections_still_match(router, description, expected):
+    assert router.classify(TaskRequest(description=description)) == expected
+
+
+def test_short_ascii_keywords_use_strict_boundary(router):
+    # `pr` (the git_diff_review hint) must not bleed into `print`
+    skills = router.infer_skills(TaskRequest(description="print queue を実装したい"))
+    assert "git_diff_review" not in skills
+    # but a standalone "PR" still triggers it
+    skills_pr = router.infer_skills(TaskRequest(description="このPRをレビューして"))
+    assert "git_diff_review" in skills_pr
+
+
+def test_full_width_text_is_nfkc_normalized(router):
+    # Ｐｙｔｈｏｎ (full-width) must be canonicalised before keyword matching
+    skills = router.infer_skills(TaskRequest(description="Ｐｙｔｈｏｎでスクリプトを書きたい"))
+    assert "python_dev" in skills
+
+
 def test_get_workflow_roles_and_artifacts_dedup():
     workflow = get_workflow("feature_development_default")
     assert workflow is not None
